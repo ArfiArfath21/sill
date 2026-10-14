@@ -1721,6 +1721,161 @@ sound, beyond §12's bullets:
   first kind 16 (`soundAcrossMove`): the settings ledger resets at every hand-over (from AWDL, to
   the cable or Wi-Fi, and #39's move home). In the iPhone Duo's book pose the right group is sized
   for Menus and four more buttons (`BarMetrics.clearing`), so Sound shows there only while the Mac's
-  menus do not; otherwise the Settings panel's switch is the way to it.
+  menus do not; otherwise the Settings panel's switch is the way to it. (Since the review, 400ffb0:
+  Menus is counted whether or not it shows, so in the book pose Sound is the panel's switch alone.)
 - The sound harness (`Scripts/audio`) compiles the host files `Door` brought (Scripts/pacing's list)
   and serves as #37's `serve(_:route:hello:)`, the device's hello read in the receive loop.
+
+## Results: the device (2026-10-13)
+
+Steps 6 and 7 of §12 were written on 2026-09-27 and stopped there (9288aa6, WIP: "the review and
+finalize steps never ran"); main at 985a733 merged in on 2026-10-13 (8ff5cfc), then the move home's
+bounds and the hand-over's button (482b70c). This is their review, the fixes and the gates:
+- 6878c11: iOS: the playout model.
+- aefe477: iOS: the Mac's sound.
+- 5f7b1ac: iOS: the Sound button and the panel's Send Audio row.
+- 9288aa6: the sound harness's device runs the playout model on real arrivals.
+
+**The review** (2026-10-13; two auditors against this plan, every finding checked here before it
+was fixed or left), one commit per theme:
+- 012c5de: **the engine's configuration change** was never observed (§7.4): an output at another rate
+  (AirPods, Bluetooth's call profile, another app changing the session's rate) stops and
+  uninitializes the engine while `engine` stayed set and packets kept the idle stop away, so the
+  sound stayed silent until a mute and unmute. Now the change stops it on `sill.audio` (never in the
+  handler) and the next packet builds one in the output's new format. **Nothing decoded while
+  silent** (§7.5): only mute muted the model, so the background decoded every packet into the
+  model's waiting list, and back in front they were placed late and reported to the Mac as late;
+  now muted, in the background or with the session refused during a call, the model is muted. A
+  start's `.playback` reset threw away its discards (their samples kept until the next stop);
+  unmuting now tries a session refused during a call again (the person's tap is the resume signal);
+  the DEBUG click finder no longer kept every stopped engine alive (a closure on the engine held the
+  engine), and is set only in manual rendering.
+- fc90d44: **the fades** (§7.4): a mute turned the player to volume 0 and stopped the engine 20 ms
+  later; the background and a session's end stopped it at once, a cut. Measured in manual rendering
+  (no output device): the main mixer ramps a change of the player's volume linearly over 1,200 of its
+  frames, 25 ms at 48 kHz, whatever the render's size (240 or 1,024 frames), so the stop at 20 ms cut
+  the sound at a fifth of its level. The fade is that ramp, and the engine stops 50 ms after it
+  starts, on mute, in the background and at a session's end.
+- 2894057: **the console's jump line** (§7.8): "audio: jump -870 ms (off by over 40 ms)", "… (clock
+  step)", "… (ahead of the picture)", "… (route)": the model keeps why a jump was owed while it
+  counts, and the next placement by time measures it. The check holds the clock steps to it.
+- 63efd90: **a remote session by address** started with away's cover (rule 2); the Mac's AwayPolicy
+  counts it as home, and now so does the device.
+- 400ffb0: **Sound counts Menus whether or not it shows** (§7.6): the bars counted Menus only while
+  the Mac's menus showed, so where only one of them fits (an iPhone SE sideways, iPad windows under
+  532 pt upright) Sound showed until the menus' top level came and then went. In the book pose the
+  buttons past the fold hold Menus and four more: Sound is the panel's switch alone there.
+- 2c5e42e and d237e83: the checks and the harness: a move home as a hand-over (both connections
+  carrying the stream, away on the old one, home on the new); two whole thumbnails from 375 pt in
+  phone-portrait's grid; the random runs' summary line, which passed whenever any run happened;
+  audiocheck exits 3 when it never reached the host (it printed a summary of zeros and passed), and
+  run.sh's header names H12's known failure.
+- c2a1802 (found by S2): the DEBUG click finder kept the last engine's timeline, so no click was
+  found after a mute and unmute; it starts afresh with each engine.
+
+Left as they are: the tail's timer hands the tail over at `max(now, deadline)`, early if a fresh
+reading moved its deadline later (by microseconds, while the output's and the host's clocks agree;
+an early tail only costs a fade out and in); the DEBUG click finder copies TestTone's click (2 kHz,
+4 ms, −6 dBFS, Hann), which iOS cannot import from SillHostCore; `-SillSoundSwitchAt` calls
+`setSoundMuted` as the switch's binding does, without the Toggle; no pure case holds
+`MacMenuButton.fits`'s thresholds (666, 640 and 532 pt), which live in a SwiftUI file.
+
+**Where the build departs from the plan, and why:**
+1. **Rule 10 holds only a packet's last 5 ms** (its tail), not the whole packet: held whole, a packet
+   arriving at the window's largest excess raced its predecessor's deadline, and a link sitting there
+   faded every packet out and in. The rest of the packet goes to the player at once.
+2. **The output latency is max(the session's, the player's presentation latency)**, not their sum:
+   the player's includes the output's own (AVAudioNode.h), so the sum counted the device twice.
+3. **A packet is stamped when the playout takes it on `sill.audio`**, not on the network queue as
+   frames are (§7.2's Queue): what the packet in hand waits for is the next packet reaching the
+   playout, so the hop between the queues is part of what the cover must cover.
+4. **A fourth project file**, StreamClient+Audio.swift (AA04/FA04).
+5. **Harness arguments beyond §7.8:** `-SillSoundToggle`, `-SillSoundSwitchAt`, `-SillSettingsScroll
+   sound` and the settings case `soundoff`.
+6. **The fade before a stop is the mixer's 25 ms ramp**, not 5 ms: the player node offers nothing
+   finer without a render block of Sill's own (§13).
+7. **A configuration change stops the engine and the next packet builds one**, rather than
+   reconnecting the mixer in place: fewer lines, the same new format and latencies, one placement by
+   time.
+8. **Sound counts Menus always, and the book pose shows it in the panel alone** (400ffb0; the merge's
+   §7.6 note said "only while the Mac's menus do not").
+9. **The simulator never opens an output**, in every build: manual rendering is the simulator's
+   default, and `-SillSoundSink device` (DEBUG) opens it for a person at the simulator.
+10. **S2 and S3 ran against `SillHost --synthetic --audio`** on loopback and the software encoder
+    (SILL_TEST_LOOPBACK, SILL_TEST_SOFTWARE_ENCODER, SILL_TEST_NO_ROUTER), not the harness, whose
+    window list and kind 16 are zero-filled stand-ins a device cannot decode (no Sound button, and a
+    move's probe cancels on such a list). The software encoder answers §11's reason for the
+    harness-only rule: the hardware encoder is never touched.
+
+**Verified (2026-10-13 and 14)** (no sound captured or made, no device; every host on 127.0.0.1 and
+the software encoder, `no-device.sh` before and after each run):
+- **H1.** `swift build -c release` from `git archive` of HEAD, only the CaptureProbe warning; the
+  iOS app from a scratch copy with the iOS 27.1 SDK's names stubbed (this Mac has Xcode 27.0, and
+  DuoPostureReader alone needs 27.1): Debug and Release for the generic simulator and Debug for a
+  generic device, `CODE_SIGNING_ALLOWED=NO`, only the known `StreamClient` capture warning
+  (StreamClient.swift:3461). A build with Xcode 27.1 (CI's) is owed.
+- **H3** (the device's): `audio-playout` 214 checks (205 before the review), `phone-portrait` 169,
+  `tour` 51,842, `ledger`, `duo` 252,557; every mutant pattern still applies once (mutants not run
+  here).
+- **H5–H8** (`Scripts/audio/run.sh`, the merged tree): every gate but H12. At home 100.03 packets a
+  second, no seq gap, 60 of 60 clicks within 1 ms, the playout model on the arrivals nothing late
+  after 2 s and no jump after 3 s, the picture's net.sent, drops and frame age as without sound. (A
+  first run read 103.29 a second: the encoder's first creation took 1.9 s, and the tone's catch-up
+  sent two seconds at once; a run straight after, 100.03.) 1024-frame chunks 93.85 a second; pauses
+  and a source change on two devices (each epoch's format first, 6 and 5 segment starts, every click
+  within 1 ms, the model's cover after 3 s 20 ms); away through 8 and 4 Mbit/s with 1.5 MB keyframes
+  (frames dropped, the sound never, the packets' p95/max within the frames' + 20 ms); the dip (late
+  with the picture, back in the same second, 38 s); the relay at 2 Mbit/s and +150 ms (no eviction).
+- **H12, still failing** (open question 16): the harness host's CPU time over 30 s of steady state,
+  5.73 and 6.17 % of a core with sound against 1.83 and 1.73 without, +3.9 to +4.4 points, a point
+  over 2b114e1's +3.1; what the extra point is was not isolated.
+- **H6 with sound on the merge** (`Scripts/pacing/run.sh --sound`, the same build without and with
+  sound): real24 59.3/59.3 fps, kf25m32 60.0/60.1, restartkf 60.1/60.0, stillend 6.0/5.7 (17.6 drops
+  a minute both, 3 of 3 still spells ending with the last frame within 2.2 s; each second's slowest
+  pong 544 ms at the median against 80, as on 2b114e1), all passing; over8's "≥ its base run's fps"
+  read 4.8 against 4.9: the sound's 150 kbps is 1.9 % of the 8 Mbit/s link that case overfills, with
+  17.6 drops a minute and 4.6 sent a second both. The link's verdicts with sound: linkdead stalled
+  within 8 s, linkdown behind within 3 s and never stalled, linkrestart behind and never fine through
+  its restarts, linkstill and real24 never behind, over8 behind with a carried rate of 8.45 Mbit/s
+  (within 20 % of 8) and Low suggested. Without sound, main's StreamServer against the merged one
+  (`Scripts/pacing/run.sh`): every gate passed.
+- **H2** (main's SillHost at 985a733 against HEAD's, both from `git archive`): idle 35 s, picking the
+  Desktop, and a hello that lists aac-eld, with and without `--direct-wireless`: 4 of 6 identical,
+  masked and sorted; the other two only in when the host was stopped (one more 30 s idle line) and
+  one stats second with an `enc.mailboxDrop` (the software encoder beside the S1 photos). No Audio
+  line, no `aud.` key, no kind 29.
+- **H10** (the bare SillMenuBar's previews from one path, 985a733's and HEAD's): only menu.txt, the
+  Streaming and Permissions panes and the new `card-sound` and `card-remote-sound` differ.
+- **H11** (the device's): no `UIBackgroundModes`; no render block or source node in iOSClient;
+  `SillSoundSink` and `SillSoundVolume` read only under `#if DEBUG`.
+- **S2** (the normal app on a private iPad Pro 13" simulator, "Sill audio", iOS 27.0, with
+  `-SillSoundSink manual -SillSoundVolume 0`): the format and engine lines; "late 0" every second;
+  every click heard within 0.2 ms of where it was placed, and within 2 ms of its due time once rule
+  11 had closed a change of the cover (its fall from the 40 ms start, a rise as the app went to the
+  background), 2 ms a second as designed; the Sound button
+  (`-SillSoundToggle`): "engine off (muted)", then on again with one join and no jump (nothing played
+  to jump from), the clicks found again (after c2a1802); the panel's switch the same; in the
+  background (Settings brought to the front) "engine off (in the background)", and back in front a
+  new engine, one join and "late 0"; a second client's `--set=sendAudio=0`: "Audio stopped: Send
+  Audio is off." on the host, the Sound button gone from the portrait window bar (the strip one
+  thumbnail wider), and "idle, engine off" 10 s later.
+- **S3** (`-SillMoveTest 1`): the move to the network fenced and handed over (the host's second
+  "Client connected", the first leaving 0.5 s later), one duplicate counted and dropped, no join, no
+  jump, late 0.
+- **S1** (the mock on the same simulator; 1000x710, 710x1000, 710x500, the phone's arrangement at
+  440x956, 402x874, 375x667, 320x548 and 500x710, the compact halves at 500x710 and a 320x700 Slide
+  Over, the iPhone Duo's 951x669, 669x951, 466x678 and 678x466 and the book pose (951x669,
+  `-SillHinge half`); `-SillSound on` and `muted`, with VS Code's menus and with `-SillMacMenu
+  none`; the panel's `sound` case at its end and `soundnote` at the Send Audio row; at the default
+  and xxLarge text; 273 photos, and 90 of main's build at 985a733 from the same stub): every photo
+  without the sound pixel for pixel main's, 90 of 90 (two retaken: a first shot of main's own build
+  had caught a dim mid-launch, another the scroll indicator's flash, and the retakes of both builds
+  are identical). The Sound button shows in every bar that holds it, after Desktop, the strip one
+  button narrower, on the phone at row 2's end with Menus beside it; it never shows in the book pose,
+  the compact halves at 500 pt, the Slide Over or the Duo's cover sideways (594 pt beside its
+  camera's strip, under the compact bar's 640), whose bars are pixel for pixel main's, with Menus
+  where it showed. The Send Audio row after the closing footnote, with its note in orange; the Sound
+  switch first in the This iPad group, the Slide Over's only Sound control. The photos are in
+  /tmp/sill-audio-s1 (not kept).
+
+Not done here: the iOS build with Xcode 27.1, the mutants (a later stage), and Noah's P1–P16.

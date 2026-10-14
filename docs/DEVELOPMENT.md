@@ -313,8 +313,19 @@ pacing's backlog, which drops frames and never the sound. The log says what
 the sound is of ("Audio: capturing Safari's sound (every window of it).") and
 why it stops; the stats line gains `aud.in`, `aud.out`, `aud.sent`, `aud.drop`
 and `aud.gap` while it runs. `defaults delete me.saffer.sill.mac sendAudio`
-puts it back to off. docs/audio-plan.md has the design; the device's playback
-is the next step.
+puts it back to off. docs/audio-plan.md has the design.
+
+On the device, the bar's Sound button (where the bar holds it beside Menus; on
+a phone held upright at the end of the thumbnails' row) and the Settings panel's
+Sound switch mute it on that device alone, remembered across launches
+(`Sill.soundMuted`); the Mac keeps sending. It plays mixed with the device's own
+audio, on silent too, as a video app does, and never in the background.
+Headphones taken out mute it and say so. The device keeps it a little behind
+the picture, never ahead: the console's `audio:` lines (DEBUG) say how far each
+second, and each jump with its size and cause. The simulator never opens an
+output: its engine renders offline (manual rendering), and `-SillSoundVolume 0`
+turns the player down besides, so a test makes no sound; in manual rendering
+the console says where each click of a synthetic host's test tone was heard.
 
 ## Trackpad gestures
 

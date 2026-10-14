@@ -21,8 +21,9 @@ and every open question takes its default (Send Audio off by default, AAC-ELD
 at 128 kbps, per device mute, and so on). Built here: the plan's steps 1 to 7,
 the device's playout model (6878c11), its output (aefe477) and the Sound button
 and the panel's rows (5f7b1ac) after the host's. The workflow stopped there
-(9288aa6, WIP): the device's steps were never reviewed, and their docs (step 8)
-are not written; docs/audio-plan.md says what remains.
+(9288aa6, WIP); on 2026-10-13 the device's steps were reviewed against the plan,
+fixed (012c5de to c2a1802, below) and verified in the simulator
+(docs/audio-plan.md, "Results: the device").
 - Wire (additive; `Audio.swift`): kind 29, host → device. Type 1 is a JSON
   `AudioFormat`: codec "aac-eld", 48 kHz stereo, 480 or 512 frames a packet,
   the priming, the bitrate, the epoch, the cookie and what the sound is of.
@@ -73,6 +74,29 @@ are not written; docs/audio-plan.md says what remains.
   AudioOutput and StreamClient+Audio, in the Xcode project as AA01–AA04; the
   Sound button in every bar and the panel's rows (5f7b1ac). AudioDecoder also
   serves the `audio-codec` check and the harness's device.
+  - The playout (§7.2): the floor, the need (the jitter cover from 40 ms at home
+    and 150 ms away, a packet, the IO buffer, the output latency), the picture's
+    lag as a guard, placement by time then packet after packet, each packet's
+    last 5 ms held for a fade, drift closed a frame a packet, jumps over 40 ms,
+    clock steps; a move's hand-over resets nothing, and its copies are dropped.
+  - AudioOutput: AVAudioEngine with a player node (no render block of Sill's),
+    `.playback` mixing with others, active only while the engine runs; the
+    engine stops on mute, in the background and at a session's end after the
+    mixer's 25 ms ramp to volume 0 (measured), and after 10 s without a packet;
+    a configuration change (an output at another rate) stops it and the next
+    packet builds one; nothing is decoded while muted, in the background or
+    refused during a call, each packet still counting for the floor and the
+    cover. Headphones out mute it and say so. The simulator renders offline
+    (manual rendering) in every build: nothing opens an output.
+  - The Sound button counts Menus whether or not it shows: where only one fits
+    (an iPhone SE sideways, iPad windows under 532 pt upright) Menus keeps its
+    place and Sound is the panel's switch alone, as in the iPhone Duo's book
+    pose. A remote session by address takes home's cover, as the Mac counts it.
+  - The review's fixes (2026-10-13): 012c5de (the configuration change, nothing
+    decoded while silent, a start's reset, unmute retrying a refused session, a
+    DEBUG leak), fc90d44 (the fades), 2894057 (the console's "audio: jump -870
+    ms (off by over 40 ms)"), 63efd90 (by address), 400ffb0 (Sound and Menus),
+    2c5e42e and d237e83 (checks and harness), c2a1802 (the DEBUG click finder).
 - Checks:
   - `audio-packetizer`: 89 checks, 27 of 27 mutants.
   - `audio-codec`: 21 checks, 9 of 9 mutants. Each click lands at its whole
@@ -130,8 +154,23 @@ are not written; docs/audio-plan.md says what remains.
   `--sound` cases and link verdicts are owed, the sound now counting in
   `pendingBytes` and `takenThisSecond` at home too. No mutants, H2 or
   previews.
-- **Untested, for Noah:** everything on the devices, the plan's P1–P16 (the
-  device's steps are built, not reviewed). Sill.app's menu and Settings rows can be looked at (previews), and
+- On the merge and the review's fixes (2026-10-13 and 14; docs/audio-plan.md,
+  "Results: the device"): `swift build -c release` from `git archive`; the iOS
+  app from a scratch copy with the 27.1 names stubbed, Debug and Release for the
+  simulator and Debug for a device, only the known warning (Xcode 27.1's build,
+  CI's, owed); `audio-playout` 214, `phone-portrait` 169, `tour`, `ledger`,
+  `duo` (mutants owed); the sound harness, every gate but H12 (now +3.9 to +4.4
+  points of a core: open question 16); the pacing harness with sound (every
+  gate but over8's "≥ its base fps", 4.8 against 4.9: the sound is 1.9 % of
+  that overfilled 8 Mbit/s link) and without it against main (every gate);
+  H2 (4 of 6 identical, the rest the stop's timing); H10 (only the sound's
+  panes, menu.txt and its two cards); S2 and S3 against `SillHost --synthetic
+  --audio` on loopback and the software encoder, the engine rendering offline
+  at volume 0 (every click within 0.2 ms of its place; mute, the switch, the
+  background, Send Audio off from a second client, a move with its duplicate
+  dropped); S1's photos of every bar against main's build.
+- **Untested, for Noah:** everything on the devices, the plan's P1–P16.
+  Sill.app's menu and Settings rows can be looked at (previews), and
   `defaults read me.saffer.sill.mac sendAudio` is absent (off) until it is
   first set.
 
@@ -5408,6 +5447,18 @@ where the route line says how), away from home's and the link's settings cases
 `away|awaymixed|awayhome|linkbehind|linkmixed|linklow|linkstalled` (the header's
 away line, the footnote, the callout; `linkstalled` shows none) and
 `-SillLinkLine behind` (the mock reports the link behind: the stream's line),
+the Mac's sound's `-SillSound on|muted` (the mock Mac sends it: the Sound
+button and switch in that state; the mock plays nothing) and settings cases
+`sound|soundoff|soundnote` (the Send Audio row on, off, or on with the Mac's
+note), `-SillSettingsScroll sound` (the panel at the Send Audio row), and in
+the normal app and under `-SillLive 1` `-SillSoundSink manual|device` (manual
+rendering, no output device: the simulator's default in every build; `device`
+plays through the Mac's speakers, never in a gate) with `-SillSoundVolume 0`,
+`-SillSoundToggle <s>[,<s>…]` (the Sound button used at those seconds) and
+`-SillSoundSwitchAt <s>` (the panel's switch off, then on a second later); the
+console's "audio: …" lines say what happened (the format, the engine and its
+latencies, a line a second, each jump with its size and cause, and in manual
+rendering where each click of a synthetic host's test tone was heard),
 `-SillSettingsScript '<t> set K=V[,K=V] | suggestion; …'` (a live session to a
 synthetic host on loopback: the panel's controls and the link callout's button,
 t seconds after the first window list), `-SillMoveHomeTest to:HOST:PORT|refused|
