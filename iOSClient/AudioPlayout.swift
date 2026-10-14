@@ -588,6 +588,9 @@ struct AudioPlayout {
 
     private mutating func place(_ a: Admitted, now: Double) -> Output {
         var out = Output()
+        // Rule 10: a tail whose deadline has passed goes out faded before anything follows it. The
+        // deadline's timer shares the playout's queue with the packets, so a packet can come first.
+        if hand != nil, let d = deadline, now >= d { out.add(handOver(fadeOut: true)) }
         guard let floor else { return out }
         expireFrames(now: now)
         let lag = pictureLag(now: now)

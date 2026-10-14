@@ -570,6 +570,33 @@ do {
     check(never == nil, "no frame and no floor: no lag")
 }
 
+// MARK: - Rule 10: a packet past the hand's deadline, before its timer ran
+
+// The deadline's timer and the packets share the playout's queue, so a packet that came just before the
+// deadline can be taken after it (the queue busy) with the timer still waiting: the tail in hand goes out
+// faded first, and the packet is placed by time with rule 6's test, never after a tail too late to render.
+do {
+    var m = AudioPlayout()
+    _ = m.format(epoch: 1, framesPerPacket: 480, primingFrames: 0, cookie: Data())
+    m.latency(output: 0.010, io: 0.005, refresh: 1.0 / 60, streamFPS: 60)
+    _ = m.played(sample: 0, at: 100.0, now: 100.0)
+    var t = 100.0
+    for k in 0..<50 {
+        _ = m.packet(epoch: 1, seq: UInt32(k), stamp: t - 0.023, segmentStart: k == 0, now: t)
+        t += 0.010
+    }
+    let d = m.deadline ?? .nan
+    let now = d + 0.004
+    let out = m.packet(epoch: 1, seq: 50, stamp: t - 0.023, segmentStart: false, now: now).output
+    let tail = out.schedules.first { $0.part == .tail && $0.seq == 49 }
+    check(tail?.fadeOut == true, "a packet 4 ms past the hand's deadline, its timer not yet run: the tail in hand goes out faded")
+    let next = out.schedules.filter { $0.seq == 50 }
+    check(!out.discards.isEmpty || (!next.isEmpty && next.allSatisfy { $0.at != nil && $0.fadeIn }),
+          "…and the packet is placed by time, faded in (or late)")
+    check(next.allSatisfy { $0.goesOut - now >= 0.005 + AudioPlayout.margin - 1e-9 },
+          "…never less than the IO buffer + 2 ms before it renders: \(next.map { ms($0.goesOut - now) })")
+}
+
 // MARK: - Fades and a frame gained or lost
 
 do {

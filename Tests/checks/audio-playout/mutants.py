@@ -84,6 +84,8 @@ MUTANTS = {
         "            correcting = 0\n            let ear = time(ofSample: start) + outputLatency"),
     "M36 a step's second without a count": ("                if arrival - run.since >= 1, run.count >= Self.stepPackets {",
                                             "                if arrival - run.since >= 0.2 {"),
+    "M37 a packet past the hand's deadline follows it (the timer's turn not given first)": (
+        "        if hand != nil, let d = deadline, now >= d { out.add(handOver(fadeOut: true)) }\n", ""),
 }
 caught = 0
 for name, (old, new) in MUTANTS.items():
