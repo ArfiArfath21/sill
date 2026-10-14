@@ -147,6 +147,8 @@ final class Run {
     var duplicatesSent = 0
     var dupChangedWindows = 0
     var formatsIgnored = 0
+    /// The jumps the model reported for the console (`takeJump`): when, how far and why.
+    var jumpsMade: [(t: Double, by: Double, cause: AudioPlayout.JumpCause)] = []
     // The output: the timeline starts at t0 (nil: not running), in IO-sized renders.
     var t0: Double?
     var playerEnd: Double?
@@ -190,6 +192,7 @@ final class Run {
     }
 
     func apply(_ out: AudioPlayout.Output, _ now: Double) {
+        if let j = model.takeJump() { jumpsMade.append((now, j.by, j.cause)) }
         for d in out.discards {
             if discarded.contains(d) { violation("discarded twice: \(d)") }
             discarded.insert(d)
@@ -692,6 +695,14 @@ for by in [1.0, -1.0] {
     check(tail < 0.005, "…the error back under 5 ms (\(ms(tail)))")
     let behind = r.seconds.filter { $0.t > 18 }.compactMap(\.s.behindMs)
     check(!behind.isEmpty && behind.allSatisfy { $0 > 0 && $0 < 100 }, "…the sound still trails the picture a little (\(behind.prefix(3)))")
+    // The console's "audio: jump …" lines (§7.8): each jump once, with its size and cause.
+    let reported = r.jumpsMade.map { "\(ms($0.by)) (\($0.cause.rawValue))" }
+    check(r.jumpsMade.count == r.jumps(between: 11, 16), "…each jump reported once: \(reported)")
+    if by > 0 {
+        check(r.jumpsMade.first?.cause == .step && abs(r.jumpsMade.first?.by ?? 1) < 0.005, "…forward: a clock step's jump of nothing (\(reported))")
+    } else {
+        check((r.jumpsMade.first?.by ?? 0) < -0.5 && r.jumpsMade.contains { $0.cause == .step }, "…back: the second dropped, then the clock step (\(reported))")
+    }
 }
 
 // A 2 s stall, then a burst: what is past its time is dropped, and playback returns by a jump.
@@ -747,7 +758,6 @@ do {
     check(homeCover.allSatisfy { $0 <= 0.150 }, "…home's bounds once the window forgets (\(homeCover.map(ms).prefix(2)))")
     check(r.seconds.reduce(0) { $0 + $1.s.joins } == 0, "…nothing reset at the move home")
 }
-
 // A seq gap: the Mac skipped three packets.
 do {
     var w = World()

@@ -75,8 +75,8 @@ MUTANTS = {
     "M32 the hand's deadline from the packet's start (no headroom)": (
         "        return time(ofSample: h.tailStart) - ioBuffer - Self.margin",
         "        return time(ofSample: h.start) - ioBuffer - Self.margin"),
-    "M33 the picture's window kept at a step": ("        above = nil\n        frameArrivals = []\n        frameRaws = []\n        frameHead = 0\n        sortedRaws = []\n        lastPictureRaw = nil\n        owe()",
-                                                "        above = nil\n        owe()"),
+    "M33 the picture's window kept at a step": ("        above = nil\n        frameArrivals = []\n        frameRaws = []\n        frameHead = 0\n        sortedRaws = []\n        lastPictureRaw = nil\n        owe(.step)",
+                                                "        above = nil\n        owe(.step)"),
     "M34 a jump drops even within half a packet": ("                if jumpOwed, chain - start > Double(framesPerPacket) / 2 {",
                                                    "                if jumpOwed {"),
     "M35 a jump owed forgotten after a late packet": (

@@ -165,6 +165,18 @@ struct AudioPlayout {
         var output = Output()
     }
 
+    /// Why a jump was owed: the console's words (docs/audio-plan.md §7.8, "audio: jump +52 ms (clock step)").
+    enum JumpCause: String, Equatable {
+        /// Rule 13: the Mac's clock stepped, or the path changed.
+        case step = "clock step"
+        /// Rule 12: off by more than 40 ms (a stall, a fast change of the picture's lag).
+        case error = "off by over 40 ms"
+        /// Rule 12: it would have led the picture.
+        case ahead = "ahead of the picture"
+        /// A route's new latency (`reset(.jump)`).
+        case route = "route"
+    }
+
     /// What a reset throws away. `session`: a new connection after the old one ended (everything).
     /// `playback`: the timeline (the engine restarted or stopped, unmuted, an interruption): the kept
     /// packets, the placement and the decoder's continuity, never the floor, the cover or the dedupe.
@@ -307,6 +319,10 @@ struct AudioPlayout {
     private var nextID = 1
     /// Rule 12 or 13 owes a jump: the next packet is placed by time.
     private var jumpOwed = false
+    /// Why, while the jump counted (something plays), until the next placement by time measures it.
+    private var owedCause: JumpCause?
+    /// The jump that placement made, for the console (`takeJump`).
+    private var madeJump: (by: Double, cause: JumpCause)?
     /// Rule 11's direction: +1 adding frames, −1 dropping, 0.
     private var correcting = 0
     /// The error of the last packet that followed another.
@@ -471,7 +487,7 @@ struct AudioPlayout {
     mutating func reset(_ kind: Reset) -> Output {
         switch kind {
         case .jump:
-            owe()
+            owe(.route)
             return Output()
         case .playback, .session:
             var out = Output()
@@ -482,6 +498,8 @@ struct AudioPlayout {
             chainEnd = nil
             mapping = nil
             jumpOwed = false
+            owedCause = nil
+            madeJump = nil
             correcting = 0
             expectedSeq = nil
             primingLeft = 0
@@ -588,12 +606,17 @@ struct AudioPlayout {
                 placed = Planned(packet: a, start: start, contiguous: true, change: change, fadeIn: false, decision: decision)
             } else {
                 // Rule 12: too far off, or ahead of the picture: closed at once.
-                owe()
+                owe(ear < picture ? .ahead : .error)
             }
         }
         if placed == nil {
             // Rule 5: by time.
             var start = sample(atTime: due - outputLatency)
+            if jumpOwed, let cause = owedCause, let chain = hand?.end ?? chainEnd {
+                // The jump's size: where this packet goes by time against where it would have followed.
+                madeJump = ((start - chain) / Self.rate, cause)
+                owedCause = nil
+            }
             if let chain = hand?.end ?? chainEnd, start < chain {
                 if jumpOwed, chain - start > Double(framesPerPacket) / 2 {
                     // Behind: dropped, until a packet is due within half a packet of what is already
@@ -640,11 +663,21 @@ struct AudioPlayout {
         return Output(schedules: [h.tail(fadeOut: fadeOut, goesOut: time(ofSample: h.tailStart))])
     }
 
-    /// A jump is owed (rules 12 and 13), counted once, and only where something plays.
-    private mutating func owe() {
+    /// A jump is owed (rules 12 and 13, a route), counted once, and only where something plays.
+    private mutating func owe(_ cause: JumpCause) {
         guard !jumpOwed else { return }
         jumpOwed = true
-        if hand != nil || chainEnd != nil { second.jumps += 1 }
+        if hand != nil || chainEnd != nil {
+            second.jumps += 1
+            owedCause = cause
+        }
+    }
+
+    /// The jump the last placement by time made, once: how far (seconds; positive, the sound placed later
+    /// with silence before it; negative, packets dropped) and why. For the console.
+    mutating func takeJump() -> (by: Double, cause: JumpCause)? {
+        defer { madeJump = nil }
+        return madeJump
     }
 
     /// Rule 11: the direction for this packet, with a band so a steady stream does not flutter.
@@ -727,7 +760,7 @@ struct AudioPlayout {
         frameHead = 0
         sortedRaws = []
         lastPictureRaw = nil
-        owe()
+        owe(.step)
     }
 
     private mutating func remember(_ key: Int64) {

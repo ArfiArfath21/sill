@@ -254,6 +254,9 @@ final class AudioOutput {
     private func apply(_ out: AudioPlayout.Output) {
         for id in out.discards { kept[id] = nil }
         for s in out.schedules { schedule(s) }
+        #if DEBUG
+        if let j = model.takeJump() { print("audio: jump \(String(format: "%+.0f", j.by * 1000)) ms (\(j.cause.rawValue))") }
+        #endif
     }
 
     private func schedule(_ s: AudioPlayout.Schedule) {
