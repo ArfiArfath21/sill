@@ -2781,7 +2781,9 @@ final class StreamClient: ObservableObject {
         refusedListing = nil
         resetHomeMove()
         resetPointerFeed()   // the Mac has the pointer until this device's first input (Q6)
-        sound.sessionStarted(away: true)   // away from home: the cover's start and bounds (rule 2)
+        // Away from home through a VPN or the internet: away's cover, its start and bounds (rule 2). By
+        // address (a LAN address through the remote door) is home, as the Mac's AwayPolicy counts it.
+        sound.sessionStarted(away: s.route != .remote(.address))
         session = s
         goodbye = nil
         // Its way in is its route line's (`remoteRoute`, at its first window list), never a link word.
