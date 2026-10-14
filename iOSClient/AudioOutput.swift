@@ -354,6 +354,8 @@ final class AudioOutput {
             readLatencies()
             routeSeen = made.routeName
             #if DEBUG
+            // A new engine's timeline starts at sample 0: what the finder kept of the last one's goes.
+            clicks = ClickFinder()
             if made.manual {
                 made.onRendered = { [weak self, weak made] samples, from in
                     guard let self, let made else { return }
