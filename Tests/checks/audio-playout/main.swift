@@ -758,6 +758,26 @@ do {
     check(homeCover.allSatisfy { $0 <= 0.150 }, "…home's bounds once the window forgets (\(homeCover.map(ms).prefix(2)))")
     check(r.seconds.reduce(0) { $0 + $1.s.joins } == 0, "…nothing reset at the move home")
 }
+// The move home as it happens (PR #39): a hand-over, away on the old connection and home on the new one,
+// 75 ms faster, both carrying the stream for a moment.
+do {
+    var w = World()
+    w.seconds = 30
+    w.away = true
+    w.move = (register: 15.0, handOver: 15.2, oldTransit: 0.080, newTransit: 0.005)
+    w.homeAt = 15.2
+    w.transit = { t in t < 15.2 ? 0.080 : 0.005 }
+    let r = simulate(w)
+    noViolations(r, "a move home's hand-over")
+    let dups = r.seconds.reduce(0) { $0 + $1.s.duplicates }
+    check(r.duplicatesSent >= 5 && dups == r.duplicatesSent && r.dupChangedWindows == 0,
+          "…every copy dropped as a duplicate, none counted (\(dups) of \(r.duplicatesSent))")
+    check(r.seconds.reduce(0) { $0 + $1.s.joins } == 0, "…nothing reset (no join)")
+    check(r.jumps(between: 14, 18) <= 1 && r.lateAfter(2) == 0, "…at most one jump (\(r.jumps(between: 14, 18))), nothing late")
+    let homeCover = r.seconds.filter { $0.t > 27 }.map(\.s.cover)
+    check(!homeCover.isEmpty && homeCover.allSatisfy { $0 <= 0.150 }, "…home's bounds after (\(homeCover.map(ms).prefix(2)))")
+}
+
 // A seq gap: the Mac skipped three packets.
 do {
     var w = World()
@@ -1044,6 +1064,7 @@ do {
 
 // MARK: - 5,000 random runs
 
+let failuresBeforeRandom = failures
 var runs = 0, steadyRuns = 0, played = 0
 var rng = RNG(20260927)
 let total = Int(CommandLine.arguments.dropFirst().first ?? "") ?? 5000
@@ -1108,7 +1129,7 @@ for k in 0..<total {
         if r.lateAfter(2) != 0 { check(false, "\(w.label): a steady link lost \(r.lateAfter(2)) packets as late after 2 s") }
     }
 }
-check(failures == 0 || runs > 0, "\(runs) random runs, \(steadyRuns) of them on a steady link, \(played) packets played: every invariant held")
+check(failures == failuresBeforeRandom && runs > 0, "\(runs) random runs, \(steadyRuns) of them on a steady link, \(played) packets played: every invariant held")
 
 print("\(passes) passed, \(failures) failed")
 exit(failures == 0 ? 0 : 1)

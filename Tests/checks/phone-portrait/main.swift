@@ -326,7 +326,8 @@ for w in 300...599 {
                          && near(l.sound.minX - l.menusBesideSound.maxX, 8) && !l.menusBesideSound.intersects(l.sound)
                          && l.stripBesideBoth.minX == l.strip.minX && l.stripBesideBoth.minY == l.strip.minY
                          && l.stripBesideBoth.height == l.strip.height && near(l.menusBesideSound.minX - l.stripBesideBoth.maxX, 8)
-                         && l.stripBesideBoth.width - 16 >= 80, size,
+                         && l.stripBesideBoth.width - 16 >= 80
+                         && (W < 375 || (l.stripBesideBoth.width - 16 + 12) / (80 + 12) >= 2), size,
                          "sound \(str(l.sound)), menus \(str(l.menusBesideSound)), strip \(str(l.stripBesideBoth))")
     }
 }
