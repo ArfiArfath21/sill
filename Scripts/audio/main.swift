@@ -122,7 +122,7 @@ func door(_ name: String, _ params: NWParameters, route: ClientRoute) throws -> 
         c.stateUpdateHandler = { state in
             switch state {
             case .ready:
-                server.serve(c, route: route)
+                server.serve(c, route: route, hello: nil)   // the device's hello reaches `took` in the receive loop
                 print("\(name) client connected: \(c.endpoint)")
             case .failed:
                 c.cancel()
@@ -136,7 +136,7 @@ func door(_ name: String, _ params: NWParameters, route: ClientRoute) throws -> 
 }
 let homeParams = NWParameters(tls: nil, tcp: RemoteTLS.tcpOptions(dialing: false))
 homeParams.serviceClass = .interactiveVideo
-let home = try door("Home", homeParams, route: .home(.loopback))
+let home = try door("Home", homeParams, route: .home(.loopback, peer: nil))
 let remoteParams: NWParameters
 if plainRemote {
     remoteParams = NWParameters(tls: nil, tcp: RemoteTLS.tcpOptions(dialing: false))

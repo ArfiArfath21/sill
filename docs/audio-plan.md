@@ -1703,3 +1703,24 @@ device; test hosts on 127.0.0.1 and the software encoder, `no-device.sh` before 
 16. **The encoder's CPU.** Default: **codec quality Medium** (AudioToolbox's default), about 1 point
     of a core on a tonal signal. The alternative is Low: 0.6 points less, 3–9 dB less SNR on tonal
     sound.
+
+## Merged with main at 985a733 (2026-10-13)
+
+One merge commit, never a rebase: PRs #37 (pairing at home), #39 (away from home), #44 to #49 (the
+iPhone Duo with the iOS 27.1 SDK and the 0.5.1 release among them) and #56. Where they meet the
+sound, beyond §12's bullets:
+- **§4.6, the sound's bytes.** Since #39 every client's `pendingBytes` and `takenThisSecond` count
+  every message, home or away, because each device's `LinkJudge` reads them. The sound's send path
+  now counts there too, at home as well as away (it was `pendingBytes` away only): the judge's
+  carried rate includes the sound's ~150 kbps, and its stalled rule sees sound waiting. Nothing at
+  home is paced on `pendingBytes`, and `paceRemote` still drops only frames. The pacing harness's
+  `--sound` cases and link verdicts are to be run again on the merge.
+- **§7.2, rule 2.** The move home (#39's `finishMove`, `.fromRemote`) gives the playout home's jitter
+  bounds (`AudioOutput.setAway(false)`) and resets nothing (rule 7).
+- **§7.6.** The Sound button and switch stay through a move's hand-over until the new connection's
+  first kind 16 (`soundAcrossMove`): the settings ledger resets at every hand-over (from AWDL, to
+  the cable or Wi-Fi, and #39's move home). In the iPhone Duo's book pose the right group is sized
+  for Menus and four more buttons (`BarMetrics.clearing`), so Sound shows there only while the Mac's
+  menus do not; otherwise the Settings panel's switch is the way to it.
+- The sound harness (`Scripts/audio`) compiles the host files `Door` brought (Scripts/pacing's list)
+  and serves as #37's `serve(_:route:hello:)`, the device's hello read in the receive loop.

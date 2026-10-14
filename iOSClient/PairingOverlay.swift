@@ -20,6 +20,8 @@ struct PairingOverlay: View {
     @FocusState private var codeFocused: Bool
     @AccessibilityFocusState private var titleFocused: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// The Duo's fold across the stream screen (StreamScreen, iOS 27.1): the overlay keeps off it.
+    @Environment(\.duoFold) private var duoFold
 
     init(client: StreamClient, scannerMode: CodeScanner.Mode, typed: Bool = false, close: @escaping () -> Void) {
         self.client = client
@@ -33,8 +35,8 @@ struct PairingOverlay: View {
 
     var body: some View {
         GeometryReader { geo in
-            let layout = ConnectLayout(size: geo.size)
-            let width = min(layout.short ? 640 : 420, geo.size.width - 32)
+            let layout = ConnectLayout(size: geo.size, fold: duoFold)
+            let width = min(layout.short ? 640 : 420, (layout.leadingPage ?? geo.size.width) - 32)
             // The code field has the keyboard: the content goes to the top, so Pair stays above it
             // (the stream screen ignores the keyboard's safe area, so nothing moves by itself), as
             // on the connect screen. The half-folded Duo's is in the top half already.
@@ -60,10 +62,11 @@ struct PairingOverlay: View {
                 }
                 .frame(width: width, alignment: .leading)
                 .padding(.vertical, 16)
-                // The Duo half-folded: the top half only (the crease is at the middle); elsewhere
-                // centred, or at the top while the code is typed.
-                .frame(maxWidth: .infinity, maxHeight: layout.topHalf ? geo.size.height / 2 : geo.size.height,
+                // The Duo half-folded: above the fold only, or, in the book pose, on the leading
+                // page; elsewhere centred, or at the top while the code is typed.
+                .frame(maxWidth: layout.leadingPage ?? .infinity, maxHeight: layout.topRoom ?? geo.size.height,
                        alignment: toTop ? .top : .center)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
         .transition(.opacity)
@@ -73,8 +76,14 @@ struct PairingOverlay: View {
         .background(EscapeKey(action: cancel))
         .onAppear {
             titleFocused = true
-            // "Show your pairing code": the Mac opens its pairing window by itself.
-            if !asked, client.pendingLink == nil, client.connected { asked = true; client.requestPairingCode() }
+            // "Show your pairing code": the Mac opens its pairing window by itself (a plain door), or
+            // its ask rule says whether it does (a door that speaks TLS: the line under the title).
+            if !asked, client.pendingLink == nil, client.connected { asked = true; client.requestPairingCode(mac: mac) }
+        }
+        // The Mac's answer to that ask, spoken: VoiceOver's focus is on the title, and a line that
+        // says no code is showing, or why, must be heard.
+        .onChange(of: client.overlayAskLine) { _, line in
+            if let line, line != DiscoveryPolicy.HomeCopy.overlayAsking(mac: mac) { AccessibilityNotification.Announcement(line).post() }
         }
         .task(id: client.pairing) {
             // Paired: says so, then fades after a second; the stream never stopped.
@@ -83,15 +92,18 @@ struct PairingOverlay: View {
             if !Task.isCancelled {
                 withAnimation(reduceMotion ? nil : .easeOut(duration: 0.25)) { close() }
                 client.pairing = .idle
+                client.endOverlayAsk(withdraw: false)      // its window closed as used
             }
         }
     }
 
     /// Cancel, Esc and the escape gesture: a pairing still dialing stops (as the connect screen's
-    /// card does), and an outside link waiting here is dropped rather than shown again later.
+    /// card does), an outside link waiting here is dropped rather than shown again later, and a code
+    /// the Mac showed for this overlay's ask is withdrawn rather than left up for its 5 minutes.
     private func cancel() {
         client.cancelPendingLink()
         client.cancelPairing()
+        client.endOverlayAsk(withdraw: true)
         close()
     }
 
@@ -150,9 +162,12 @@ struct PairingOverlay: View {
                 .foregroundStyle(Palette.text)
                 .accessibilityAddTraits(.isHeader)
                 .accessibilityFocused($titleFocused)
-            Text("\(mac) is showing a code now.")
+            // Over a door that speaks TLS, what the Mac answered this overlay's ask; over a plain
+            // one, which always opens a window for kind 21, that a code is showing.
+            Text(client.overlayAskLine ?? DiscoveryPolicy.HomeCopy.overlayShowing(mac: mac))
                 .font(.system(size: 13))
                 .foregroundStyle(Palette.muted)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
@@ -178,16 +193,13 @@ struct PairingOverlay: View {
         }
     }
 
-    /// The typed path here needs only the code: the address is this connection's Mac's own
-    /// (StreamClient.overlayAddress).
+    /// The typed path here needs only the code: over a session at home that speaks TLS it goes to
+    /// the session's own row, pinned to the key the session saw (docs/home-pairing-plan.md §7.5);
+    /// over any other, to the address from this connection's kind 18 (StreamClient.pairOverlayTyped).
     private func pairTyped() {
         guard !working else { return }
         codeFocused = false
-        guard let address = client.overlayAddress() else {
-            client.pairing = .failed(.notPairing(mac))
-            return
-        }
-        client.pairTyped(code: code, address: address, overlay: true)
+        client.pairOverlayTyped(code: code, mac: mac)
     }
 
     @ViewBuilder private var status: some View {

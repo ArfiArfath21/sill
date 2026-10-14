@@ -1,24 +1,26 @@
 # Pure checks
 
 The parts of Sill that decide things (when the device looks for a Mac and which path a session
-takes, the settings ledger, the wire format, pairing, who may use which door, how frames go into the
-video encoder and when a stream gets a new encoder session, which device versions a Mac serves, what
-the Mac does with a trackpad gesture, how a session ends, how the device reads the Mac's messages,
-what the update check makes of GitHub's answer, who moves the Mac's pointer and what the device's
-pointer sprite shows, how the Mac download's disk image lays out its window, where everything goes on
-a phone held upright, what the Mac sends of its menus and what the device makes of it, how the Mac's
-sound becomes packets and back, and when and where the device plays them) are plain
-Swift files that compile on their own. Each folder here compiles one or a few of those files,
-exactly as they are in `Sources/`, `iOSClient/` and `Scripts/`, together with its own `main.swift`,
-and runs the result. Nothing here needs a device, Screen Recording, Accessibility, the video encoder
-or any network but loopback, so the checks run anywhere Xcode does, and in CI
-(`.github/workflows/ci.yml`) on pull requests and pushes to `main`.
+takes, the settings ledger, the wire format, pairing, who may use which door, which device versions a
+Mac serves, what the Mac does with a trackpad gesture, how a session ends, how the device reads the
+Mac's messages, what the update check makes of GitHub's answer, how frames go into the video encoder
+and when a stream gets a new encoder session, who moves the Mac's pointer and what the device's
+pointer sprite shows, how the Mac download's disk image lays out its window, where everything goes
+on a phone held upright, which modifiers a device's keys leave set on the Mac, what the Mac sends of
+its menus and what the device makes of it, how the Mac's sound becomes packets and back and when and
+where the device plays them, when the first-run tour shows and where its card goes, pairing at home:
+who each door admits, what counts as the USB cable, the device's home rows and dials, and where the
+layouts meet the iPhone Duo's fold) are plain Swift files that compile on their own. Each folder
+here compiles one or a few of those files, exactly as they are in `Sources/`, `iOSClient/` and
+`Scripts/`, together with its own `main.swift`, and runs the result. Nothing here needs a device,
+Screen Recording, Accessibility, the video encoder or any network but loopback, so the checks run
+anywhere Xcode does, and in CI (`.github/workflows/ci.yml`) on pull requests and pushes to `main`.
 
 ```
-Tests/checks/run-all.sh                   # every check, about two minutes on an M-series Mac
+Tests/checks/run-all.sh                   # every check, about five minutes on an M-series Mac
 Tests/checks/run-all.sh policy fence      # only these
 Tests/checks/policy/run.sh                # one check, with its whole output
-Tests/checks/run-all.sh --mutants         # also the mutants: most of an hour
+Tests/checks/run-all.sh --mutants         # also the mutants: well over an hour
 ```
 
 `run-all.sh` prints one line per check and, for a failing one, its `FAIL` lines and last lines; its
@@ -30,50 +32,66 @@ exit status is the number of checks that failed. Binaries, data and logs go to
 | Check | Compiles | What it checks | Cases | Mutants |
 |---|---|---|---|---|
 | `addresses` | `Sources/SillHost/AddressList.swift`, `PairingWindow.swift` and `OriginPolicy.swift` with `Sources/StreamProtocol` (`build.sh`) | the addresses the Mac offers for remote access, from its services and tunnels; the pairing window's proofs, tries and back-off | 41 | 15 |
+| `ask-limits` | `Sources/SillHost/PairingWindow.swift` with `Sources/StreamProtocol` (`module.txt`) | the limits on a device's asks to pair at home: 10 minutes of quiet by key and by address (after the Mac's Cancel or a stop, never an expiry or the device's own Cancel), 3 device-opened windows in any 10 minutes, the reason a proof turned away closed hears, the test override | 34 | 20 |
 | `audio-codec` | `Sources/SillHost/AudioEncoder.swift`, `AudioPacketizer.swift` and `TestTone.swift` with `iOSClient/AudioDecoder.swift`; a binary that links a media framework but AudioToolbox is refused | the Mac's sound through AAC-ELD in memory (docs/audio-plan.md H4): the test tone through the packetizer, the encoder and the decoder, every decoded sample placed by its packet's stamp, each click at its whole second at 480 and 512 frames a packet and across gaps; a segment starting clean on both ends; a late join; one packet a block; the bitrate | 21 | 9 |
 | `audio-packetizer` | `Sources/SillHost/AudioPacketizer.swift` | how the Mac's sound becomes packet-sized blocks (docs/audio-plan.md §4.3): the packet size from the first chunk, the stamps against each chunk's anchor (a jitter oracle), the continuity tolerance, gaps that end a segment with nothing flushed or filled, a format change; `AudioSourceRule`'s table; `PCMLayout`'s conversions; the first minute's tally | 89 | 27 |
 | `audio-playout` | `iOSClient/AudioPlayout.swift` | the device's playout of the Mac's sound on a simulated clock (docs/audio-plan.md §7.2): the floor, the need and its cover (start, bounds, rising at once), the picture's lag and the guard, placement by time and packet after packet, each packet's last 5 ms held for its fade, late packets, duplicates and a move's hand-over, gaps and joins on a reset decoder, drift by single frames at 1.9 ms a second or better, jumps and steps (a clock stepped either way, a slower path, the round trip's threshold), an engine starting, mute, fades and a frame gained or lost; then 5,000 random runs against the invariants (nothing before it arrives, no overlap, never ahead of the picture, never under the IO buffer + 2 ms ahead of its render, no noise played, nothing twice, a frame at most a packet) | 205 | 36 |
+| `away-copy` | `iOSClient/AwayCopy.swift` with StreamProtocol's `HostSettings.swift` | away from home and the link on the device: the Settings panel's header line and what VoiceOver adds, the footnote's three forms, the link's callout (first match wins) with its button's words, spoken label and change, nothing for stalled, the old round-trip callout only for a Mac without `away`, the stream screen's line, and `LinkLine`: shown on arrival, gone 2 s after the report clears, hidden while something is open, gone at once when its report clears (or it is covered) off screen, announced once a spell | 74 | 17 |
+| `away-quality` | `Sources/SillHost/HostConfig.swift`, `DeviceSettings.swift`, `AwayPolicy.swift` and `OriginPolicy.swift` with StreamProtocol's `HostSettings.swift` (`build.sh`, `-package-name sill`) | away from home on the host: the away pair in `standard`, `validated()`, `changes(to:)` and `effective(away:)`; the pair a device's state shows and where its change lands (`applyingAway`); the whitelist from both routes; who counts as away, when the away quality is the target, and its two log lines | 65 | 16 |
+| `away-wire` | `Sources/StreamProtocol/HostSettings.swift` | kind 16's `away` (AwayQuality) and `link` (LinkReport): their wire names, what decodes and what does not, an older host's state and an older device's decoder (main's HostSettingsState at 2b38179); QualityPreset's `name(forBitrate:)` and `shortTitle(bitrate:captureScale:)` | 47 | 9 |
+| `cable-link` | `Sources/SillHost/CableLink.swift` and `OriginPolicy.swift` with `Sources/StreamProtocol` (`module.txt`) | what counts as the USB cable to an iPhone or iPad, from this Mac's own IOKit readings with an iPad on the cable; the device ID; the test stand-in | 40 | 20 |
 | `clientlink` | `Sources/SillHost/ClientLink.swift` (`-package-name sill`) | which route a device came by, from its endpoint's scope and path, and the menu card's word for it | 89 | 14 |
+| `compatibility` | `Sources/StreamProtocol/*.swift` | `SillVersion` (tags, bundles and the wire's versions, and their order), `SillProtocol`, and the update notice's payloads: kind 23's hello, kind 22's new fields with the five older goodbyes byte for byte, the window list's `hostVersion` and `protocol`; the Mac's sound's JSON (the hello's codecs, AudioFormat, Send Audio, the note, the stats) with the older types reading it, and the host's pick of a codec; kind 28's trackpad gesture and the window list's `gestures`; pairing at home's reason and the update notice's as their devices read them | 131 | 31 |
+| `device-gate` | `Sources/SillHost/DeviceGate.swift` with `Sources/StreamProtocol` (`build.sh`, `-package-name sill`) | the host's device floor: which hello it admits, the refusal's words, the Refused, count and hello lines, the shipped floor "0" | 58 | 14 |
 | `dmg-layout` | `Scripts/dmg-layout/DSStore.swift`, `FinderAlias.swift`, `DMGLayout.swift` (with make-dmg.sh's layout arguments and `design/DMGBackground.svg`) | the `.DS_Store` of Sill.dmg's window byte by byte against Finder's own layout of the file (blocks, free lists, header), the window's bounds (the picture and macOS 27's 32-point title bar), view options and icon places; the background's alias field by field; the encoder and decoder, a two-level tree among them; the volume icon's flag; an alias for a real file where it runs; that make-dmg.sh and the SVG still give that window | 70 | 43 |
+| `duo` | `iOSClient/DuoPosture.swift` | the iPhone Duo's posture and the layout rules that follow from it (docs/iphone-duo-plan.md): the poses as the iOS 27.1 simulator reported them, the fold's band in the screen's own space, the laptop pose's split at the real fold and open flat's at the picture's own shape, the book pose's bar (the right group, the strip, the Settings panel) clear of the fold, a tour card (on its targets' page), the connect column and its room above the laptop pose's fold, the pairing overlay and the window lights on one page or off the fold, the stream screen's status bar (hidden on the inner display held upright), the hinge from the fold before its first report, the rules as before iOS 27.1 over a grid of sizes, the harness's stand-in and the displays' safe areas. With it `tour` places its cards at the Duo's real sizes and folds and `phone-portrait` pins the real cover | 252,557 | 67 |
+| `door-policy` | `Sources/SillHost/DoorPolicy.swift`, `OriginPolicy.swift` and `PairingWindow.swift` with `Sources/StreamProtocol` (`module.txt`) | who each door admits: both doors, each origin, each application protocol, Require pairing on and off, paired or not, a window or not; the ask rule's six steps in order; what a session the device gate held is judged by as the gate admits it (`afterGate`); which hosts take the test hooks; a kind 19 of another generation answered `closed`, no try counted; the device's own Cancel; when plain tries mean an older Sill | 128 | 58 |
 | `encoder-mailbox` | `Sources/SillHost/EncoderMailbox.swift` | HEVCEncoder's frames on their way into VideoToolbox (one inside, the one-slot mailbox, the watchdog's clock, timestamps, keyframe requests, `abandon`, the teardown) through a copy of HEVCEncoder's glue around a stand-in for VideoToolbox, in virtual time; a binary that links VideoToolbox is refused | 38,256 | 27 |
 | `encoder-slowstate` | `Sources/SillHost/EncoderSlowState.swift` | when a hardware stream's session has settled in the encoder's slow state and gets a new one, and how the new one is judged: the rule at its edges, and streams in virtual time against a scripted engine; a binary that links VideoToolbox is refused | 1,207 | 29 |
-| `compatibility` | `Sources/StreamProtocol/*.swift` | `SillVersion` (tags, bundles and the wire's versions, and their order), `SillProtocol`, and the update notice's payloads: kind 23's hello, kind 22's new fields with the five older goodbyes byte for byte, the window list's `hostVersion` and `protocol`; the Mac's sound's JSON (the hello's codecs, AudioFormat, Send Audio, the note, the stats) with the older types reading it, and the host's pick of a codec; kind 28's trackpad gesture and the window list's `gestures` | 130 | 31 |
-| `device-gate` | `Sources/SillHost/DeviceGate.swift` with `Sources/StreamProtocol` (`build.sh`, `-package-name sill`) | the host's device floor: which hello it admits, the refusal's words, the Refused, count and hello lines, the shipped floor "0" | 58 | 14 |
-| `fence` | `iOSClient/SessionLink.swift`, `Sources/StreamProtocol/StreamMessage.swift` | the session's fenced hand-overs, hold, adopt, unhold and a new session dropping a hand-over, against a stand-in Mac on loopback: 600 numbered inputs arrive complete and in order, whatever the machine's speed (each step waits for what it needs, not a set time); the inputs counted for the session's connection, which the Mac's pointer reports are judged by, equal those the stand-in read there (every mode, and `count` step by step) | 15 modes | 32 |
+| `fence` | `iOSClient/SessionLink.swift`, `Sources/StreamProtocol/*.swift` | the session's fenced hand-overs, hold, adopt, unhold and a new session dropping a hand-over, against a stand-in Mac on loopback: 600 numbered inputs arrive complete and in order, whatever the machine's speed (each step waits for what it needs, not a set time); the inputs counted for the session's connection, which the Mac's pointer reports are judged by, equal those the stand-in read there (every mode, and `count` step by step); the move home from the remote door's TLS to the home door's (TLS since pairing at home), fenced, and with the remote connection gone mid-move | 17 modes | 32 |
 | `gesture-chords` | `Sources/SillHost/GestureChords.swift` (`-package-name sill`) | a trackpad gesture from a device (kind 28) as the Mac's own shortcut for its action: the first of its shortcuts that is on and bound, its device-independent modifier bits only, never another action's; the opposite gesture closing what Sill opened, the same gesture again doing nothing and once more opening it again, the Spaces leaving a view open, a click, a key or text forgetting it and a move, a scroll or a button or key coming up not, a pick forgetting it; unknown names, the log line, the modifiers a chord must not leave behind, the TEST ONLY table; 5,000 random sequences against a model | 141 | 33 |
 | `gestures` | `iOSClient/TrackpadGestures.swift` | which stroke on the device's glass goes silent (three fingers down before any has moved 24 pt, no button held, however slowly and beside a resting thumb), which of those arms (the three that landed last, within 0.15 s), how long the silence lasts (until the next stroke's first touch), and what the first lift of one of the three decides: each swipe at, under and over its distances, the flick, the axis rule both ways, the fingers moving together (a pinch led by the thumb, a grab, the Mac's thumb-and-three-finger pinch are no swipe), pinch and spread at their ratio, travel winning over a spread, a fourth finger (moving with them, against them, still), a fifth, a brief extra contact, a cancel, a swipe taken back, one decision a stroke; a Pencil's touch ending a finished stroke's silence; whether a decided gesture goes to the Mac (the switch, the Mac's `gestures`) and whether the Desktop is picked first; 5,000 random strokes against a model | 156 | 45 |
-| `goodbye` | `iOSClient/GoodbyePolicy.swift` with `Sources/StreamProtocol` (`build.sh`) | how a session ends after the Mac's goodbye: today's five reasons, "update" and reasons the device does not know, the message cleaned, when it reconnects | 42 | 16 |
-| `ledger` | `iOSClient/HostSettingsLedger.swift`, `Sources/StreamProtocol/HostSettings.swift` | the device's settings ledger against a model host, scenarios and 5,000 random runs | 90 | none |
+| `goodbye` | `iOSClient/GoodbyePolicy.swift` with `Sources/StreamProtocol` (`build.sh`) | how a session ends after the Mac's goodbye: the five older reasons and "pairingRequired", "update" and reasons the device does not know, the message cleaned, when it reconnects | 45 | 18 |
+| `home-device` | `iOSClient/DiscoveryPolicy.swift` (`module.txt`) | the device's home rules: every row's word and what a tap dials, DEBUG and Release, `homeTLS` and `revoked`; an open door's row never reading like a paired Mac's; which saved Mac a row is, by its tag or its Bonjour name, and a tap on a look-alike dialed pinned; the device's cable check; the rows' VoiceOver labels and hints; the home card's words for each refusal; Pair This iPad…'s line from the Mac's answer to its ask; the reconnect ending at a row that waits for a tap; a kind 18 and a goodbye "removed" speaking only for the Mac whose key the session has | 182 | 124 |
+| `home-model` | `iOSClient/DiscoveryPolicy.swift`, `SavedMacs.swift`, `GoodbyePolicy.swift` and `Sources/SillHost/PairingWindow.swift` with `Sources/StreamProtocol` (`module.txt`) | the home rules against the wire's own values (its strings, a real kind 20, a real TXT tag), then pairing at home walked end to end as StreamClient chains the rules, a look-alike under a saved Mac's name included, a real signed kind 18 replayed on another Mac's connection, and the reconnect meeting a door that now asks devices to pair; with `PairingWindow.swift`, the card's words against the Mac's quiet rule | 62 | 21 |
+| `home-records` | `Sources/SillHost/HostIdentity.swift`, `CableLink.swift` and `OriginPolicy.swift` and `iOSClient/SavedMacs.swift` with `Sources/StreamProtocol` (`module.txt`, `-package-name sill`) | the records pairing at home adds to (the Mac's `cableDevice` and "cable", the device's `homeTLS` and `revoked`): older records decode, lists encode byte for byte as before, an older reader reads the new ones; Require pairing's stored record, off only with the Mac's own signature | 39 | 21 |
+| `home-txt` | `Sources/StreamProtocol/*.swift` (`module.txt`) | pairing at home's wire values: the TXT record's `p` (HomeDoorTXT), kinds 19, 20 and 22 as the plan shows them on the wire, kind 20's `message` and the reasons a device words itself, the RemoteTLS parameters for the home door | 49 | 24 |
+| `key-strokes` | `Sources/SillHost/KeyStrokes.swift` and `iOSClient/KeyChords.swift` with `Sources/StreamProtocol` (`build.sh`, `-package-name sill`) | which modifiers a device's keys leave set in the Mac's HID state table, which the next click and scroll start from: on the Mac's side, a shortcut sent as one key down and up (the Spotlight key's ⌘Space from an older device) leaves none, a modifier's own key goes up without its flag, a device's own word on its modifiers lets go of the keys it no longer holds, a device that leaves and the host that goes let go of theirs, and a trackpad gesture's shortcut goes up with the table's flags from before it; the check a quarter of a second after each key's up (`KeyUpCheck`), armed for every path and reporting on a Mac that keeps its table through a modifier key's up or another key's; input with nowhere to land (`DroppedInput`) dropped but for the up of a key or a button the Mac has down; on the device's, a shortcut goes out with its modifiers' own keys around it and a hardware key's up follows its down, leaving nothing held on this Mac or on one from before; the exact events, each latched combination, and random sessions (two devices from before, with gestures, 3,000 on a Mac as the model says and 1,000 on each Mac keeping its table; this device alone, 2,000 and 500 each; 2,000 of input placed or not) against the invariant and the check's | 329 | 72 |
+| `keychain` | `Sources/SillMenuBar/IdentityStorePlan.swift` | which identity store the menu-bar host uses at launch (docs/keychain-plan.md §4): the data-protection keychain only for an entitled real Sill.app and never the legacy one beside it, the legacy login keychain for an unentitled real Sill.app, memory or a test directory for a test host | 13 | 7 |
+| `ledger` | `iOSClient/HostSettingsLedger.swift`, `Sources/StreamProtocol/HostSettings.swift` | the device's settings ledger against a model host, scenarios and 5,000 random runs (some against a host without sound: Send Audio never sent there) | 99 | none |
+| `link-judge` | `Sources/SillHost/LinkJudge.swift` with StreamProtocol's `HostSettings.swift` (`build.sh`) | each device's link as the host judges it once a second: a short second, behind at 3 short of 5 and fine after 5 clean, stalled after 3 s with bytes waiting, none taken and nothing heard, a restart's reset and which restarts judge afresh (another bitrate, rate or resolution, or no stream; never one that keeps the quality), the carried rate (a mean of the measured seconds) and when it is reported again, the suggestion at 60 and 120 fps, the host's lines; a model against 20,000 random runs | 82 | 26 |
 | `menu-state` | `iOSClient/MacMenuState.swift` with `Sources/StreamProtocol` (`build.sh`) | the device's view of the Mac's menus (docs/menu-bar-plan.md §7.2): the top level, fetches joined, answered, refused, timed out, a new tree and a move's hand-over, choices and their refusals, stale menus, a bar menu built from an older top level keeping its id only while the menu there has its title (another session's versions included), every fetch carrying the title it was shown under, the rows and sections (a note a section of its own); then 5,000 random sessions in which every opened menu's completion is settled exactly once | 122 and 5,000 sessions | 29 |
 | `menus` | `Sources/SillHost/MenuFormat.swift` and `MenuPolicy.swift` with `Sources/StreamProtocol` (`build.sh`, `-package-name sill`) | kinds 24, 25 and 27 and MacMenu.swift's JSON (a fetch's title); the Mac's shortcuts as it draws them (modifiers, special and function keys, glyphs); items, ids and paths; the 1 s cache, only under the title it was read under, and the wait after an app is brought forward; the title shown; the request rates; a request's deadline from its device's wait; the submenus a version has read at their places (one tree per version); the press decision (only a leaf whose title now is the one shown); the refusals' words and the log's path | 309 | 43 |
 | `message-reader` | `iOSClient/MessageReader.swift`, `Sources/StreamProtocol/StreamMessage.swift` | the session's reader against a stand-in Mac on loopback: 2,000 random messages in random chunks delivered byte for byte and in order, payloads read in pieces of at most 256 KB with every piece reported (liveness counts bytes), the end mid-message and with the last bytes, the caps, and a stop between messages, mid-payload and at a message the end came with | 46 | 17 |
 | `origin` | `Sources/SillHost/OriginPolicy.swift`, `InterfaceSnapshot.swift` | which door a connection may use, by source address and interface; the last cases read this Mac's own interfaces (read-only) | 66 | 10 |
 | `pairing-address` | `Sources/SillMenuBar/PairingWindowAddress.swift` with `AddressList`, `OriginPolicy` and `Sources/StreamProtocol` (`build.sh`) | the address the pairing window gives to type, with 5,000 random runs | 80 | 35 |
-| `phone-portrait` | `iOSClient/PhonePortraitLayout.swift` | where everything goes on a phone held upright: the picture's 16:10 pane, row 1's five buttons in their band, the strip, the six caps, the trackpad and its span, the Aa ruler, the drawer and the Settings panel across row 1, and the dim, and the Menus button ending the strip's row; the plan's tables phone by phone (the keyboard's too, and the Duo's outer display's), the approved mockup's numbers, and every width from 300 to 599 pt at every height to 1,400 | 152 | 31 |
+| `phone-portrait` | `iOSClient/PhonePortraitLayout.swift` | where everything goes on a phone held upright: the picture's 16:10 pane, row 1's five buttons in their band, the strip, the six caps, the trackpad and its span, the Aa ruler, the drawer and the Settings panel across row 1, and the dim, and the Menus button ending the strip's row, the Sound button under Settings with Menus beside it (docs/audio-plan.md §7.6); the plan's tables phone by phone (the keyboard's too, the Duo's outer display's, and the iPhone Duo's real cover, 382×678 beside its camera's strip), the approved mockup's numbers, and every width from 300 to 599 pt at every height to 1,400 | 169 | 35 |
 | `pointer-control` | `Sources/SillHost/PointerControl.swift` with `Sources/StreamProtocol` (`build.sh`) | who moves the Mac's pointer: the settle after Sill's own input, posts and warps, a real move from the last position that counted (jitter never, a slow drift yes), keys, one controller of two devices, a read after a gap, when it counts as moving (the frame-rate sampling), the fraction kind 26 carries (the far edges outside); kind 26 itself (MacPointer's JSON, the kind table), with 5,000 random runs | 157 | 33 |
 | `pointer-presence` | `iOSClient/PointerPresence.swift` | what the device's pointer sprite shows, row by row of the plan's table (the Mac's, the portrait trackpad's, the Pencil's, both flips), the portrait key row keeping what shows, a new frame re-centring only this device's own pointer while it shows, a report's freshness, the network queue's feed (the anchor, its re-seeds, a hand-over's carry-over and restatements), the portrait pad's cursor and its re-seed mid-stroke or under a resting finger | 165 | 43 |
 | `pointer-watch` | `Sources/SillHost/PointerWatch.swift` with `PointerControl.swift`, `Stats.swift` and `Sources/StreamProtocol` (`build.sh`, `-package-name sill`) | the host's sampling of the Mac's pointer around PointerControl: nothing read without a geometry, and a synthetic host never reading the real pointer; the fraction and inside per geometry; the kind 26 each device is sent (nothing to the one driving); a regular-mode window's bounds and on-screen flag re-read on a queue of its own (after a move at most every 0.1 s while a device is sent the pointer, every 2 s anyway), never waited for, a stale answer dropped and an owed one run; Sill's own motion; the frame interval and when the frame-rate sampler runs (over the source, a device sent it, faster than the tick); the TEST ONLY scripted pointer (its file, its clock, a dry run's move against its steps) and the software-encoder hook, with their lines | 132 | 40 |
-| `policy` | `iOSClient/DiscoveryPolicy.swift` | when the device looks nearby, its rows and their words, the route word, the wired dial, reconnects, the move off AWDL, a session following the best path (the cable, Wi-Fi, Direct) and the remote rule | 286 | 70 |
-| `protocol` | `Sources/StreamProtocol/*.swift`, then `crosscheck.py` | the address parser, SafeText, pairing codes and proofs, tags, the Mac ID, the certificate, kind 18's signature, framing, kind 29's two types (every malformed payload refused, 2,000 random ones never trapping), and TLS 1.3 with pinned keys on loopback; the cross-check repeats the certificate and signature with Python and `/usr/bin/openssl` | 218 + 8 | 30 |
-| `remote-rules` | `iOSClient/DiscoveryPolicy.swift`, `RemoteDialPolicy.swift`, `SavedMacs.swift` with `Sources/StreamProtocol` (`build.sh`) | the Remote rows and automatic remote dial, the order a saved Mac's addresses are tried in, what a failure means, saved Macs | 64 | 35 |
-| `tour` | `iOSClient/TourPolicy.swift` (with `PhonePortraitLayout.swift`) | the first-run tour's rules: the steps and targets per layout (sideways, the halves, a phone's rows; and under VoiceOver), what is owed, when the tour shows by itself (a beat after the picture, nothing touched, sent, used or open; a turn), memory and runs, Skip in Take the Tour, what a session decided and the automatic reconnect's, a rotation mid-run, the crease, the card's width and place, beside its targets (pinned at the Duo's four sizes, the iPhone SE's two and four phones upright against PhonePortraitLayout's rects, an oracle, a grid of screens and heights), every string | 43,784 | 63 |
+| `policy` | `iOSClient/DiscoveryPolicy.swift`, with `main.swift` and `home.swift` | when the device looks nearby, its rows and their words, the route word, the wired dial, reconnects, the move off AWDL, a session following the best path (the cable, Wi-Fi, Direct), the remote rule and a remote session's move home (`moveHome`; `moveHomeTrust`: pinned TLS only; `moveHomeRow` and `HomeRows`: which row, by row, a refused row or a plain one never keeping the session from the Mac's own, with a model of the glue; `HomeMoveInfo`: the move's kind 18 held to the floor taken as it starts, the broadcast race among the cases); pairing at home's session rules (`home.swift`: the pin, the trust a dial starts, how a session at home ends, the ask's answer, the words) | 392 | 130 |
+| `protocol` | `Sources/StreamProtocol/*.swift`, then `crosscheck.py` | the address parser, SafeText, pairing codes and proofs, tags, the Mac ID, the certificate, kind 18's signature, framing, kind 29's two types (every malformed payload refused, 2,000 random ones never trapping), and TLS 1.3 with pinned keys on loopback, the two ALPNs every host offers for good among them; the cross-check repeats the certificate and signature with Python and `/usr/bin/openssl` | 220 + 8 | 33 |
+| `remote-rules` | `iOSClient/DiscoveryPolicy.swift`, `RemoteDialPolicy.swift`, `SavedMacs.swift` with `Sources/StreamProtocol` (`build.sh`), with `main.swift` and `home.swift` | the Remote rows and automatic remote dial, the order a saved Mac's addresses are tried in, what a failure means, saved Macs; pairing at home's model, a look-alike under a saved Mac's name among it, and the saved Macs' home fields (`home.swift`) | 123 | 72 |
+| `tour` | `iOSClient/TourPolicy.swift` (with `PhonePortraitLayout.swift`) | the first-run tour's rules: the steps and targets per layout (sideways, the halves, a phone's rows; and under VoiceOver), what is owed, when the tour shows by itself (a beat after the picture, nothing touched, sent, used or open; a turn), memory and runs, Skip in Take the Tour, what a session decided and the automatic reconnect's, a rotation mid-run, the crease, the card's width and place, beside its targets (pinned at the Duo's four sizes, the iPhone SE's two and four phones upright against PhonePortraitLayout's rects, an oracle, a grid of screens and heights), every string (the Duo's own words for its keys); no step lights the Sound button | 51,842 | 72 |
 | `update-policy` | `Sources/SillMenuBar/UpdatePolicy.swift` with `Sources/StreamProtocol` (`build.sh`) | Sill.app's update check: what each answer from GitHub's releases feed means, the offer, the schedule, the feeds and pages it accepts, every text | 124 | 18 |
 
-The counts are those of main at 1f3072a, where every check passes and every mutant is caught; the
-two encoder checks' are those of the encoder-two-in-flight branch that brought them, the four the
-`update-notice` branch brought (`compatibility`, `device-gate`, `goodbye`, `update-policy`) those of
-its merge with main at 32d532b, `dmg-layout`'s and `phone-portrait`'s those of the `mac-dmg` and
-`iphone-portrait` branches that brought them, `fence`'s main's at cf05a78 (ci-fence-fix's) with the
-`pointer-visibility` branch's count on top, `pointer-control`, `pointer-presence` and
-`pointer-watch`'s that branch's after its review (docs/pointer-visibility-plan.md), `menus`' and
-`menu-state`'s those of the `menu-bar-mirror` branch after its review, which also added the menus'
-kinds to `pointer-control`'s (152 before) and the Menus button to `phone-portrait`'s (149 and 28),
-`message-reader`'s the `remote-pacing` branch's (docs/remote-bundle-plan.md, H5), and
-`compatibility`'s, `gesture-chords`' and `gestures`' are the `trackpad-gestures` branch's, which
-added kind 28's cases to the first and brought the other two, and at its merge with main (643af6b)
-kind 28 to `pointer-control`'s (155 before) and `protocol`'s (188 before). The `audio` branch brought
-`audio-packetizer`, `audio-codec` and `audio-playout`, and added the sound's cases to `compatibility`
-(130 with the gestures'), `protocol` (218) and the kind tables (`pointer-control` 157).
+The counts are those of the `remote-away` branch (PR #39) after its merge with main at e6b3265
+(2026-10-08), where every check passes. The mutants of the 27 checks whose files that merge changed
+against the parent their mutants last ran on were run again there, 952 in all, every one caught
+(docs/remote-bundle-plan.md, "Merged with main"): every check that compiles StreamProtocol's
+`HostSettings.swift`, whose kind 16 gained `away` and `link`; the four that compile
+`DiscoveryPolicy.swift` (`policy`, `remote-rules`, `home-device`, `home-model`), which gained the move
+home and its trust; and the branch's own four. The other eleven compile files exactly as main had
+them at e6b3265 (`clientlink`, `dmg-layout`, the two encoder checks, `gesture-chords`, `gestures`,
+`keychain`, `origin`, `phone-portrait`, `pointer-presence`, `tour`; `ledger` has no mutants).
+Before it: the `home-pairing` branch's merge with main at da43f6b ran the mutants of the 18 checks
+that compile the whole of StreamProtocol (docs/home-pairing-plan.md, Results), `key-strokes`' count
+is the `spotlight-modifier-fix` branch's after its review, and `home-device`, `home-model` and
+`remote-rules` grew with #44 and #46. The `audio` branch brought `audio-packetizer`, `audio-codec`
+and `audio-playout`, and added the sound's cases to `compatibility` (130 with the gestures'),
+`protocol` (218) and the kind tables (`pointer-control` 157); at its merge with main at 985a733,
+`compatibility`'s 131 and 31 and `protocol`'s 220 + 8 and 33 are both sides' cases and mutants
+together, not yet counted by a run.
 
 A mutant changes the checked file in one place and must make the check fail: `run.sh --mutants`
 (or `run-all.sh --mutants`) passes only when the script's last line counts every mutant as caught.
@@ -90,26 +108,38 @@ name them: H2, H3, H13 and so on) and moved here unchanged except for paths: the
 `main.swift`'s header comment, and the `policy`, `fence` and `clientlink` mutants scripts, which
 named absolute paths and wrote beside themselves; they now read the repository and write to
 `.build/checks/<name>/`. The others take the repository's root as their argument, as `run.sh` passes
-it. `ledger`'s old mutants were whole copies of an older ledger, so it has none. `encoder-mailbox`
-and `encoder-slowstate` came with encoder-two-in-flight, which had them as
-`Scripts/encoder-check/mailbox` and `slowstate`; its two real-time encoder checks (`probe`, the
-re-check's loop against a stand-in encoder, and `encoder`, the real HEVCEncoder against a stand-in
-VideoToolbox) stay in `Scripts/encoder-check/run.sh`, which runs these two as well: their timing
-bounds are tight for a shared runner. The `update-notice` branch's four came the same way at its
-merge: each `main.swift` as it was (the plan's H3; only `compatibility`'s header comment names its
-compile line now), and each list of mutants, a JSON file beside it there, the same mutants in a
-`mutants.py`. `dmg-layout` was written for the `mac-dmg` branch, after its review: its allocator
+it. `ledger`'s old mutants were whole copies of an older ledger, so it has none. The `update-notice`
+branch's four came the same way at its merge: each `main.swift` as it was (the plan's H3; only
+`compatibility`'s header comment names its compile line now), and each list of mutants, a JSON file
+beside it there, the same mutants in a `mutants.py`. `encoder-mailbox` and `encoder-slowstate` came
+with encoder-two-in-flight, which had them as `Scripts/encoder-check/mailbox` and `slowstate`; its
+two real-time encoder checks (`probe`, the re-check's loop against a stand-in encoder, and
+`encoder`, the real HEVCEncoder against a stand-in VideoToolbox) stay in
+`Scripts/encoder-check/run.sh`, which runs these two as well: their timing bounds are tight for a
+shared runner. `dmg-layout` was written for the `mac-dmg` branch, after its review: its allocator
 expectations are those of a Finder-made image's `.DS_Store` (an installer image of 2023, which is
 not in the repository), and its run reads make-dmg.sh's layout by sourcing the script, which then
 only defines its functions. `menus` and `menu-state` were written for `menu-bar-mirror` (the plan's
 H3); the menu reader and mirror, which need Accessibility and an app to read, are checked against a
 fixture app by `Scripts/menu-check/run.sh`, outside CI.
 
+Pairing at home's came with the `home-pairing` branch, from its own scratch folder, at its merge
+with main: `door`, `cable`, `asklimits`, `records`, `device`, `hometxt` and `home` there are
+`door-policy`, `cable-link`, `ask-limits`, `home-records`, `home-device`, `home-txt` and
+`home-model` here, each `main.swift` and list of mutants as it was but for its name, and the helper
+that built them (`lib.py` there) is `module.py`, which compiles the files a check's `module.txt`
+lists as one module. Its additions to `policy` and `remote-rules` (`step4.swift` there) are each
+folder's `home.swift`. `door-policy` gained the cases and mutants of `afterGate`, which the merge
+added, and `goodbye` its "pairingRequired" cases: it and `compatibility` had used that reason as
+one the device does not know, which is "pairAgain" in both now.
+
 ## Adding a check
 
 A folder with a `main.swift` (prints `ok` or `FAIL` per case, exits non-zero on any failure) and a
 `run.sh` that sets `here`, sources `../common.sh` (which sets `root` and `out` and changes to the
-root) and compiles with `swiftc` into `"$out"`. A `mutants.py` is optional; its last line must count
+root) and compiles with `swiftc` into `"$out"`; or, for files that compile as one module with
+StreamProtocol's sources, a `module.txt` naming them and a `run.sh` that hands the check to
+`../module.py`, as `door-policy/run.sh` does. A `mutants.py` is optional; its last line must count
 the mutants (`N of M mutants caught`, or `mutants caught: N of M`), and `run.sh --mutants` hands it
 to `run_mutants`; add the check's name to the `mutants` matrix in `.github/workflows/ci.yml` too.
 `run-all.sh` picks up every folder with a `run.sh`, and fails a check whose `run.sh` is not
@@ -118,19 +148,15 @@ a permission, a device or the network, and never anything that links VideoToolbo
 
 ## Checks that belong to open branches
 
-- `update-notice`: it adds kind 23 (the device's hello), so `protocol/main.swift`'s case "kind 23 is
-  unknown (skipped)" becomes "kind 23 is hello (update-notice), 24 unknown (skipped)" in that merge.
-- `encoder-two-in-flight`: EncoderMailbox (`Sources/SillHost/EncoderMailbox.swift`, only on that
-  branch) and the encoder checks built on it. The branch carries them as `Scripts/encoder-check/`
-  (`mailbox` with its mutants, `probe`, `encoder`; `Scripts/encoder-check/run.sh`), which refuse to
-  run any binary that links VideoToolbox. When it merges, move them here (or call that script from
-  `ci.yml`).
-- `home-pairing` and the rest of `remote-bundle` (items 2–4) are plans so far, without checks. Its
-  item 1's host side is measured by the pacing harness (`Scripts/pacing/run.sh`), which needs no
-  encoder but runs for minutes and on loopback at up to 600 Mbit/s, so it is not a pure check.
 - `audio` (kind 29, the Mac's sound; docs/audio-plan.md): `protocol`, `menus`, `pointer-control` and
   `compatibility` expect 28 to be the trackpad gesture, 29 the sound and 30 and up to read as
   `.unknown`. The mutants that renumber a kind do so onto numbers no plan will take, 250 to 254
   (`menus`' "the fetch at 250", `pointer-control`'s "kind 26 numbered 251" and "… 252",
   `compatibility`'s "kind 28 as 250" and "kind 29 as 253", `protocol`'s "kind 29 as 254"), since a
   kind renumbered onto a taken one no longer compiles: the next kind moves none of them.
+
+`remote-bundle`'s pacing (item 1) and the link's judgement (item 3), which merged with PR #39, are
+also measured on the host's side by the pacing harness (`Scripts/pacing/run.sh`), which needs no
+encoder but runs for minutes and on loopback at up to 600 Mbit/s, so it is not a pure check; their
+pure parts are `message-reader`, `link-judge`, `away-wire`, `away-quality`, `away-copy` and the move
+home's cases in `policy` and `fence`.

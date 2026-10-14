@@ -164,12 +164,20 @@ struct HostSettingsPanel: View {
                             Text("Connected \(r.phrase.replacingOccurrences(of: " ", with: "\u{00A0}"))\u{00A0}· \(Self.rttText(client.linkStats))")
                                 .fixedSize(horizontal: false, vertical: true)
                         }
+                        // Away from home (docs/remote-bundle-plan.md §5.8): which quality this
+                        // connection's Mac runs for it, from the Mac's word. Its own line, wrapping
+                        // like the readout; the quality kept whole.
+                        if let line = AwayCopy.headerLine(state.away) {
+                            Text(line.text)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
                     }
                     .font(.footnote.monospacedDigit())
                     .foregroundStyle(Palette.muted)
                     .accessibilityElement(children: .ignore)
                     .accessibilityLabel(Self.spokenReadout(state.stream, route: client.route, remote: remoteRoute,
-                                                           rttMs: client.linkStats?.rtt?.median))
+                                                           rttMs: client.linkStats?.rtt?.median)
+                                        + (AwayCopy.headerLine(state.away)?.spoken ?? ""))
                 }
             }
             Spacer(minLength: 8)
@@ -224,13 +232,22 @@ struct HostSettingsPanel: View {
                 if let problem = client.settingsProblem {
                     Callout(text: problem)
                 }
-                // Away from home on a slow link: what helps. It goes when the link recovers, and
-                // with the panel.
-                if remoteRoute != nil, client.slowLink {
+                // The link cannot carry the quality (the Mac's own judgement, docs/remote-bundle-plan.md
+                // §6.7): what it recommends, with a button that picks it. From an older Mac, which
+                // judges nothing, the round-trip test away from home as before.
+                if let callout = AwayCopy.callout(link: state.link, away: state.away, mac: mac) {
+                    Callout(text: callout.text, button: callout.button.map { b in
+                        Callout.Action(title: b.title, spoken: b.spoken) { client.changeSettings(b.change) }
+                    })
+                } else if AwayCopy.showsRttCallout(away: state.away, remote: remoteRoute != nil, slowLink: client.slowLink) {
                     Callout(text: "The picture is arriving slowly from \(mac). Choose Low quality or Standard resolution.")
                 }
                 streamRows(shown)
                 Footnote(text: streamFooter)
+                // Which quality these rows set, away from home or at home.
+                if let note = AwayCopy.footnote(state.away, mac: mac, remoteAccessOn: client.macInfo?.remoteAccess == true) {
+                    Footnote(text: note, top: 0)
+                }
                 // As in the Mac's Settings › Streaming: its own group, the Mac's name for it, and
                 // what it trades away.
                 Rows {
@@ -389,8 +406,13 @@ struct HostSettingsPanel: View {
     /// This connection's way in from afar, when it is one.
     private var remoteRoute: RemoteRoute? { client.remoteRoute }
 
-    /// The last group (docs/remote-access-plan.md §7.11): whether this device can reach the Mac
-    /// away from home, from the Mac's kind 18. None from an older Mac (no kind 18 on this connection).
+    /// The Mac's last group (docs/remote-access-plan.md §7.11, docs/home-pairing-plan.md §7.6):
+    /// whether this device is paired with the Mac and can reach it away from home, from the Mac's
+    /// kind 18 (DiscoveryPolicy.awayFromHome). "Paired" for a saved Mac, however it paired; Pair This
+    /// iPad… only in an unpaired session: at home over TLS on a Mac that lets any device in (it pairs
+    /// at this session's own door, Remote Access on or not), or over a plain door with Remote Access
+    /// on (through the remote door, as before). None from an older Mac (no kind 18 on this
+    /// connection).
     @ViewBuilder private var awayFromHome: some View {
         if let info = client.macInfo {
             Text("Away from home")
@@ -400,18 +422,23 @@ struct HostSettingsPanel: View {
                 .padding(.top, 6)
                 .padding(.bottom, 6)
                 .accessibilityAddTraits(.isHeader)
-            if client.macInfoSaved {
+            switch DiscoveryPolicy.awayFromHome(saved: client.macInfoSaved, remoteSession: remoteRoute != nil,
+                                                remoteAccess: info.remoteAccess, tlsAtHome: client.sessionAtHomeOverTLS) {
+            case .paired(let reach):
                 Rows {
-                    Label("Paired for remote access", systemImage: "checkmark.circle.fill")
+                    Label("Paired", systemImage: "checkmark.circle.fill")
                         .foregroundStyle(Palette.text)
                         .rowFrame()
                 }
-                if let r = remoteRoute {
-                    Footnote(text: "Connected \(r.phrase).")
-                } else {
+                switch reach {
+                case .connected:
+                    if let r = remoteRoute { Footnote(text: "Connected \(r.phrase).") }
+                case .reaches:
                     Footnote(text: "Away from home, Sill reaches \(mac) \(Self.reach(info)).")
+                case .turnOnRemoteAccess:
+                    Footnote(text: Self.turnOnRemoteAccess(mac))
                 }
-            } else if info.remoteAccess {
+            case .pairThisDevice(let atHome):
                 Rows {
                     Button(action: pairThisDevice) {
                         Text("Pair This \(device)…")
@@ -422,11 +449,17 @@ struct HostSettingsPanel: View {
                     .buttonStyle(.plain)
                     .rowFrame()
                 }
-                Footnote(text: "Pair once to reach \(mac) through your VPN or the internet. \(mac) shows a code; scan it with this \(device).")
-            } else {
-                Footnote(text: "To reach \(mac) away from home, turn on Remote Access in Sill’s Settings on the Mac.")
+                Footnote(text: atHome ? DiscoveryPolicy.HomeCopy.pairThisDeviceAtHome(mac: mac, device: device)
+                                      : "Pair once to reach \(mac) through your VPN or the internet. \(mac) shows a code; scan it with this \(device).")
+            case .turnOnRemoteAccess:
+                Footnote(text: Self.turnOnRemoteAccess(mac))
             }
         }
+    }
+
+    /// With Remote Access off on the Mac: how to reach it away from home.
+    static func turnOnRemoteAccess(_ mac: String) -> String {
+        "To reach \(mac) away from home, turn on Remote Access in Sill’s Settings on the Mac."
     }
 
     // MARK: This device
@@ -728,9 +761,11 @@ private struct PendingSpinner: View {
 }
 
 /// A group's footer: small, muted, from the leading edge; orange with a warning sign for a problem.
+/// `top` 0 continues the footer above it.
 private struct Footnote: View {
     let text: String
     var warning = false
+    var top: CGFloat = 6
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 6) {
             if warning { Image(systemName: "exclamationmark.triangle.fill").accessibilityHidden(true) }
@@ -741,25 +776,49 @@ private struct Footnote: View {
         .fixedSize(horizontal: false, vertical: true)
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 14)
-        .padding(.top, 6)
+        .padding(.top, top)
         .padding(.bottom, 12)
     }
 }
 
-/// Something to know before touching anything: the Mac did not answer, or its hardware encoder
-/// is down. Above the groups.
+/// Something to know before touching anything: the Mac did not answer, its hardware encoder is
+/// down, or the link cannot carry the quality, with a button that picks what the Mac recommends
+/// (at least 44 pt tall, like the rows). Above the groups.
 private struct Callout: View {
+    struct Action {
+        let title: String
+        let spoken: String
+        let perform: () -> Void
+    }
     let text: String
+    var button: Action? = nil
     var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange).accessibilityHidden(true)
-            Text(text).foregroundStyle(Palette.text).fixedSize(horizontal: false, vertical: true)
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange).accessibilityHidden(true)
+                Text(text).foregroundStyle(Palette.text).fixedSize(horizontal: false, vertical: true)
+            }
+            .accessibilityElement(children: .combine)
+            if let button {
+                Button(action: button.perform) {
+                    Text(button.title)
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(Palette.accent)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                        .padding(.horizontal, 12)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Palette.control))
+                .accessibilityLabel(button.spoken)
+            }
         }
         .font(.footnote)
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color.orange.opacity(0.14)))
-        .accessibilityElement(children: .combine)
+        .accessibilityElement(children: .contain)
         .padding(.bottom, 10)
     }
 }

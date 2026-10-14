@@ -4,22 +4,34 @@ import StreamProtocol
 /// How the connect screen's column sits on this screen (docs/remote-access-plan.md §7.10).
 struct ConnectLayout {
     let size: CGSize
+    /// The Duo's fold across this screen (iOS 27.1, DuoPosture); `.inferred` before it, and on every
+    /// other device, where the rules below are what they were.
+    var fold: FoldInfo = .inferred
 
     /// 380 pt, or the screen's width less 32 pt on one narrower than 412 pt (which also gives the
     /// old column the margin it lacked at 375 pt).
     var columnWidth: CGFloat { size.width < 412 ? max(200, size.width - 32) : 380 }
-    /// The column's leading edge: where the 380 pt column sits centred. What widens the column
-    /// (the side-by-side card) grows towards the trailing edge, so the title never moves sideways.
-    var columnX: CGFloat { max(16, (size.width - columnWidth) / 2) }
+    /// The column's leading edge: where the 380 pt column sits centred, or, across the book pose's
+    /// fold, centred in the leading page. What widens the column (the side-by-side card) grows
+    /// towards the trailing edge, so the title never moves sideways.
+    var columnX: CGFloat { DuoPosture.columnX(columnWidth: columnWidth, screenWidth: size.width, fold: fold) }
     /// The card side by side (a short screen): the viewfinder's 260 pt and its words, from the
     /// column's leading edge to 24 pt short of the screen's trailing one, at most 620 pt.
     var sideBySideWidth: CGFloat { max(columnWidth, min(size.width - columnX - 24, 620)) }
-    /// The Duo half-folded, or in its laptop posture (710×1000): the column lives in the top half,
-    /// so nothing crosses the crease at the middle and the keyboard has the lower half.
-    var topHalf: Bool { size.height > size.width && size.width >= 600 && size.width < 740 && size.height < 1100 }
-    /// Any height under 520 pt (the Duo's outer display on its side, an iPhone in landscape): the
-    /// card goes side by side.
-    var short: Bool { size.height < 520 }
+    /// The Duo half-folded upright (the laptop pose): the room above the fold, where the column
+    /// lives, so nothing crosses it and the keyboard has the lower half. Before iOS 27.1 the fold
+    /// is the middle of a 710×1000-like screen (DuoPosture.crease); open flat there is none.
+    var topRoom: CGFloat? { DuoPosture.crease(size, fold)?.top }
+    var topHalf: Bool { topRoom != nil }
+    /// The laptop pose as the device reports it (iOS 27.1): the room above the fold, all the
+    /// connect screen's column has; it scrolls there. Nil elsewhere, the inferred crease included.
+    var roomAboveFold: CGFloat? { DuoPosture.roomAboveFold(size, fold) }
+    /// The book pose: the leading page's width, which holds what would cross the fold.
+    var leadingPage: CGFloat? { DuoPosture.leadingPage(fold) }
+    /// Any height under 520 pt (the Duo's outer display on its side, an iPhone in landscape), or a
+    /// room above the laptop pose's fold under that (373.5 pt with the status bar): the card goes
+    /// side by side.
+    var short: Bool { size.height < 520 || (roomAboveFold ?? .infinity) < 520 }
     /// The Duo's outer display upright (500×710) and phones: the column anchors to the top while a
     /// field has the keyboard.
     var compactPortrait: Bool { size.height > size.width && size.width < 600 }
@@ -28,6 +40,11 @@ struct ConnectLayout {
 /// Add a Mac (docs/remote-access-plan.md §7.7–7.8, §7.10), unfolded in the connect screen's column
 /// in place of the rows. Scanning the code on the Mac is the default; Enter Code Instead types its
 /// address and 12-digit code. Pairing progress and every error show inline, never in an alert.
+///
+/// The home card (docs/home-pairing-plan.md §7.5, §7.7–7.8) is the same card for a row whose Mac
+/// shows its code because a tap asked (`home`, the row's name): the scanner, or the code alone,
+/// both going to the door the ask reached (StreamClient.pairHome, the scanner through `scanned`);
+/// one line of words, which is also its collapsed line; every layout rule as above.
 struct AddMacCard: View {
     @ObservedObject var client: StreamClient
     let layout: ConnectLayout
@@ -38,6 +55,8 @@ struct AddMacCard: View {
     let close: () -> Void
     /// A field has the keyboard: the column collapses its words to one line.
     @Binding var editing: Bool
+    /// The home card's Mac, as its row names it; nil for Add a Mac.
+    var home: String? = nil
 
     @State private var address = ""
     @State private var code = ""
@@ -53,7 +72,7 @@ struct AddMacCard: View {
             if layout.short && !typed {
                 HStack(alignment: .top, spacing: 16) {
                     CodeScanner(mode: scannerMode, onLink: { client.scanned($0, tapped: $1, overlay: false) },
-                                retryNeedsTap: client.scanRetryNeedsTap)
+                                retryNeedsTap: client.scanRetryNeedsTap, mac: home)
                         .frame(width: 260, height: 200)
                     VStack(alignment: .leading, spacing: 8) {
                         words
@@ -70,7 +89,7 @@ struct AddMacCard: View {
                         // Gone while a pairing runs, back after a failure: the new scanner finds the
                         // code still in view, which StreamClient.scanned holds until it is tapped.
                         CodeScanner(mode: scannerMode, onLink: { client.scanned($0, tapped: $1, overlay: false) },
-                                    retryNeedsTap: client.scanRetryNeedsTap)
+                                    retryNeedsTap: client.scanRetryNeedsTap, mac: home)
                             .frame(height: layout.short ? 200 : 230)
                     }
                     progress
@@ -86,7 +105,14 @@ struct AddMacCard: View {
     // MARK: Words
 
     @ViewBuilder private var words: some View {
-        if editing && (layout.compactPortrait || layout.short) {
+        if let mac = home {
+            // The home card has one line, the same whether or not the code has the keyboard: the
+            // Mac shows its code now, and the typed path needs no address.
+            Text(typed ? DiscoveryPolicy.HomeCopy.typeCode(mac: mac) : DiscoveryPolicy.HomeCopy.showing(mac: mac, device: device))
+                .font(.system(size: 13))
+                .foregroundStyle(Palette.text)
+                .fixedSize(horizontal: false, vertical: true)
+        } else if editing && (layout.compactPortrait || layout.short) {
             Text("Type the address and code from your Mac.")
                 .font(.system(size: 13))
                 .foregroundStyle(Palette.muted)
@@ -107,11 +133,14 @@ struct AddMacCard: View {
 
     private var fields: some View {
         VStack(alignment: .leading, spacing: 8) {
-            PairingField(prompt: "100.101.102.103 or mac.example.net", label: "Address", text: $address,
-                         keyboard: .URL, submit: .next)
-                .focused($focus, equals: .address)
-                .onSubmit { focus = .code }
-            if let problem, problem.field == .address { ProblemLine(text: problem.text) }
+            // The home card dials the door its ask reached: the code alone.
+            if home == nil {
+                PairingField(prompt: "100.101.102.103 or mac.example.net", label: "Address", text: $address,
+                             keyboard: .URL, submit: .next)
+                    .focused($focus, equals: .address)
+                    .onSubmit { focus = .code }
+                if let problem, problem.field == .address { ProblemLine(text: problem.text) }
+            }
             PairingField(prompt: "0000 0000 0000", label: "Code", text: $code, keyboard: PairingField.codeKeyboard, submit: .go, monospaced: true)
                 .focused($focus, equals: .code)
                 .onSubmit(pair)
@@ -138,7 +167,11 @@ struct AddMacCard: View {
     private func pair() {
         guard !working else { return }
         focus = nil
-        client.pairTyped(code: code, address: address, overlay: false)
+        if home != nil {
+            client.pairHome(code: code)
+        } else {
+            client.pairTyped(code: code, address: address, overlay: false)
+        }
     }
 
     // MARK: Progress and errors

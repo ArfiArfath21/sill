@@ -35,17 +35,21 @@ enum Palette {
 /// Which layout a screen gets, decided from its size in points alone: no device check, no idiom,
 /// so an iPad at an odd split size and an iPhone each get the layout their dimensions deserve (only
 /// the arrangement `.outerPortrait` draws depends on the device; below). The numbers are written
-/// for the iPhone Duo and its four postures:
+/// for the iPhone Duo (first guessed at 1000×710 and 500×710; the real sizes, from the iOS 27.1
+/// simulator, are these, the stream screen's: docs/iphone-duo-plan.md):
 ///
-/// * inner display, unfolded landscape — 1000×710 → `.innerLandscape` (top bar over the stream)
-/// * inner display, portrait or half-folded — 710×1000 → `.innerPortrait` (stream over controls)
-/// * outer display, on its side — 710×500 → `.outerLandscape`
-/// * outer display, upright — 500×710 → `.outerPortrait`
+/// * inner display sideways, open flat or half-folded (the book pose) — 951×669 → `.innerLandscape`
+///   (top bar over the stream)
+/// * inner display upright, open flat or half-folded (the laptop pose) — 669×951 → `.innerPortrait`
+///   (stream over controls)
+/// * the cover on its side — 594×466 (678×466 less the camera's strip) → `.outerLandscape`
+/// * the cover upright — 382×678 (466×678 less that strip) → `.outerPortrait`
 ///
 /// The outer display is not a different app: it is the same two layouts at compact sizes, because
 /// the posture only changed how much room there is, not what the screen is for. The thresholds sit
-/// between those sizes with room to spare — 600 separates the 500 pt outer width from the 710 pt
-/// inner one, and 560 the 500 pt outer height from the inner 710.
+/// between those sizes with room to spare — 600 separates the cover's 382 pt width from the inner
+/// 669, and 560 the cover's 466 pt height from the inner 669. Where the fold runs across the inner
+/// display, and whether it is in the way, is the device's word (iOS 27.1, DuoPosture), not the size's.
 ///
 /// The same sizes catch the phones: every iPhone held upright (375–440 pt wide, 320 with Display
 /// Zoom) is `.outerPortrait` and on its side `.outerLandscape`, and so is an iPad window narrower
@@ -135,6 +139,10 @@ struct StreamScreen: View {
     @State private var panelSize: CGSize = .zero
     /// The viewport send waiting out its debounce, if any.
     @State private var pendingViewport: Task<Void, Never>? = nil
+    /// The line over the stream while the link cannot carry the quality (docs/remote-bundle-plan.md
+    /// §6.7; AwayCopy's LinkLine), and its next look (the linger's end).
+    @State private var linkLine = LinkLine()
+    @State private var linkLineCheck: Task<Void, Never>? = nil
 
     // The first-run tour (TourPolicy, TourOverlay; docs/first-run-walkthrough-plan.md). One stream
     // screen is one session. What the session decided is `client.tourSession`, which outlives the
@@ -157,6 +165,8 @@ struct StreamScreen: View {
     /// Settings panel that started it opened.
     @State private var tourKeyboardAfter = false
     @Environment(\.accessibilityVoiceOverEnabled) private var voiceOverEnabled
+    /// The Duo's hinge (iOS 27.1, DuoPostureReader): with the fold, the book and laptop poses.
+    @Environment(\.duoEnvironment) private var duoEnvironment
     #if DEBUG
     /// The console says once when a decision starts to wait.
     @State private var tourWaitLogged: Double? = nil
@@ -191,13 +201,15 @@ struct StreamScreen: View {
             let duo = DuoLayout.of(geo.size)
             let layout: TourLayout = duo == .innerLandscape || duo == .outerLandscape ? .landscape
                 : (DuoLayout.drawsPhone(geo.size) ? .phone : .portrait)
+            // The fold across this screen, in its own space (iOS 27.1 on the Duo; else as before).
+            let posture = DuoPosture.read(geo, duoEnvironment)
             ZStack {
                 Group {
                     switch duo {
                     case .innerLandscape:
-                        landscape(bar: .regular, width: geo.size.width)
+                        landscape(bar: .regular, width: geo.size.width, fold: posture.info(in: geo.size))
                     case .outerLandscape:
-                        landscape(bar: .compact, width: geo.size.width)
+                        landscape(bar: .compact, width: geo.size.width, fold: posture.info(in: geo.size))
                     case .innerPortrait:
                         portrait(metrics: .regular)
                     case .outerPortrait:
@@ -215,7 +227,8 @@ struct StreamScreen: View {
                 // The tour: a sibling above the layouts, as the pairing overlay is, and under it: an
                 // outside link puts the tour aside until the overlay has closed.
                 if let run = tour, !overlayShown {
-                    TourOverlay(run: run, copy: tourCopy(run, layout), layout: layout, targets: tourTargets,
+                    TourOverlay(run: run, copy: tourCopy(run, layout, keysOnItsSide: posture.onInnerDisplay),
+                                layout: layout, targets: tourTargets,
                                 screen: geo.size, bottomInset: geo.safeAreaInsets.bottom,
                                 next: tourNext, skip: tourSkip)
                         .transition(.opacity)
@@ -232,6 +245,10 @@ struct StreamScreen: View {
             .onPreferenceChange(TourTargetsKey.self) { tourTargets = $0 }
             .onChange(of: layout, initial: true) { _, now in layoutChanged(to: now) }
             .background(TouchWatcher(watch: touches))
+            // The layouts and the overlays share this screen's space, and so its fold; the inner
+            // display gives the picture the status bar's strip in every pose.
+            .duoFold(posture, size: geo.size, screen: "stream screen")
+            .duoStatusBar(posture, size: geo.size)
         }
         .background(Color.black)
         .overlayPreferenceValue(WindowMenuAnchorKey.self) { anchor in
@@ -287,6 +304,14 @@ struct StreamScreen: View {
         .onReceive(NotificationCenter.default.publisher(for: UIScreen.modeDidChangeNotification).receive(on: RunLoop.main)) { _ in
             sendViewport(after: 0.25)
         }
+        // Away from home the stream rate follows the route (60 fps through a VPN or the internet): a
+        // session that stops being away (the move home) asks for its full rate whatever path it took
+        // (docs/remote-bundle-plan.md §7.3).
+        .onChange(of: client.remoteRoute) { _, _ in sendViewport() }
+        // The link's line over the stream (§6.7): a report arriving or clearing, or the panel, the
+        // drawer or the pairing overlay opening or closing over it.
+        .onChange(of: linkReportLine, initial: true) { _, _ in updateLinkLine() }
+        .onChange(of: linkLineAllowed) { _, _ in updateLinkLine() }
         // The tour: the first picture starts its beat; an outside link puts it aside and back.
         .onChange(of: pictureReady, initial: true) { _, ready in if ready { pictureCame() } }
         // The bar's own controls used, by a tap or by VoiceOver, Switch Control, Voice Control or
@@ -305,6 +330,39 @@ struct StreamScreen: View {
             tourWait = nil
         }
     }
+
+    // MARK: The link's line
+
+    /// What the Mac's report says for the line now: nil while the link keeps up.
+    private var linkReportLine: String? {
+        let host = client.settings.host
+        return AwayCopy.streamLine(link: host?.link, away: host?.away, mac: client.macName.isEmpty ? "the Mac" : client.macName)
+    }
+
+    /// Nothing open over the stream: the Settings panel (which has the callout), the drawer, the
+    /// pairing overlay, the first-run tour (its dim and card; VoiceOver is on its card meanwhile).
+    private var linkLineAllowed: Bool { !settingsOpen && !drawerOpen && !overlayShown && !tourOnScreen }
+
+    /// Runs LinkLine on the report and what is open, says the line once a spell, and looks again at
+    /// the linger's end.
+    private func updateLinkLine() {
+        if let words = linkLine.update(report: linkReportLine, allowed: linkLineAllowed, now: ProcessInfo.processInfo.systemUptime) {
+            AccessibilityNotification.Announcement(words).post()
+            #if DEBUG
+            print("link: the stream's line “\(words)” (announced)")
+            #endif
+        }
+        linkLineCheck?.cancel()
+        linkLineCheck = nil
+        guard let at = linkLine.recheckAt else { return }
+        linkLineCheck = Task { @MainActor in
+            try? await Task.sleep(for: .seconds(max(0.01, at - ProcessInfo.processInfo.systemUptime)))
+            if !Task.isCancelled { updateLinkLine() }
+        }
+    }
+
+    /// The line as it shows over the stream now, or nil.
+    private var shownLinkLine: String? { linkLine.visible ? linkLine.text : nil }
 
     // MARK: Viewport
 
@@ -513,9 +571,10 @@ struct StreamScreen: View {
         return nil
     }
 
-    private func tourCopy(_ run: TourRun, _ layout: TourLayout) -> TourCopy {
+    /// `keysOnItsSide`: the iPhone Duo open, whose keys and trackpad come with the device on its side.
+    private func tourCopy(_ run: TourRun, _ layout: TourLayout, keysOnItsSide: Bool = false) -> TourCopy {
         TourPolicy.copy(run.at, layout, mac: client.macName, device: StreamClient.deviceWord,
-                        voiceOver: tourVoiceOver, firstOfRun: run.firstOfRun)
+                        voiceOver: tourVoiceOver, firstOfRun: run.firstOfRun, keysOnItsSide: keysOnItsSide)
     }
 
     private func tourLog(_ line: @autoclosure () -> String) {
@@ -758,20 +817,31 @@ struct StreamScreen: View {
         reduceMotion ? .opacity : .scale(scale: 0.94, anchor: anchor).combined(with: .opacity)
     }
 
-    private func landscape(bar: BarMetrics, width: CGFloat) -> some View {
+    private func landscape(bar plain: BarMetrics, width: CGFloat, fold: FoldInfo) -> some View {
+        // The book pose (docs/iphone-duo-plan.md, (a)): nothing on the fold's band; elsewhere as before.
+        let (bar, stripWidth) = plain.clearing(fold, width: width)
         // Apps, Menus, Aa, Keyboard, Desktop, Sound, Settings, and the strip: Menus where the row holds it
         // and a whole thumbnail, then Sound where it holds that one more.
         let row = width - 2 * bar.padding
         let menusFit = MacMenuButton.fits(width: row, buttons: 6, buttonWidth: bar.buttonWidth, gap: bar.gap, thumbWidth: bar.thumbWidth)
         let menusShown = client.menus.hasMenus && menusFit
+        let soundFits: Bool
+        if stripWidth != nil, let band = fold.verticalBand {
+            // The book pose: the buttons past the fold, sized for Menus and four more (BarMetrics.clearing);
+            // Sound only where that page holds it too, else the Settings panel's switch alone.
+            let buttons: CGFloat = menusShown ? 6 : 5
+            soundFits = width - bar.padding - buttons * bar.buttonWidth - (buttons - 1) * bar.gap >= band.maxX
+        } else {
+            soundFits = MacMenuButton.fits(width: row, buttons: menusShown ? 7 : 6, buttonWidth: bar.buttonWidth,
+                                           gap: bar.gap, thumbWidth: bar.thumbWidth)
+        }
         return VStack(spacing: 0) {
-            TopBar(client: client, metrics: bar, drawerOpen: $drawerOpen,
+            TopBar(client: client, metrics: bar, stripWidth: stripWidth, drawerOpen: $drawerOpen,
                    keyboardShown: $keyboardShown,
                    textScale: $textScale, scaleOpen: $scaleOpen, windowMenu: $windowMenu,
                    settingsOpen: settingsOpen,
                    menusFit: menusFit,
-                   soundFits: MacMenuButton.fits(width: row, buttons: menusShown ? 7 : 6, buttonWidth: bar.buttonWidth,
-                                                 gap: bar.gap, thumbWidth: bar.thumbWidth),
+                   soundFits: soundFits,
                    toggleKeyboard: { overlay.toggleKeyboard() },
                    setSettings: { setSettings($0, restoreKeyboard: $1) },
                    menusOpened: menusOpened, menusClosed: menusClosed)
@@ -790,6 +860,7 @@ struct StreamScreen: View {
                              settingsTransition: { settingsTransition(anchor: $0) },
                              onPanelSize: { panelSize = $0 },
                              pairThisDevice: openPairingOverlay,
+                             linkLine: shownLinkLine,
                              takeTour: takeTour)
     }
 
@@ -812,6 +883,7 @@ struct StreamScreen: View {
                              sendGesture: { client.sendGesture($0, fingers: $1) })
             }
             .background(Palette.panel)
+            .overlay(alignment: .top) { LinkLineView(text: shownLinkLine) }
             .clipShape(streamShape)
             .overlay(streamShape.strokeBorder(Color.white.opacity(0.09), lineWidth: 1))
             // The panel itself, inside the padding: the size the host fits the Mac window to.
@@ -861,6 +933,54 @@ struct StreamScreen: View {
     }
 }
 
+// MARK: - The link's line
+
+/// The line over the stream while the link cannot carry the quality (docs/remote-bundle-plan.md §6.7):
+/// a capsule at the top centre of the stream panel, 8 pt inside its top edge and at most the panel's
+/// width less 32 pt, footnote text on the bar's colour; two lines at most, the text no larger than
+/// xxLarge. It never takes a touch meant for the Mac, and comes and goes with a fade (with Reduce
+/// Motion too). VoiceOver hears it once a spell (StreamScreen.updateLinkLine) and can read it here.
+/// In the iPhone Duo's book pose it is centred on the leading page instead, off the fold
+/// (docs/iphone-duo-plan.md).
+struct LinkLineView: View {
+    let text: String?
+    /// The Duo's hinge (iOS 27.1): with the fold, where the line goes.
+    @Environment(\.duoEnvironment) private var duoEnvironment
+    var body: some View {
+        GeometryReader { geo in
+            let page = DuoPosture.leadingPage(DuoPosture.read(geo, duoEnvironment).info(in: geo.size))
+            line
+                .frame(width: page ?? geo.size.width)
+                .frame(maxWidth: .infinity, alignment: .topLeading)
+        }
+        .allowsHitTesting(false)
+    }
+
+    private var line: some View {
+        ZStack {
+            if let text {
+                Text(text)
+                    .font(.footnote)
+                    .foregroundStyle(Palette.text)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 7)
+                    .background(Capsule(style: .continuous).fill(Palette.bar.opacity(0.92)))
+                    .dynamicTypeSize(...DynamicTypeSize.xxLarge)
+                    .transition(.opacity)
+                    .accessibilityAddTraits(.isStaticText)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 8)
+        .frame(maxWidth: .infinity, alignment: .top)
+        .allowsHitTesting(false)
+        .animation(.easeOut(duration: 0.2), value: text)
+    }
+}
+
 // MARK: - Top bar
 
 /// The landscape top bar's numbers. The inner display gets the Main board's roomy bar; the outer
@@ -901,6 +1021,9 @@ struct BarMetrics {
 private struct TopBar: View {
     @ObservedObject var client: StreamClient
     let metrics: BarMetrics
+    /// The book pose: the strip's width, so that it ends short of the fold (BarMetrics.clearing);
+    /// nil: it takes the room there is, as before.
+    var stripWidth: CGFloat? = nil
     @Binding var drawerOpen: Bool
     @Binding var keyboardShown: Bool
     @Binding var textScale: Double?
@@ -934,7 +1057,10 @@ private struct TopBar: View {
                         pad: metrics.thumbPad, fade: metrics.thumbFade, menuFor: $windowMenu)
                 .opacity(scaleOpen ? 0.2 : 1)      // the ruler is centred on Aa and reaches over the strip's end
                 .allowsHitTesting(!scaleOpen)
+                .frame(width: stripWidth)
                 .tourTarget(.strip, inset: WindowStrip.tourBand(pad: metrics.thumbPad))
+            // The book pose: the fold's band, and nothing on it, between the strip and the buttons.
+            if stripWidth != nil { Spacer(minLength: 0) }
 
             // The Mac's menus of the streamed app, next to the thumbnails because they are the picked
             // window's app's. Only while the Mac sent some, and where the bar holds it: with none the
@@ -1021,9 +1147,7 @@ enum Spotlight {
         ? "sparkle.magnifyingglass" : "magnifyingglass.circle"
 
     static func press(send: (InputEvent) -> Void) {
-        let space: UInt16 = 0x2C
-        send(.key(hidUsage: space, down: true, modifiers: KeyModifiers.command.rawValue))
-        send(.key(hidUsage: space, down: false, modifiers: KeyModifiers.command.rawValue))
+        KeyChord.spotlight.forEach(send)
     }
 }
 
@@ -1474,14 +1598,20 @@ struct WindowLightsMenu: View {
     var alwaysBelow: (CGSize) -> Bool = { _ in false }
 
     private static let size = CGSize(width: 214, height: 62)
+    /// The Duo's hinge (iOS 27.1): the lights keep off its fold.
+    @Environment(\.duoEnvironment) private var duoEnvironment
 
     var body: some View {
         GeometryReader { proxy in
             let frame = proxy[anchor]
-            let below = alwaysBelow(proxy.size) || frame.midY < proxy.size.height / 2
             let w = Self.size.width, h = Self.size.height
-            let x = min(max(frame.midX, w / 2 + 8), proxy.size.width - w / 2 - 8)
-            let y = below ? frame.maxY + 8 + h / 2 : frame.minY - 8 - h / 2
+            // Off the Duo's fold (iOS 27.1): onto a page beside it, below the thumbnail when above it
+            // would sit on it; elsewhere as before.
+            let at = DuoPosture.lightsMenu(x: min(max(frame.midX, w / 2 + 8), proxy.size.width - w / 2 - 8),
+                                           below: alwaysBelow(proxy.size) || frame.midY < proxy.size.height / 2,
+                                           thumbnail: frame, size: Self.size, gap: 8, screenWidth: proxy.size.width,
+                                           fold: DuoPosture.read(proxy, duoEnvironment).info(in: proxy.size))
+            let below = at.below, x = at.x, y = at.y
             ZStack {
                 Color.clear.contentShape(Rectangle()).onTapGesture(perform: dismiss)
                 HStack(spacing: 6) {
@@ -1796,9 +1926,12 @@ struct DrawerRow<Leading: View>: View {
                     .lineLimit(1)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 if let trailing {
+                    // Whole, on one line, whatever the title's length: the title truncates instead
+                    // ("Not paired", "Update Sill" and "3 windows" hold a space).
                     Text(trailing)
                         .font(.system(size: 13))
                         .foregroundStyle(Palette.muted)
+                        .fixedSize()
                 }
             }
             .padding(.horizontal, 10)

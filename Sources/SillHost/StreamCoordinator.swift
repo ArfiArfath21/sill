@@ -33,8 +33,10 @@ package final class StreamCoordinator {
     /// The bitrate knob is per 60 fps; a faster stream gets proportionally more so each frame
     /// keeps its share of bits.
     private var streamBitrate: Int { bitrate * fps / 60 }
-    private var scale: CGFloat { config.captureScale }
-    private var bitrate: Int { config.bitrate }
+    /// The quality the pipeline runs: the away pair while it runs the away quality (`awayRunning`),
+    /// else the home pair (HostConfig.effective).
+    private var scale: CGFloat { config.effective(away: awayRunning).captureScale }
+    private var bitrate: Int { config.effective(away: awayRunning).bitrate }
     private var prioritizeSpeed: Bool { config.prioritizeSpeed }
 
     let server: StreamServer
@@ -56,7 +58,8 @@ package final class StreamCoordinator {
     /// encoder, the launch probe never runs and the re-check never starts, so no test touches the
     /// Mac's one hardware encoder while Noah streams (PointerTestHooks).
     private let softwareOnly: Bool
-    /// The TEST ONLY hooks' lines (PointerTestHooks), printed as `start` begins; empty without them.
+    /// The TEST ONLY hooks' lines (PointerTestHooks, InputInjector.testInputLog), printed as `start`
+    /// begins; empty without them.
     private let testHookLines: [String]
     /// A picked window streams from its own HiDPI display (see VirtualStage): the CLI's
     /// `--virtual-display`, or the app's setting. Every branch this adds is behind this flag;
@@ -210,11 +213,36 @@ package final class StreamCoordinator {
     /// In every window list (`WindowList.hostVersion`, with `protocol`): Sill.app's version; nil
     /// from the CLI, which has no bundle. For later devices, which can then say which Mac to update.
     private let hostVersion: String?
-    /// Remote access (RemoteAccess): Sill.app always, SillHost only with --remote. Nil: no
-    /// identity, no TXT tag, no kind 18, no remote door, exactly the host as before.
+    /// Remote access (RemoteAccess): Sill.app always, SillHost only with --remote or --pairing
+    /// (with --pairing alone, an identity for the TLS home door and no remote door). Nil: no
+    /// identity, no TXT tag, no kind 18, no remote door, no `away` in kind 16: exactly the host
+    /// as before.
     package let remote: RemoteAccess?
     /// Each admitted connection's route (home and its origin, or the remote door's), from the server.
     private var routes: [ObjectIdentifier: ClientRoute] = [:]
+    /// Away from home (docs/remote-bundle-plan.md §5; AwayPolicy): every connected device is away,
+    /// so the away quality is the target. Kept while no device is connected; the next to register
+    /// decides (`routesChanged`). What the Mac's card, menu and every device are told.
+    private var awayWanted = false
+    /// The away quality runs: the value the last `select` (or `adopt`) took. The pipeline reads it.
+    private(set) var awayRunning = false
+    /// A device that joined and flipped `awayWanted` (`routesChanged`): its first viewport, which
+    /// carries its rate and which a device sends as soon as it is connected, takes the flip in the
+    /// same restart as the rate; without one within a second (a test client), the flip goes alone.
+    /// Nothing else applies the flip meanwhile but a `select` that runs anyway, which takes it.
+    private var flipWait: ObjectIdentifier?
+    private var flipWaitToken = 0
+    /// Each connection whose catalog went out (`sendCatalog`): the ones settings states reach.
+    private var connections: [ObjectIdentifier: NWConnection] = [:]
+    /// Each connection's link while it does not keep up (LinkJudge, docs/remote-bundle-plan.md §6.5):
+    /// its kind 16's `link`, and the card's. A state leaves out a report whose bitrate (the running
+    /// one when it was judged) is no longer the target's, so the answer to the pick that lowers it
+    /// already carries none (the restart's reset follows). The bitrate alone: a change of the capture
+    /// scale alone may restart nothing (the software encoder runs at points).
+    private var linkReports: [ObjectIdentifier: LinkReport] = [:]
+    /// The quality the devices' links are judged at: the running stream's (`select`'s commit), nil
+    /// while nothing streams. A restart that keeps it keeps their judgement (LinkJudge.judgedAfresh).
+    private var judgedQuality: LinkJudge.Quality?
     /// When each connection last asked for a pairing code (kind 21): once per 30 s.
     private var lastPairingWanted: [ObjectIdentifier: CFAbsoluteTime] = [:]
     /// The streamed app's menus, for the devices that asked for them (kinds 24, 25 and 27,
@@ -242,9 +270,15 @@ package final class StreamCoordinator {
 
     /// `config` is validated, and its virtual display forced off without the AppKit loop, which
     /// the display needs (VirtualDisplay.swift, "Event loop"). `appKitLoop`: see the property.
-    /// `hostVersion`: Sill.app's version for the window lists, when it has one that parses.
+    /// `homePairing`: the home door speaks TLS with `remote`'s identity and trust list
+    /// (docs/home-pairing-plan.md §4.9; Sill.app, SillHost --pairing), or has no listener at all
+    /// when that identity could not be loaded; without it the home door is plain, as before (the
+    /// CLI's default). `testHooks`: false for Sill.app's own executable, which honours no TEST ONLY
+    /// hook that bears on who gets in or what pairing needs (§4.3): with it false, or on a host
+    /// that advertises, those hooks are ignored with one line each. `hostVersion`: Sill.app's
+    /// version for the window lists, when it has one that parses.
     package init(config: HostConfig, synthetic: Bool = false, appKitLoop: Bool, remote: RemoteAccess? = nil,
-                 hostVersion: String? = nil) throws {
+                 homePairing: Bool = false, testHooks: Bool = true, hostVersion: String? = nil) throws {
         var config = config.validated()
         if !appKitLoop { config.virtualDisplay = false }
         self.config = config
@@ -254,14 +288,29 @@ package final class StreamCoordinator {
         let env = ProcessInfo.processInfo.environment
         let path = PointerTestHooks.pointerPath(synthetic: synthetic, environment: env)
         let software = PointerTestHooks.softwareEncoder(synthetic: synthetic, environment: env)
+        let inputLog = InputInjector.testInputLog(synthetic: synthetic, environment: env)
         pointer = PointerWatch(synthetic: synthetic, path: path.path)
         softwareOnly = software.on
-        testHookLines = [path.line, software.line].compactMap { $0 }
+        testHookLines = [path.line, software.line, inputLog.line].compactMap { $0 }
         status = HostStatus()
-        server = try StreamServer(advertise: !synthetic)   // the test pattern is for test clients, not devices
+        var home = StreamServer.HomeDoorMode.plain
+        if homePairing, let remote {
+            if let identity = remote.identity {
+                home = .tls(StreamServer.HomeTLS(identity: identity, trust: remote.trust))
+            } else {
+                home = .closed("Sill couldn’t use its key \(remote.keyPlace) (\(remote.identityProblem ?? "no identity"))")
+            }
+        }
+        // The test pattern is for test clients, not devices.
+        server = try StreamServer(advertise: !synthetic, home: home, testHooks: testHooks)
         server.macName = macName                           // the update goodbye names this Mac (DeviceGate)
-        gesturesDry = server.isTestHost                    // a test host never posts a gesture (§7.4)
-        testHotKeys = server.isTestHost ? Self.testHotKeyTable() : nil
+        TestHooks.reportIgnored(testHost: server.isTestHost)
+        // A host that does not advertise, `--synthetic` in the CLI and in the app alike (as
+        // `injector.dryRun` below), not `server.isTestHost`, which also leaves out Sill.app's own
+        // executable: that narrowing is for the door and pairing hooks (TestHooks), and a gesture's
+        // chord must never be posted from the test pattern.
+        gesturesDry = synthetic                            // a test host never posts a gesture (§7.4)
+        testHotKeys = synthetic ? Self.testHotKeyTable() : nil
         menus = MenuMirror(server: server)
         let hook = Self.testMenuHook(synthetic: synthetic)
         testMenuPID = hook.pid
@@ -276,9 +325,11 @@ package final class StreamCoordinator {
         server.pointerWatch = pointer
         injector.watch = pointer
         injector.dryRun = synthetic
+        injector.testLog = synthetic && inputLog.on
         stage.onWarp = { [pointer] in pointer.sillMoved() }
-        // The identity's TXT tag must be in the first registration: set before `server.start()`.
-        remote?.attach(server: server, status: status, macName: macName)
+        // The identity's TXT record (its tag, and `p` on a TLS home door) must be in the first
+        // registration: set before `server.start()`.
+        remote?.attach(server: server, status: status, macName: macName, requirePairing: config.requirePairing)
         catalog.preferMainDisplay = virtualDisplay   // the Desktop source must never capture the virtual display
         stage.onLost = { [weak self] in Task { @MainActor in await self?.stageLost() } }
         status.update { $0.synthetic = synthetic; $0.virtualDisplayOn = config.virtualDisplay }
@@ -309,18 +360,30 @@ package final class StreamCoordinator {
                 guard let self else { return }
                 let id = ObjectIdentifier(connection)
                 self.routes[id] = route
-                // A remote device shows its paired name and its route until its own stats arrive;
-                // a home device its link (Wired, Wi-Fi, Direct) as soon as it is known.
+                // A paired device shows its paired name until its own stats arrive, and a remote one
+                // its route; a home device its link (Wired, Wi-Fi, Direct) as soon as it is known.
                 self.status.update {
                     $0.devices.append(HostStatusSnapshot.Device(id: id, endpoint: "\(connection.endpoint)", name: route.pairedName,
                                                                 route: link, remoteRoute: route.label))
                 }
-                if let fp = route.fingerprint, let label = route.label { self.remote?.sessionStarted(fingerprint: fp, route: label) }
+                // A paired key's session, at either door: the pane's "last connected", and over the
+                // cable the iPhone or iPad the key runs on (learned once).
+                if let fp = route.fingerprint, route.pairedName != nil {
+                    let words = route.label ?? Self.homeRouteWords(route, link: link)
+                    self.remote?.sessionStarted(fingerprint: fp, route: words, cableDevice: route.cableDevice)
+                }
+                // Home or away before its catalog: its settings state says which quality it sets.
+                self.routesChanged(joined: id, endpoint: "\(connection.endpoint)")
                 // Catalog first: the client's UI needs it even if the keyframe is slow to come.
                 self.catalog.thumbnailsWanted = true
                 self.sendCatalog(to: connection)
                 self.encoder?.requestKeyframe()
             }
+        }
+        // Each device's link (LinkJudge): the report its kind 16 carries, the card's row, one line.
+        server.onClientLinkChanged = { [weak self] connection, verdict in
+            let id = ObjectIdentifier(connection)
+            Task { @MainActor in self?.linkChanged(id, verdict) }
         }
         server.onKeyframeNeeded = { [weak self] in
             // Network queue → encoder lock: the next repaint carries the keyframe, or the last frame is
@@ -333,13 +396,26 @@ package final class StreamCoordinator {
                 self.clientFPS[ObjectIdentifier(connection)] = nil
                 self.settingsArrivals[ObjectIdentifier(connection)] = nil
                 self.settingsIgnoredLineAt[ObjectIdentifier(connection)] = nil
-                self.gestureArrivals[ObjectIdentifier(connection)] = nil
-                self.routes[ObjectIdentifier(connection)] = nil
-                self.lastPairingWanted[ObjectIdentifier(connection)] = nil
+                let id = ObjectIdentifier(connection)
+                self.gestureArrivals[id] = nil
+                self.routes[id] = nil
+                self.lastPairingWanted[id] = nil
+                self.connections[id] = nil
+                self.lastPublished[id] = nil
+                self.linkReports[id] = nil
+                if self.flipWait == id { self.flipWait = nil }
                 self.menus.clientLeft(connection)
-                self.status.update { $0.devices.removeAll { $0.id == ObjectIdentifier(connection) } }
-                // A 120 Hz device left a 60 Hz one behind: come down to its rate.
-                if self.active != .none, self.catalog.clientCount > 1, self.effectiveFPS != self.fps { await self.select(self.active) }
+                self.releaseKeys(of: id)
+                self.status.update { $0.devices.removeAll { $0.id == id } }
+                // The last device at home left devices away behind: the away quality, at once.
+                let flipped = self.routesChanged(joined: nil, endpoint: nil)
+                // A 120 Hz device left a 60 Hz one behind: come down to its rate. The restart takes
+                // the flip too (select's commit), so a device that leaves costs one.
+                if self.active != .none, self.catalog.clientCount > 1, self.effectiveFPS != self.fps {
+                    await self.select(self.active)
+                } else if flipped {
+                    await self.applyPending()
+                }
             }
         }
         server.onClientCountChanged = { [weak self] count in
@@ -455,6 +531,19 @@ package final class StreamCoordinator {
         }
     }
 
+    /// How the Devices pane says a paired device last connected at home: "over the USB cable",
+    /// "on this Mac", "directly" (peer-to-peer Wi-Fi), "over Wi‑Fi", "over Ethernet", else "at home".
+    static func homeRouteWords(_ route: ClientRoute, link: ClientLink.Route?) -> String {
+        if route.cableDevice != nil { return "over the USB cable" }
+        if route.origin == .loopback { return "on this Mac" }
+        switch link {
+        case .direct?: return "directly"
+        case .wifi?: return "over Wi\u{2011}Fi"
+        case .wired?: return "over Ethernet"
+        case nil: return route.origin == .direct ? "directly" : "at home"
+        }
+    }
+
     /// The listener is up, waiting or failed. Up means registering until Bonjour confirms a name,
     /// or not advertised at all in synthetic mode; a late "ready" never undoes a registered name.
     private func listenerChanged(_ network: HostStatusSnapshot.Network) {
@@ -490,7 +579,8 @@ package final class StreamCoordinator {
         for line in testHookLines { print(line) }
         if !synthetic, promptForPermissions { InputInjector.ensureAccessibility() }   // prompts once; input is dropped silently without it
         if softwareOnly {
-            // TEST ONLY: the software encoder from the start, and never a hardware session.
+            // TEST ONLY: a gate that must never touch the Mac's one hardware encoder (Noah may be
+            // streaming): the software encoder from the start, no probe, no re-check.
             useSoftwareEncoder = true
             status.update { $0.softwareEncoder = true }
         } else {
@@ -551,9 +641,11 @@ package final class StreamCoordinator {
     private var target: HostConfig { pendingConfig ?? config }
 
     /// Who keeps the settings when a device changes one. Sill.app lays the change over its
-    /// HostSettings (saved, shown in its menu and Settings) and returns the result. Unset (the
-    /// CLI): the change lands on `target` and lasts until the process ends. Set it before `start`.
-    package var onDeviceSettingsChange: (@MainActor (HostSettingsChange) -> HostConfig)?
+    /// HostSettings (saved, shown in its menu and Settings) and returns the result: over the away
+    /// quality (`applyingAway`) for a device away from home (`away`), else over the home one
+    /// (`applying`). Unset (the CLI): the change lands on `target` the same way and lasts until the
+    /// process ends. Set it before `start`.
+    package var onDeviceSettingsChange: (@MainActor (HostSettingsChange, _ away: Bool) -> HostConfig)?
 
     /// New settings from the app or a device, applied live. Synchronous: validated, the virtual
     /// display kept off without the AppKit loop, compared with the target, told to every device.
@@ -579,18 +671,61 @@ package final class StreamCoordinator {
         return true
     }
 
+    /// Takes what waits for the pipeline: settings (`pendingConfig`), and a flip between the home and
+    /// the away quality (`awayWanted` against `awayRunning`) unless it waits for a joined device's
+    /// first viewport (`flipWait`), which then brings both in one restart. At once when nothing
+    /// streaming depends on it, else through one restart of the current source.
     private func applyPending() async {
-        guard let new = pendingConfig, !switching, !shuttingDown else { return }   // select's defer calls it again
-        guard restartNeeded(for: new) else { pendingConfig = nil; adopt(new); return }
+        let flip = awayWanted != awayRunning && flipWait == nil
+        guard pendingConfig != nil || flip, !switching, !shuttingDown else { return }   // select's defer calls it again
+        let new = pendingConfig ?? config
+        // A flip still waiting for its viewport stays out of a settings change that needs no restart;
+        // a restart takes it anyway (select's commit).
+        let away = flipWait == nil ? awayWanted : awayRunning
+        guard restartNeeded(for: new, away: away) else { pendingConfig = nil; adopt(new, away: away); return }
         // A restart, not a pick. Turning the virtual display off still brings the staged window
         // forward as it comes home: select's commit decides that, from the value it actually takes.
         await select(active)   // committed inside select
     }
 
-    /// Whether the running pipeline would come out different under `new`: its rate (the devices'
-    /// highest under the new limit, 60 at most on the software encoder), capture scale, bitrate,
-    /// encoder speed, or, for a window, the virtual display. The Desktop never uses the display.
-    /// Direct Wireless is deliberately absent: it is the listener's (`adopt` hands it over).
+    /// Home or away (docs/remote-bundle-plan.md §5.4): a device registered (`joined`, before its
+    /// catalog) or one left (nil). The away quality becomes the target once every connected device
+    /// is away, the home one once any is at home; with nobody connected the flag stays (AwayPolicy).
+    /// A flip prints its line; one from a device that joined waits for that device's first viewport
+    /// (`flipAwaits`), one from a device that left is the caller's to apply. Returns whether it
+    /// flipped.
+    @discardableResult
+    private func routesChanged(joined: ObjectIdentifier?, endpoint: String?) -> Bool {
+        let before = awayWanted
+        awayWanted = AwayPolicy.wanted(devicesAway: routes.values.map(\.isAway), current: awayWanted)
+        let flipped = awayWanted != before
+        if flipped {
+            print(awayWanted ? AwayPolicy.awayLine(target) : AwayPolicy.homeLine(target, endpoint: endpoint ?? "a device"))
+            if let joined { flipAwaits(joined) } else { flipWait = nil }
+        }
+        status.update { $0.away = awayWanted && !routes.isEmpty }   // publishes (status.onChange)
+        return flipped
+    }
+
+    /// The flip waits for `id`'s first viewport, which carries its rate, so the two go in one
+    /// restart; after a second without one (a test client) it goes alone.
+    private func flipAwaits(_ id: ObjectIdentifier) {
+        flipWaitToken += 1
+        let token = flipWaitToken
+        flipWait = id
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(1))
+            guard self.flipWaitToken == token, self.flipWait == id else { return }
+            self.flipWait = nil
+            await self.applyPending()
+        }
+    }
+
+    /// Whether the running pipeline would come out different under `new` with the home or the away
+    /// quality (`away`): its rate (the devices' highest under the new limit, 60 at most on the
+    /// software encoder), capture scale and bitrate (the pair `away` picks), encoder speed, or, for a
+    /// window, the virtual display. The Desktop never uses the display. Direct Wireless is
+    /// deliberately absent: it is the listener's (`adopt` hands it over).
     ///
     /// A new bitrate needs a new encoder session. VideoToolbox accepts AverageBitRate on a live
     /// session and reads it back, but the hardware HEVC encoder's rate control does not follow it
@@ -598,27 +733,32 @@ package final class StreamCoordinator {
     /// stayed at 9.6 Mbps for 5 s and across a keyframe, against 28 Mbps for a session made at 40;
     /// lowered from 40 to 8 it dropped 41 of the next 60 frames). Only the software encoder and
     /// low-latency rate control follow a live change.
-    private func restartNeeded(for new: HostConfig) -> Bool {
+    private func restartNeeded(for new: HostConfig, away: Bool) -> Bool {
         guard active != .none else { return false }
         let wanted = min(new.maxFPS, max(24, clientFPS.values.max() ?? 60))
         let newFPS = useSoftwareEncoder ? min(wanted, 60) : wanted
-        let newScale = useSoftwareEncoder ? min(new.captureScale, 1.0) : new.captureScale
+        let pair = new.effective(away: away)
+        let newScale = useSoftwareEncoder ? min(pair.captureScale, 1.0) : pair.captureScale
         if newFPS != fps || newScale != captureScale { return true }
-        if new.bitrate != config.bitrate || new.prioritizeSpeed != config.prioritizeSpeed { return true }
+        if pair.bitrate != bitrate || new.prioritizeSpeed != config.prioritizeSpeed { return true }
         if new.virtualDisplay != config.virtualDisplay, case .window = active { return true }
         return false
     }
 
-    /// Makes `next` the running settings, inside `select` or at once when nothing running depends
-    /// on what changed. Logs one "Settings:" line.
-    private func adopt(_ next: HostConfig) {
+    /// Makes `next` the running settings, and `away` the quality the pipeline runs, inside `select`
+    /// or at once when nothing running depends on what changed. Logs one "Settings:" line when the
+    /// settings changed; a flip alone prints nothing here (`routesChanged` said it).
+    private func adopt(_ next: HostConfig, away: Bool) {
+        awayRunning = away
         let old = config
         guard next != old else { return }
         config = next
         // The listener's, not the pipeline's: StreamServer replaces it and connected devices keep streaming.
         if old.directWireless != next.directWireless { server.setPeerToPeer(next.directWireless) }
-        // The remote door's, not the pipeline's: RemoteAccess starts, stops or moves it.
-        if old.remoteAccess != next.remoteAccess || old.remotePort != next.remotePort || old.internetAccess != next.internetAccess {
+        // The doors', not the pipeline's: RemoteAccess starts, stops or moves the remote door, and
+        // Require pairing changes who the home door admits (and its TXT record).
+        if old.remoteAccess != next.remoteAccess || old.remotePort != next.remotePort || old.internetAccess != next.internetAccess
+            || old.requirePairing != next.requirePairing {
             remote?.apply(next)
         }
         catalog.preferMainDisplay = next.virtualDisplay   // the Desktop source must never capture the virtual display
@@ -679,6 +819,62 @@ package final class StreamCoordinator {
         CGDisplayVendorNumber(id) == VirtualStage.vendorID
     }
 
+    // MARK: Each device's link (docs/remote-bundle-plan.md §6)
+
+    /// The stream's quality as `select` commits it (nil: nothing streams). The devices' links are
+    /// judged afresh when it changes (LinkJudge.judgedAfresh: another bitrate, rate or resolution, or
+    /// no stream), and keep their judgement through a restart that keeps it, so a device's report,
+    /// line and callout neither go nor come back for a window picked or a rotation.
+    private func judgeLinks(_ quality: LinkJudge.Quality?) {
+        if LinkJudge.judgedAfresh(from: judgedQuality, to: quality) { server.resetLinks() }
+        judgedQuality = quality
+    }
+
+    /// A device's link changed: behind or stalled becomes its report (the running quality, what was
+    /// withheld, the carried rate and what would fit at the running pair and the stream's rate), a
+    /// line when the state is new, and the card's row; a report that only moves the carried rate
+    /// prints nothing, and changes nothing unless it changes the suggestion; fine clears it, with
+    /// "keeping up again" only for a judged recovery, never for a restart's reset. The snapshot
+    /// change publishes, and each connection's state carries its own.
+    private func linkChanged(_ id: ObjectIdentifier, _ v: LinkJudge.Verdict) {
+        guard routes[id] != nil else { return }       // gone meanwhile
+        let device = status.snapshot.devices.first { $0.id == id }
+        let who = device?.name ?? device?.endpoint ?? "a device"
+        switch v.state {
+        case .fine:
+            let had = linkReports.removeValue(forKey: id) != nil
+            status.update {
+                guard let i = $0.devices.firstIndex(where: { $0.id == id }) else { return }
+                $0.devices[i].link = nil
+            }
+            if had, !v.reset { print(LinkJudge.fineLine(device: who)) }
+        case .behind, .stalled:
+            let behind = v.state == .behind
+            let fps = status.snapshot.stream?.fps ?? self.fps
+            let suggestion = LinkJudge.suggestion(carriedKbps: v.carriedKbps, bitrate: bitrate, fps: fps, captureScale: Double(captureScale))
+            let report = LinkReport(state: behind ? LinkReport.behind : LinkReport.stalled, withheldPerSecond: v.withheld,
+                                    bitrate: bitrate, carriedKbps: v.carriedKbps,
+                                    suggestedBitrate: suggestion?.bitrate, suggestedCaptureScale: suggestion?.captureScale)
+            let previous = linkReports[id]
+            // The same state with the same suggestion (the judge reporting its rate as it moves): the
+            // device and the card have nothing new to show, so nothing is published.
+            if let previous, previous.state == report.state, previous.suggestedBitrate == report.suggestedBitrate,
+               previous.suggestedCaptureScale == report.suggestedCaptureScale { return }
+            linkReports[id] = report
+            let shown = HostStatusSnapshot.LinkStatus(state: behind ? .behind : .stalled, withheld: v.withheld, bitrate: bitrate,
+                                                      carriedKbps: v.carriedKbps, suggestedBitrate: suggestion?.bitrate,
+                                                      suggestedCaptureScale: suggestion?.captureScale)
+            status.update {
+                guard let i = $0.devices.firstIndex(where: { $0.id == id }) else { return }
+                $0.devices[i].link = shown
+            }
+            guard previous?.state != report.state else { return }
+            print(behind ? LinkJudge.behindLine(device: who, bitrate: bitrate, withheld: v.withheld, offered: v.offered,
+                                                carriedKbps: v.carriedKbps, suggestion: suggestion)
+                         : LinkJudge.stalledLine(device: who, waiting: v.waiting))
+        }
+    }
+
     // MARK: Client messages
 
     private func handle(_ message: StreamMessage, from connection: NWConnection) async {
@@ -720,14 +916,23 @@ package final class StreamCoordinator {
                 if let error { print("Launch failed: \(error.localizedDescription)") }
             }
         case .input:
-            guard let event = Wire.decode(InputEvent.self, from: message.payload),
-                  let rect = currentSourceRect() else { return }
+            guard let event = Wire.decode(InputEvent.self, from: message.payload) else { return }
+            let device = ObjectIdentifier(connection)
+            guard let rect = currentSourceRect() else {
+                // Nothing streams (between sources, or the stream stopped: the window closed under a
+                // drag): input has nowhere to land. The up of a key or a button the Mac has down still
+                // goes (DroppedInput), a button's where the pointer is (`.null`), so no modifier this
+                // device pressed stays down to make a later click a ⌘-click, and no button to make
+                // every later move a drag.
+                if injector.isUpOfSomethingDown(event) { deliver(event, in: .null, from: device) }
+                return
+            }
             // A click, a key or text may close a view a gesture opened; a move or a scroll does not.
             gestureChords.input(Self.gestureInput(event))
             // A synthetic host acts on nothing: it posts no event (InputInjector.dryRun), so it
             // activates and raises nothing either.
             if !synthetic { raiseIfInteracting(event) }
-            deliver(event, in: rect)
+            deliver(event, in: rect, from: device)
             desktopInputMayActivate(event)
         case .gesture:
             // A three- or four-finger gesture (docs/trackpad-gestures-plan.md §7.4), which the Mac
@@ -748,18 +953,35 @@ package final class StreamCoordinator {
         case .viewport:
             guard let v = Wire.decode(Viewport.self, from: message.payload) else { return }
             viewport = v
-            clientFPS[ObjectIdentifier(connection)] = v.fps ?? 60
-            if switching { viewportArrivedWhileSwitching = true; return }
+            let id = ObjectIdentifier(connection)
+            clientFPS[id] = v.fps ?? 60
+            // The flip its connection made waited for this, its rate (`flipAwaits`): the restart the
+            // rate needs takes the flip too, and the flip alone restarts once when the rate needs none.
+            let flipWaited = flipWait == id
+            if flipWaited { flipWait = nil }
+            if switching { viewportArrivedWhileSwitching = true; return }   // select's defer applies both
             await applyViewportToActiveWindow()
+            if flipWaited { await applyPending() }
         case .pairingWanted:
             // "Show your pairing code" (Pair This iPad…): only from a device near the Mac (the home
             // door, from loopback, this network or peer-to-peer Wi-Fi), once per 30 s per connection.
+            // At a TLS home door only from an unpaired session (Require pairing off), which goes
+            // through the ask rule; a paired session's is ignored.
             let id = ObjectIdentifier(connection)
-            guard let remote, case .home(let origin)? = routes[id], [.loopback, .lan, .direct].contains(origin) else { return }
+            guard let remote, case .home(let origin, let peer)? = routes[id], [.loopback, .lan, .direct].contains(origin) else { return }
+            if server.homeTLS, peer.map({ remote.isPaired($0.fingerprint) }) ?? true { return }
             let now = CFAbsoluteTimeGetCurrent()
             if let last = lastPairingWanted[id], now - last < 30 { return }
             lastPairingWanted[id] = now
-            remote.pairingWanted(by: deviceName(connection))
+            var session: (fingerprint: Data, source: String, display: String, from: String, fromThisMac: Bool)?
+            if server.homeTLS, let peer, let s = Door.source(of: connection) {
+                let thisMac = DoorPolicy.isFromThisMac(source: s.bytes, ownAddresses: InterfaceSnapshot.ownAddresses())
+                let source: String
+                if case .hostPort(let host, _) = connection.endpoint { source = StreamServer.addressText(host).text } else { source = s.display }
+                session = (peer.fingerprint, source, s.display,
+                           origin == .direct ? "nearby" : (thisMac || origin == .loopback ? "on this Mac" : "on this network"), thisMac)
+            }
+            remote.pairingWanted(by: deviceName(connection), session: session)
         case .changeSettings:
             // A device's settings control. No `await` in this case: the answer leaves in request
             // order, per device and across devices, and before any restart (setTarget schedules the
@@ -779,7 +1001,7 @@ package final class StreamCoordinator {
                     settingsIgnoredLineAt[id] = now
                     print("Settings from \(who) ignored: more than \(Self.settingsPerSecond) changes a second.")
                 }
-                server.send(settingsMessage(settingsState(answering: change.token)), to: connection)
+                server.send(settingsMessage(settingsState(for: id, answering: change.token)), to: connection)
                 return
             }
             recent.append(now)
@@ -791,14 +1013,16 @@ package final class StreamCoordinator {
             if !refused.isEmpty { print("Settings from \(who) refused: \(refused.joined(separator: ", "))") }
             if !ok.isEmpty, !shuttingDown {
                 let before = target
+                // A device away from home sets the away quality, never the home one (§5.1).
+                let away = routes[id]?.isAway ?? false
                 // The app: the hook assigns its settings, whose didSet has already set the target
                 // (this call then finds it equal). The CLI: the change lands on the target.
-                setTarget(onDeviceSettingsChange?(ok) ?? before.applying(ok))
+                setTarget(onDeviceSettingsChange?(ok, away) ?? (away ? before.applyingAway(ok) : before.applying(ok)))
                 if target != before { print("Settings from \(who): " + before.changes(to: target)) }
             }
             // Exactly one answer, to this device alone: the settings as they now stand, so a
             // refused or ignored field goes back to the Mac's value on the device.
-            server.send(settingsMessage(settingsState(answering: change.token)), to: connection)
+            server.send(settingsMessage(settingsState(for: id, answering: change.token)), to: connection)
         case .fetchMenu:
             // The Mac's menus (MenuMirror): no `await` here either; the mirror schedules its reads
             // and answers this device alone. JSON that does not decode has no token to answer.
@@ -1005,21 +1229,34 @@ package final class StreamCoordinator {
                 viewportArrivedWhileSwitching = false
                 Task { @MainActor in await self.applyViewportToActiveWindow() }
             }
-            // Settings that came in meanwhile; a no-op when the pick's select commits them first.
-            if pendingConfig != nil { Task { @MainActor in await self.applyPending() } }
+            // Settings, or a flip between the home and the away quality, that came in meanwhile; a
+            // no-op when the pick's select commits them first.
+            if pendingConfig != nil || (awayWanted != awayRunning && flipWait == nil) { Task { @MainActor in await self.applyPending() } }
+            // A stream that did not start (its window gone, capture refused): nothing streams, so
+            // the links have nothing to be judged at.
+            if active == .none { judgeLinks(nil) }
         }
 
         await capture.stop()
         await syntheticCapture.stop()
         capture.onFrame = nil; syntheticCapture.onFrame = nil   // both queues drained: let the old encoder go
         rectCache = nil
-        // Input held for the old source must not replay into the new one. A gesture's chord held
-        // behind it acts on the whole Mac, not on the source: it goes now.
-        let heldChords = heldInput.compactMap { item -> (UInt16, UInt64)? in
-            if case .chord(let keyCode, let flags) = item { return (keyCode, flags) } else { return nil }
-        }
+        // Input held for the old source must not replay into the new one, but what acts on the whole
+        // Mac still goes, in order: a gesture's chord held behind it, and the up of a key or a button
+        // the Mac has down (DroppedInput: a modifier left down makes the next click a ⌘-click, a
+        // button every move a drag), a button's where the pointer is (`.null`), not where the old
+        // source would have put it. The keys of devices that left meanwhile go up after them.
+        let dropped = heldInput
         heldInput = []; holdUntil = 0
-        for (keyCode, flags) in heldChords { injector.chord(keyCode: keyCode, flags: flags) }
+        for item in dropped {
+            switch item {
+            case .input(let event, _, let device):
+                if injector.isUpOfSomethingDown(event) { injector.apply(event, in: .null, from: device) }
+            case .chord(let keyCode, let flags):
+                injector.chord(keyCode: keyCode, flags: flags)
+            }
+        }
+        releaseKeysOfDevicesThatLeft()
         encoder = nil                  // deinit invalidates the VT session
         server.resetForNewStream()          // every client waits for the next parameter sets + keyframe
         // New settings take effect here, between pipelines, before the rate, the scale and the
@@ -1044,9 +1281,15 @@ package final class StreamCoordinator {
             // The newest value: another may have arrived during those awaits.
             let next = pendingConfig ?? first
             pendingConfig = nil
-            adopt(next)
+            adopt(next, away: awayWanted)
+        } else if awayWanted != awayRunning {
+            // Home or away changed (a device joined or left): the pipeline takes the other pair.
+            adopt(config, away: awayWanted)
         }
         fps = effectiveFPS             // the devices' panel rate (highest), or 60 before any has said
+        // The devices' links: judged afresh when the stream comes back at another quality or not at
+        // all, kept through a restart that keeps it (a window picked, a rotation, a resize).
+        judgeLinks(source == .none ? nil : LinkJudge.Quality(bitrate: bitrate, fps: fps, captureScale: Double(captureScale)))
         let comeForward = bringForward || cameHome
 
         if virtualDisplay {
@@ -1252,19 +1495,22 @@ package final class StreamCoordinator {
     private var missingPolls = 0
     private var lastRaiseCheck: CFAbsoluteTime = 0
     private var lastActivationAt: CFAbsoluteTime = 0
-    /// Input held for an activation, replayed in order once the app is up; a gesture's chord that
-    /// arrives meanwhile waits behind it, so a click just before the gesture lands first.
-    private enum Held { case input(InputEvent, CGRect), chord(keyCode: UInt16, flags: UInt64) }
+    /// Input held for an activation, replayed in order once the app is up, each with the device that
+    /// sent it (its keys are its own, KeyStrokes); a gesture's chord that arrives meanwhile waits
+    /// behind it, so a click just before the gesture lands first.
+    private enum Held { case input(InputEvent, CGRect, KeyStrokes.Device), chord(keyCode: UInt16, flags: UInt64) }
     private var heldInput: [Held] = []
     private var holdUntil: CFAbsoluteTime = 0
+    /// Devices that left while input was held: their keys go up after it (`releaseKeys`).
+    private var leftWhileHeld: [KeyStrokes.Device] = []
     /// How long held input waits for the app to become frontmost before it is replayed anyway.
     private static let activationTimeout: TimeInterval = 0.6
 
-    private func deliver(_ event: InputEvent, in rect: CGRect) {
+    private func deliver(_ event: InputEvent, in rect: CGRect, from device: KeyStrokes.Device) {
         // Queue while holding, and while anything is still queued, so order is never inverted.
-        if !heldInput.isEmpty || CFAbsoluteTimeGetCurrent() < holdUntil { heldInput.append(.input(event, rect)); return }
+        if !heldInput.isEmpty || CFAbsoluteTimeGetCurrent() < holdUntil { heldInput.append(.input(event, rect, device)); return }
         logClick(event, in: rect)
-        injector.apply(event, in: rect)
+        injector.apply(event, in: rect, from: device)
     }
 
     private func releaseHeldInput() {
@@ -1273,10 +1519,25 @@ package final class StreamCoordinator {
         heldInput = []
         for item in held {
             switch item {
-            case .input(let event, let rect): logClick(event, in: rect); injector.apply(event, in: rect)
+            case .input(let event, let rect, let device): logClick(event, in: rect); injector.apply(event, in: rect, from: device)
             case .chord(let keyCode, let flags): injector.chord(keyCode: keyCode, flags: flags)
             }
         }
+        releaseKeysOfDevicesThatLeft()
+    }
+
+    /// A device left: the keys it still holds down on the Mac go up (InputInjector.releaseKeys),
+    /// after whatever of its input is still held for an activation, so no up of its own is overtaken
+    /// and no down of its own comes after.
+    private func releaseKeys(of device: KeyStrokes.Device) {
+        if !heldInput.isEmpty || CFAbsoluteTimeGetCurrent() < holdUntil { leftWhileHeld.append(device); return }
+        injector.releaseKeys(of: device)
+    }
+
+    private func releaseKeysOfDevicesThatLeft() {
+        let left = leftWhileHeld
+        leftWhileHeld = []
+        for device in left { injector.releaseKeys(of: device) }
     }
 
     private func raiseIfInteracting(_ event: InputEvent) {
@@ -1695,15 +1956,25 @@ package final class StreamCoordinator {
     }
 
     /// Called by HostShutdown on the main queue just before `exit` (or, for the app's Quit, just
-    /// before AppKit exits): every connected device hears why (kind 22 "quit", at most 0.1 s),
-    /// then window home, display gone. Capture and encoder need no stop; the process is about to
-    /// end. The CLI without --virtual-display dies on a plain SIGINT with no goodbye, as before:
-    /// its devices notice by liveness.
+    /// before AppKit exits): every key and button a device holds down on the Mac goes up (a modifier
+    /// left down would outlive Sill: the Mac's next click a ⌘-click), every connected device hears why
+    /// (kind 22 "quit", at most 0.1 s), then window home, display gone. Capture and encoder need no
+    /// stop; the process is about to end. The CLI without --virtual-display lets go of the keys and
+    /// dies of the signal with no goodbye, as before (`releaseKeysForExit`): its devices notice by
+    /// liveness.
     package func shutdownForExit() {
+        injector.releaseAll()
         server.goodbyeAll(Goodbye(reason: Goodbye.quit), within: 0.1)
         shuttingDown = true
         audio.shutdown()   // "Audio stopped: Sill is quitting."
         stage.release()
+    }
+
+    /// The CLI's default path at a signal (HostShutdown.installKeyRelease), just before it dies of it:
+    /// every key and button a device holds down on the Mac goes up, and nothing else happens (no
+    /// goodbye, nothing printed), as before.
+    package func releaseKeysForExit() {
+        injector.releaseAll()
     }
 
     /// An encoder's watchdog fired. A hardware hang is remembered whichever encoder reports it, as
@@ -2093,8 +2364,14 @@ package final class StreamCoordinator {
         print("Catalog → \(connection.endpoint): \(catalog.infos.count) windows, \(catalog.allIcons.count) icons, \(catalog.installedApps.count) apps")
         server.send(listMessage(), to: connection)
         // What the settings are, silently (the line above is the only one printed on connect). An
-        // older device skips the kind.
-        server.send(settingsMessage(settingsState()), to: connection)
+        // older device skips the kind. Recorded as what this connection was last sent, and only
+        // then does it join the publishes: none goes out ahead of its window list, and the catalog
+        // keeps its order (2, 16, 18).
+        let id = ObjectIdentifier(connection)
+        let state = settingsState(for: id)
+        server.send(settingsMessage(state), to: connection)
+        lastPublished[id] = state
+        connections[id] = connection
         // Who this Mac is and how to reach it from afar (kind 18, signed), on both doors, only from
         // a host with an identity. An older device skips it too.
         if let info = remote?.macInfoMessage() { server.send(info, to: connection) }
@@ -2111,21 +2388,40 @@ package final class StreamCoordinator {
 
     // MARK: Settings to devices
 
-    /// The last broadcast state. Answers and the state sent on connect never touch it.
-    private var lastPublished: HostSettingsState?
+    /// The last state each connection was sent: at connect (`sendCatalog`) and by each publish.
+    /// Answers never touch it.
+    private var lastPublished: [ObjectIdentifier: HostSettingsState] = [:]
 
-    /// A pure function of the target, the status snapshot and two constants (appKitLoop, whether
-    /// the hook is set). The target changes only in `setTarget` and the snapshot only in
-    /// `HostStatus.update`, and both publish, so no change can be missed and none can stick.
-    private func settingsState(answering: Int? = nil) -> HostSettingsState {
+    /// Connection `id`'s state (docs/remote-bundle-plan.md §5.4): the pair its controls set (the
+    /// away quality for a device away), the home and away qualities with which one is the target
+    /// (`away`, from a host with an identity, `remote`: SillHost --pairing alone too, where no
+    /// connection is ever away), and the rest shared. A pure function of the target,
+    /// `awayWanted`, the connection's route, the status snapshot and two constants (appKitLoop,
+    /// whether the hook is set). The target changes only in `setTarget`, the snapshot only in
+    /// `HostStatus.update`, and `awayWanted` only in `routesChanged`, which updates the snapshot
+    /// with it; all three publish, so no change can be missed and none can stick. Never the
+    /// pipeline's `awayRunning`: it changes in `adopt`, which publishes only through a snapshot
+    /// change, and none comes while nothing streams.
+    private func settingsState(for id: ObjectIdentifier, answering: Int? = nil) -> HostSettingsState {
         let t = target, s = status.snapshot
-        return HostSettingsState(settings: t.streamSettings,
+        let thisAway = routes[id]?.isAway ?? false
+        // A report about the bitrate that runs while it is still the target's; one about a bitrate a
+        // pick has just replaced is stale (the restart's reset clears it a moment later).
+        let link = linkReports[id].flatMap { $0.bitrate == t.effective(away: awayWanted).bitrate ? $0 : nil }
+        let away = remote.map { _ in
+            AwayQuality(homeBitrate: t.bitrate, homeCaptureScale: Double(t.captureScale),
+                        awayBitrate: t.awayBitrate, awayCaptureScale: Double(t.awayCaptureScale),
+                        thisConnectionAway: thisAway, awayRunning: awayWanted)
+        }
+        return HostSettingsState(settings: t.streamSettings(away: thisAway),
                                  persistent: onDeviceSettingsChange != nil,
                                  virtualDisplayAvailable: appKitLoop,
                                  virtualDisplayNote: virtualDisplayNote(target: t, snapshot: s),
                                  softwareEncoder: s.softwareEncoder,
                                  stream: s.stream?.wire,
                                  answering: answering,
+                                 away: away,
+                                 link: link,
                                  audioNote: t.sendAudio ? s.audio?.note : nil)
     }
 
@@ -2146,17 +2442,29 @@ package final class StreamCoordinator {
                       payload: Wire.encode(state))
     }
 
-    /// To every device, when the state differs from the last broadcast. Prints nothing, so the
-    /// CLI's output only changes when a device sends a change.
+    /// To every device whose catalog went out, its own state, when that differs from the last one
+    /// it was sent. Prints nothing, so the CLI's output only changes when a device sends a change.
     private func publishSettings() {
-        let state = settingsState()
-        guard state != lastPublished else { return }
-        lastPublished = state
-        server.broadcast(settingsMessage(state))
+        var messages: [(NWConnection, StreamMessage)] = []
+        for (id, connection) in connections {
+            let state = settingsState(for: id)
+            guard state != lastPublished[id] else { continue }
+            lastPublished[id] = state
+            messages.append((connection, settingsMessage(state)))
+        }
+        if !messages.isEmpty { server.send(each: messages) }
     }
 
     /// "iPad (iPad14,1)" once the device has sent its stats, its address until then.
     private func deviceName(_ connection: NWConnection) -> String {
         status.snapshot.devices.first { $0.id == ObjectIdentifier(connection) }?.name ?? "\(connection.endpoint)"
     }
+}
+
+extension ClientRoute {
+    /// Away from home: the remote door from a VPN or the internet (AwayPolicy.isAway). Its Quality and
+    /// Resolution picks set the away quality, which runs while every connected device is away. Here,
+    /// not beside ClientRoute in StreamServer.swift, which the pacing harness compiles without the
+    /// coordinator's files.
+    var isAway: Bool { AwayPolicy.isAway(remoteDoor: isRemote, origin: origin) }
 }

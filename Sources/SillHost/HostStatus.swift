@@ -46,12 +46,36 @@ package struct HostStatusSnapshot: Equatable {
         /// Nil on the home door; "through Tailscale", "through your VPN", "over the internet" or "by
         /// address" on the remote door. The card shows it instead of `route` (StatusText).
         package var remoteRoute: String?
+        /// Its link while it does not keep up (LinkJudge, docs/remote-bundle-plan.md §6); nil while it
+        /// does. The card names it.
+        package var link: LinkStatus?
 
         package init(id: ObjectIdentifier, endpoint: String, name: String? = nil, fps: Int? = nil,
-                     frameAgeMs: Int? = nil, rttMs: Int? = nil, route: ClientLink.Route? = nil, remoteRoute: String? = nil) {
+                     frameAgeMs: Int? = nil, rttMs: Int? = nil, route: ClientLink.Route? = nil, remoteRoute: String? = nil,
+                     link: LinkStatus? = nil) {
             self.id = id; self.endpoint = endpoint; self.name = name
             self.fps = fps; self.frameAgeMs = frameAgeMs; self.rttMs = rttMs
-            self.route = route; self.remoteRoute = remoteRoute
+            self.route = route; self.remoteRoute = remoteRoute; self.link = link
+        }
+    }
+
+    /// A device's link that does not keep up, as the card shows it: behind (the link cannot carry
+    /// the running quality) or stalled (nothing gets through either way), what was withheld, the
+    /// quality, what the link carried, and what would fit.
+    package struct LinkStatus: Equatable {
+        package enum State: Equatable { case behind, stalled }
+        package var state: State
+        package var withheld: Int
+        /// The running quality's bitrate, per 60 fps.
+        package var bitrate: Int
+        package var carriedKbps: Int?
+        package var suggestedBitrate: Int?
+        package var suggestedCaptureScale: Double?
+
+        package init(state: State, withheld: Int, bitrate: Int, carriedKbps: Int? = nil,
+                     suggestedBitrate: Int? = nil, suggestedCaptureScale: Double? = nil) {
+            self.state = state; self.withheld = withheld; self.bitrate = bitrate; self.carriedKbps = carriedKbps
+            self.suggestedBitrate = suggestedBitrate; self.suggestedCaptureScale = suggestedCaptureScale
         }
     }
 
@@ -104,6 +128,10 @@ package struct HostStatusSnapshot: Equatable {
     package var synthetic = false
     /// Remote access, on a host with an identity (Sill.app, SillHost --remote); nil otherwise.
     package var remote: RemoteStatus?
+    /// Away from home (docs/remote-bundle-plan.md §5): at least one device is connected and every
+    /// connected device is away, so the away quality is the target. The menu's Quality subtitle
+    /// and the Streaming pane say so.
+    package var away = false
     /// The Mac's sound while it is wanted (Send Audio on, something streams, a device plays it); nil
     /// otherwise.
     package var audio: Audio?
@@ -137,9 +165,38 @@ package struct HostStatusSnapshot: Equatable {
     package init() {}
 }
 
-/// The remote door as the Mac's pane and menu show it. Never a pairing code or secret: those reach
-/// the app and the CLI only through `RemoteAccess.onPairingOffer`.
+extension HostStatusSnapshot.Stream {
+    /// The running pipeline as a device sees it (kind 16's `stream`).
+    var wire: RunningStream {
+        RunningStream(width: width, height: height, fps: fps, mbps: mbps, onVirtualDisplay: onVirtualDisplay)
+    }
+}
+
+/// Both doors' pairing and the remote door as the Mac's panes and menu show them. Never a pairing
+/// code or secret: those reach the app and the CLI only through `RemoteAccess.onPairingOffer`.
 package struct RemoteStatus: Equatable {
+    /// The home door (docs/home-pairing-plan.md §4.10): plain (the CLI without --pairing), TLS with
+    /// pairing required or open to any device, or unavailable, with why (no identity: the keychain
+    /// failed, so there is no home listener at all).
+    package enum HomeDoor: Equatable {
+        case plain, pairingRequired, open
+        case unavailable(String)
+    }
+    /// A device asked to pair and no window shows its code by itself (the Mac locked, or the ask
+    /// limits), or a window shows its code (one its ask opened, or one the Mac's user opened from
+    /// this request): the menu's "‹device› Wants to Pair", for 5 minutes after the ask, less once
+    /// that device pairs or, for "showing", once the window closes. Never for an ask from this Mac.
+    package struct PairingRequest: Equatable {
+        /// The device's own name, cleaned: "iPad (iPad14,1)".
+        package var name: String
+        package var at: Date
+        /// "showing" (a window it opened is up), "locked" or "limit" (quiet, or too many windows).
+        package var reason: String
+        package init(name: String, at: Date, reason: String) { self.name = name; self.at = at; self.reason = reason }
+        /// How long the menu shows it.
+        package static let shownFor: TimeInterval = 300
+    }
+
     package enum Listener: Equatable {
         case off
         case listening(Int)
@@ -159,7 +216,8 @@ package struct RemoteStatus: Equatable {
     }
     package enum Pairing: Equatable {
         case closed
-        case open(requestedBy: String?, expiresAt: Date, triesLeft: Int, lastWrongFrom: String?)
+        /// `byDevice`: a device opened it by asking (shown in front without the keyboard).
+        case open(requestedBy: String?, expiresAt: Date, triesLeft: Int, lastWrongFrom: String?, byDevice: Bool)
         /// The last window paired this device (its name).
         case paired(String)
         /// Five wrong codes.
@@ -183,13 +241,21 @@ package struct RemoteStatus: Equatable {
     package var paired: [PairedDeviceSummary]
     /// "The keychain couldn’t be used: …" when the identity could not be loaded.
     package var identityProblem: String?
+    package var homeDoor: HomeDoor
+    package var pairingRequest: PairingRequest?
+    /// When the home door last refused a source's third plain try within a minute (an older Sill,
+    /// DoorPolicy.olderSillTry: a TLS 1.2 client fails the same way, but once), for the menu's
+    /// "An iPhone or iPad Needs Sill Updated" (10 minutes from it).
+    package var olderDeviceAt: Date?
 
     package init(remoteAccess: Bool = false, internetAccess: Bool = false, listener: Listener = .off, addresses: [MacAddress] = [],
                  vpnDown: [String] = [], lanAddress: String? = nil, router: Router = .off, addressName: String = "",
-                 pairing: Pairing = .closed, paired: [PairedDeviceSummary] = [], identityProblem: String? = nil) {
+                 pairing: Pairing = .closed, paired: [PairedDeviceSummary] = [], identityProblem: String? = nil,
+                 homeDoor: HomeDoor = .plain, pairingRequest: PairingRequest? = nil, olderDeviceAt: Date? = nil) {
         self.remoteAccess = remoteAccess; self.internetAccess = internetAccess; self.listener = listener
         self.addresses = addresses; self.vpnDown = vpnDown; self.lanAddress = lanAddress; self.router = router
         self.addressName = addressName; self.pairing = pairing; self.paired = paired; self.identityProblem = identityProblem
+        self.homeDoor = homeDoor; self.pairingRequest = pairingRequest; self.olderDeviceAt = olderDeviceAt
     }
 }
 
@@ -202,10 +268,14 @@ package struct PairedDeviceSummary: Equatable, Identifiable {
     package var name: String
     package var model: String?
     package var pairedAt: Date
-    /// "qr" or "code".
+    /// "qr", "code" or "cable".
     package var method: String
-    /// When it last connected from away, and how ("through Tailscale"); nil when it never has (the
-    /// app keeps these across launches).
+    /// "with the QR code", "with a code", "over the USB cable"; nil for a method this build does
+    /// not know (PairedDevice.displayMethod).
+    package var displayMethod: String? { PairedDevice.displayMethod(method) }
+    /// When it last connected, and how: from away ("through Tailscale") or at home ("over the USB
+    /// cable", "over Wi‑Fi", "directly"…); nil when it never has (the app keeps these across
+    /// launches).
     package var lastSeen: Date?
     package var lastRoute: String?
 

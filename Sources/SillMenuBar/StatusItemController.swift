@@ -25,6 +25,9 @@ struct MenuEntry: Equatable {
         case showSettingsTab(SettingsTab)
         /// Pair iPhone or iPad…: a pairing window, or the open one brought forward.
         case showPairing
+        /// "‹device› Wants to Pair": the window that shows its code brought forward, else one
+        /// opened on the Mac, asked by that device.
+        case showPairingRequest(name: String, showing: Bool)
         /// Sill 0.4 Is Available…: the release's page on GitHub, in the browser (UpdateChecker).
         case openUpdate(URL)
     }
@@ -67,6 +70,8 @@ enum MenuBuilder {
             case .allowScreenRecording: .allowScreenRecording
             case .allowAccessibility: .allowAccessibility
             case .showRemoteAccess: .showSettingsTab(.remoteAccess)
+            case .showDevices: .showSettingsTab(.devices)
+            case .pairingRequest(let name, let showing): .showPairingRequest(name: name, showing: showing)
             case .none: .none
             }
             menu.append(MenuEntry(kind: .item, title: a.title, subtitle: a.subtitle, enabled: action != .none,
@@ -89,8 +94,12 @@ enum MenuBuilder {
         if QualityPreset(rawValue: config.bitrate) == nil {
             quality.append(MenuEntry(kind: .item, title: QualityPreset.title(forBitrate: config.bitrate), checked: true, enabled: false))
         }
-        menu.append(MenuEntry(kind: .item, title: "Quality", subtitle: "Per 60 fps; a 120 fps stream gets twice as much",
-                              children: quality))
+        // The home quality, as ever; while every connected device is away, the subtitle says which
+        // quality runs instead (the away one is set in Settings › Streaming, never here).
+        let qualityNote = p.away
+            ? "Away from home now: \(QualityPreset.shortTitle(bitrate: config.awayBitrate, captureScale: Double(config.awayCaptureScale)))"
+            : "Per 60 fps; a 120 fps stream gets twice as much"
+        menu.append(MenuEntry(kind: .item, title: "Quality", subtitle: qualityNote, children: quality))
         menu.append(MenuEntry(kind: .item, title: "Resolution", children: [
             MenuEntry(kind: .item, title: "Retina", checked: config.captureScale >= 1.5, action: .setCaptureScale(2)),
             MenuEntry(kind: .item, title: "Standard", subtitle: "A quarter of the pixels; much lighter to encode",
@@ -295,6 +304,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         case .showSettings: model.showSettings?(nil)
         case .showSettingsTab(let tab): model.showSettings?(tab)
         case .showPairing: model.pairDevice()
+        case .showPairingRequest(let name, let showing): model.showPairingRequest(name: name, showing: showing)
         case .openUpdate(let url): NSWorkspace.shared.open(url)   // the browser; no modal loop
         case .quit: NSApp.terminate(nil)
         }

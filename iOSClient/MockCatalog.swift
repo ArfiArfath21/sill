@@ -83,6 +83,20 @@ enum MockCatalog {
         client.thumbnails = thumbnails
 
         seed(client, settings: settings)
+        // `-SillOverlayLine asking|shown|openonmac|locked|noanswer`: Pair This iPad…'s line over a
+        // session at home that speaks TLS, as the Mac's answer to its ask sets it (the mock never
+        // asks: over it the overlay reads "…is showing a code now." as over a plain door).
+        if let line = UserDefaults.standard.string(forKey: "SillOverlayLine") {
+            let device = StreamClient.deviceWord
+            switch line {
+            case "asking": client.overlayAskLine = DiscoveryPolicy.HomeCopy.overlayAsking(mac: "Mac mini")
+            case "shown": client.overlayAskLine = DiscoveryPolicy.overlayLine(.shown, mac: "Mac mini", device: device)
+            case "openonmac": client.overlayAskLine = DiscoveryPolicy.overlayLine(.openOnMac, mac: "Mac mini", device: device)
+            case "locked": client.overlayAskLine = DiscoveryPolicy.overlayLine(.locked, mac: "Mac mini", device: device)
+            case "noanswer": client.overlayAskLine = DiscoveryPolicy.overlayLine(nil, mac: "Mac mini", device: device)
+            default: break
+            }
+        }
         // nil under `-SillLive 1`: the mock is never shown then, and must say nothing on the console.
         if let menus { client.showMockMenus(macMenus(menus)) }
         if let pointer { seedPointer(client, pointer, pencilPointer: pencilPointer) }
@@ -262,15 +276,70 @@ enum MockCatalog {
         case nodirect    // a host without the setting (the ipad-host-settings build): no row
         case wired       // the session runs over the USB cable (or Ethernet): "Wired" in the readout
         case noroute     // a path that names no link (loopback, a VPN): the readout ends in the bitrate
-        case remote          // connected through Tailscale, 48 ms, a saved Mac: the route line, Paired for remote access
+        case remote          // connected through Tailscale, 48 ms, a saved Mac: the route line, Paired
         case remoteinternet  // connected over the internet, 120 ms
         case remoteslow      // through Tailscale on a slow link (320 ms): the slow-link callout
-        case remotepair      // at home, Remote Access on, not saved: Pair This iPad…
-        case remoteoff       // at home, Remote Access off: the footnote only
+        case remotepair      // at home over a plain door, Remote Access on, not saved: Pair This iPad…
+        case remoteoff       // at home over a plain door, Remote Access off: the footnote only
         case noremote        // at home, an older Mac without kind 18: no Away from home group
+        // Pairing at home (docs/home-pairing-plan.md §7.6, §7.9): a session at home over TLS.
+        case paired          // a saved Mac, Remote Access on: Paired, and how Sill reaches it from afar
+        case pairedoff       // a saved Mac, Remote Access off: Paired, and how to turn it on
+        case openpair        // not saved, on a Mac that lets any device in (Require pairing off), Remote Access off: Pair This iPad…
+        // Away from home and the link (docs/remote-bundle-plan.md §5.8, §6.7), through Tailscale:
+        case away            // the away quality runs (Low · Standard; home Pro · Retina): "Away: Low · Standard"
+        case awaymixed       // away, while a device at home is connected: "Home quality: Pro · Retina (…)"
+        case awayhome        // at home over Wi‑Fi, Remote Access on: the footnote says what runs away from home
+        case linkbehind      // away at Pro · Retina on a link that cannot carry it: the callout and "Use Low · Standard"
+        case linkmixed       // behind while a device at home keeps Pro: the callout without a button
+        case linklow         // behind at Low · Standard: "even at Low", no button
+        case linkstalled     // stalled: the Mac's alone, so no callout
+        // The Mac's sound (docs/audio-plan.md §7.8):
         case sound           // the Mac sends its sound: the Send Audio row on, the Sound button and switch
         case soundoff        // a Mac with sound, Send Audio off: the row off, no button
         case soundnote       // on, and the Mac could not capture it: the note under the row
+    }
+
+    /// The away and link cases: the Mac's two qualities (home Pro · Retina, away Low · Standard unless
+    /// the case raises it), the settings this connection controls, what runs, and the link's report.
+    private static func seedAway(_ client: StreamClient, _ state: inout HostSettingsState, _ c: SettingsCase) {
+        let home = (bitrate: 40_000_000, scale: 2.0)
+        var awayPair = (bitrate: 4_000_000, scale: 1.0)
+        if c == .linkbehind || c == .linkstalled { awayPair = (40_000_000, 2) }
+        let atHome = c == .awayhome
+        let running = !(c == .awaymixed || c == .linkmixed || atHome)
+        state.away = AwayQuality(homeBitrate: home.bitrate, homeCaptureScale: home.scale, awayBitrate: awayPair.bitrate,
+                                 awayCaptureScale: awayPair.scale, thisConnectionAway: !atHome, awayRunning: running)
+        // The pair this connection's controls set: the away one away from home.
+        let controls = atHome ? home : awayPair
+        state.settings.bitrate = controls.bitrate
+        state.settings.captureScale = controls.scale
+        // What runs: the away pair while every device is away, else the home one.
+        let runs = running ? awayPair : home
+        state.stream = runs.scale >= 1.5 ? RunningStream(width: 2880, height: 1800, fps: 60, mbps: runs.bitrate / 1_000_000, onVirtualDisplay: false)
+                                         : RunningStream(width: 1440, height: 900, fps: 60, mbps: runs.bitrate / 1_000_000, onVirtualDisplay: false)
+        client.macInfo = macInfo()
+        client.macInfoSaved = true
+        // At home a saved Mac's session speaks TLS since pairing at home, as `paired`'s does.
+        if atHome { client.mockHomeTLS = true }
+        if !atHome {
+            client.remoteRoute = .vpn("Tailscale")
+            client.showMockLinkStats(linkStats(rtt: c == .linkbehind || c == .linkmixed || c == .linklow || c == .linkstalled ? 180 : 48))
+        }
+        switch c {
+        case .linkbehind:
+            state.link = LinkReport(state: LinkReport.behind, withheldPerSecond: 52, bitrate: 40_000_000, carriedKbps: 6_400,
+                                    suggestedBitrate: 4_000_000, suggestedCaptureScale: 1)
+        case .linkmixed:
+            state.link = LinkReport(state: LinkReport.behind, withheldPerSecond: 44, bitrate: 40_000_000, carriedKbps: 9_100,
+                                    suggestedBitrate: 4_000_000, suggestedCaptureScale: 1)
+        case .linklow:
+            state.link = LinkReport(state: LinkReport.behind, withheldPerSecond: 20, bitrate: 4_000_000, carriedKbps: 2_100)
+        case .linkstalled:
+            state.link = LinkReport(state: LinkReport.stalled, withheldPerSecond: 60, bitrate: 40_000_000)
+        default:
+            break
+        }
     }
 
     /// The Mac's kind 18 in the remote cases: Tailscale's name and addresses, and Wi‑Fi.
@@ -298,7 +367,8 @@ enum MockCatalog {
         switch c {
         case .directlink: client.route = .direct
         case .wired: client.route = .wired
-        case .noroute, .remote, .remoteinternet, .remoteslow: client.route = nil
+        case .noroute, .remote, .remoteinternet, .remoteslow, .away, .awaymixed, .linkbehind, .linkmixed, .linklow, .linkstalled:
+            client.route = nil
         default: client.route = .wifi
         }
         // A Mac from this build takes the trackpad gestures (its window list says so); an older one
@@ -352,6 +422,15 @@ enum MockCatalog {
             client.macInfo = macInfo()
         case .remoteoff:
             client.macInfo = macInfo(remoteAccess: false)
+        case .paired, .pairedoff:
+            client.macInfo = macInfo(remoteAccess: c == .paired)
+            client.macInfoSaved = true
+            client.mockHomeTLS = true
+        case .openpair:
+            client.macInfo = macInfo(remoteAccess: false)
+            client.mockHomeTLS = true
+        case .away, .awaymixed, .awayhome, .linkbehind, .linkmixed, .linklow, .linkstalled:
+            seedAway(client, &state, c)
         case .sound:
             state.settings.sendAudio = true
         case .soundoff:
@@ -369,6 +448,16 @@ enum MockCatalog {
         case "on"?: state.settings.sendAudio = true; client.soundMuted = false
         case "muted"?: state.settings.sendAudio = true; client.soundMuted = true
         default: break
+        }
+        // `-SillLinkLine behind`: the Mac reports the link behind on this connection, whatever the
+        // case, so the stream screen shows its line (with the panel closed). Its suggestion is the
+        // host's for a slow link (LinkJudge.suggestion): Low, with Standard from Retina; at Low, the
+        // same bitrate at Standard from Retina, and nothing from Low · Standard.
+        if UserDefaults.standard.string(forKey: "SillLinkLine") == "behind", state.link == nil {
+            let bitrate = state.settings.bitrate, retina = state.settings.captureScale >= 1.5, low = QualityPreset.low.rawValue
+            let suggestion: (bitrate: Int, captureScale: Double?)? = bitrate > low ? (low, retina ? 1 : nil) : (retina ? (bitrate, 1) : nil)
+            state.link = LinkReport(state: LinkReport.behind, withheldPerSecond: 52, bitrate: bitrate, carriedKbps: 2_100,
+                                    suggestedBitrate: suggestion?.bitrate, suggestedCaptureScale: suggestion?.captureScale)
         }
         if client.macInfo != nil { client.macInfoAt = Date().addingTimeInterval(-59) }
         var ledger = SettingsLedger()
@@ -402,15 +491,28 @@ enum MockCatalog {
         case remotefail    // a remote dial's failure, -SillRemoteFailure vpnoff|timeout|timeoutip|refused|dns|wrongmac|revoked|notsill|gaveup|quit|removed|remoteoff
         case camera        // Add a Mac with the camera refused
         case externalpair  // an outside sill://pair link waiting for its confirmation
+        // Pairing at home (docs/home-pairing-plan.md §7.3–7.9). Each row's word is DiscoveryPolicy.rowWord's.
+        case homerows        // a saved Wi-Fi row, Not paired, an unpaired Wired (the cable), a Wired row through a USB Ethernet adapter (Not paired), an open door's (Not paired), Update Sill, long names
+        case homeasking      // a tap on a Not paired row: "Pairing with Mac mini…", the row lit
+        case homecard        // the Mac shows its code: the home card, scanning (a drawn viewfinder)
+        case homecode        // the home card's typed path, empty
+        case homecodeerror   // the typed path after a wrong code: "That code didn’t work… 4 tries left."
+        case homelocked      // the Mac is locked (a Wired row over the cable): "Unlock Mac mini, then tap it again."
+        case homeopenonmac   // the Mac showed no code by itself: "…choose Pair iPhone or iPad… in the Sill menu…"
+        case homerevoked     // the Mac removed this device: its row reads Not paired
+        case homecabledone   // paired over the cable, the session on its way: "Paired with Mac mini over the cable."
+        case homeolder       // a tap on an Update Sill row: "Mac mini runs an older Sill…"
+        case pairingrequired // Require pairing turned on while this device was connected without pairing
     }
 
     /// How the connect screen starts in a case: the card unfolded, on the typed path, and the
-    /// viewfinder's stand-in.
+    /// viewfinder's stand-in. The home card unfolds from the client's `homeAsk` (ConnectScreen).
     static func connectScreenOptions(_ c: ConnectCase) -> (adding: Bool, typed: Bool, scanner: CodeScanner.Mode) {
         switch c {
         case .addmac, .pairing: return (true, false, .placeholder)
         case .addcode, .addcodeerror: return (true, true, .placeholder)
         case .camera: return (true, false, .denied)
+        case .homecode, .homecodeerror: return (false, true, .placeholder)
         default: return (false, false, .placeholder)
         }
     }
@@ -438,6 +540,28 @@ enum MockCatalog {
         func remote(_ name: String, _ id: String) -> FoundMac { FoundMac(name: name, endpoint: nil, route: .remote, macID: id) }
         let remoteRows = [mac("Studio", .wifi), mac("Mac mini", .direct),
                           remote("Noah Saffer’s MacBook Pro in the Studio", "A3C5HR4RBV67YR21"), remote("Mac mini (2)", "0123456789ABCDEF")]
+        /// A row at home as `recomputeMacs` makes it: its door (`p`), what this device knows of its
+        /// Mac, and the word DiscoveryPolicy.rowWord gives them. `cable`: a Wired row whose interface
+        /// carries only link-local addresses (the USB cable to the Mac); false for a USB Ethernet
+        /// adapter on the LAN.
+        func home(_ name: String, _ method: DiscoveryPolicy.Method?, door: DiscoveryPolicy.HomeDoor = .pairingRequired,
+                  saved: Bool = false, revoked: Bool = false, homeTLS: Bool = false, cable: Bool = false) -> FoundMac {
+            let word = DiscoveryPolicy.rowWord(door: door, saved: saved, revoked: revoked, homeTLS: homeTLS,
+                                               debug: StreamClient.debugBuild, method: method, cable: cable)
+            return FoundMac(name: name, endpoint: .service(name: name, type: "_sill._tcp", domain: "local.", interface: nil),
+                            route: method == .direct ? .direct : .network, macID: saved ? "HOMEPAIRING\(name.count)" : nil,
+                            method: method, door: door, homeWord: word)
+        }
+        /// A tap's ask on `row` (`homeAsk`), waiting for its answer or answered `shown`.
+        func ask(_ row: FoundMac, shown: Bool) -> HomeAsk {
+            var a = HomeAsk(target: HomeDialer.Target(endpoint: row.endpoint!, peerToPeer: row.direct, row: row.id, label: row.name),
+                            name: row.name, cableRow: row.homeWord == .pairsOverCable, savedID: nil, tagNamed: false)
+            if shown { a.phase = .shown }
+            return a
+        }
+        let studio = home("Studio", .wifi, saved: true, homeTLS: true)
+        let device = StreamClient.deviceWord
+        typealias Copy = DiscoveryPolicy.HomeCopy
         switch c {
         case .looking:
             break
@@ -469,7 +593,8 @@ enum MockCatalog {
             let goodbye = c == .update
                 ? Goodbye(reason: Goodbye.update, message: "Update Sill on your \(StreamClient.deviceWord) to keep using Mac mini. It needs version 1.2 or later.",
                           minimumVersion: "1.2", reconnect: false)
-                : Goodbye(reason: "pairingRequired",
+                // A reason this build does not know ("pairingRequired" is pairing at home's own now).
+                : Goodbye(reason: "pairAgain",
                           message: "Mac mini now lets in only the devices it has paired with. On the Mac, choose Pair iPhone or iPad…, then scan its code with this \(StreamClient.deviceWord).",
                           reconnect: false)
             let outcome = GoodbyePolicy.outcome(goodbye, mac: "Mac mini", device: StreamClient.deviceWord, saved: false)
@@ -492,6 +617,46 @@ enum MockCatalog {
             client.status = failureCopy(UserDefaults.standard.string(forKey: "SillRemoteFailure") ?? "timeout")
         case .externalpair:
             client.pendingLink = mockLink
+        case .homerows:
+            // The long names check that "Not paired" and "Update Sill" never truncate or wrap: the
+            // title does.
+            client.macs = [home("Mac mini", .wifi, saved: true, homeTLS: true),
+                           home("Studio", .wifi),
+                           home("MacBook Pro", .wired, cable: true),
+                           home("Office iMac", .wired, cable: false),
+                           home("Living Room iMac", .wifi, door: .open),
+                           home("Mac Studio", .wifi, door: .plain, saved: true, homeTLS: true),
+                           home("Noah Saffer’s MacBook Pro in the Studio (2)", .wifi),
+                           home("Noah Saffer’s iMac on the Desk by the Window", .wired, door: .plain, saved: true, homeTLS: true)]
+        case .homeasking:
+            let mini = home("Mac mini", .wifi)
+            client.macs = [mini, studio]
+            client.homeAsk = ask(mini, shown: false)
+            client.status = Copy.pairing(mac: mini.name, cable: false)
+        case .homecard, .homecode, .homecodeerror:
+            let mini = home("Mac mini", .wifi)
+            client.macs = [mini, studio]
+            client.homeAsk = ask(mini, shown: true)
+            client.status = Copy.showing(mac: mini.name, device: device)
+            if c == .homecodeerror { client.pairing = .failed(.wrongCode(triesLeft: 4)) }
+        case .homelocked:
+            client.macs = [home("Mac mini", .wired, cable: true), studio]
+            client.status = Copy.locked(mac: "Mac mini")
+        case .homeopenonmac:
+            client.macs = [home("Mac mini", .wifi), studio]
+            client.status = Copy.openOnMac(mac: "Mac mini")
+        case .homerevoked:
+            client.macs = [home("Mac mini", .wifi, saved: true, revoked: true, homeTLS: true), studio]
+            client.status = Copy.removed(mac: "Mac mini", device: device)
+        case .homecabledone:
+            client.macs = [home("Mac mini", .wired, saved: true, homeTLS: true), studio]
+            client.status = Copy.pairedOverCable(mac: "Mac mini")
+        case .homeolder:
+            client.macs = [home("Mac mini", .wifi, door: .plain, saved: true, homeTLS: true), studio]
+            client.status = DiscoveryPolicy.updateSillStatus(mac: "Mac mini")
+        case .pairingrequired:
+            client.macs = [home("Mac mini", .wifi), studio]
+            client.status = Copy.pairingRequired(mac: "Mac mini", device: device)
         }
         return client
     }

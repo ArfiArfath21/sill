@@ -3,6 +3,9 @@ r"""Minimal Sill wire-format client for testing a host without a device.
 
 usage: sillclient.py PORT [seconds] [desktop|none|window:ID] [flags...]
   --junk             also send two unknown message kinds (the host must skip them)
+  --no-select        send no select at the start (the positional source is not sent): a device that
+                     joins while something streams, as a device asks for the Desktop only when nothing
+                     does (docs/remote-bundle-plan.md, H8: the flip waits for its viewport)
   --fps=N            send a viewport asking for N fps right after the select
   --fps-after=N@T    send a second viewport asking for N fps after T seconds
   --set=K=V[,K=V]@T  send a settings change (kind 17) T seconds in, with integer tokens 1, 2, 3...
@@ -13,7 +16,11 @@ usage: sillclient.py PORT [seconds] [desktop|none|window:ID] [flags...]
   --stats            send ClientStats (kind 12) once a second as device "sillclient", so the host
                      logs a name for this client
   --expect=K=V[,...] at exit, compare the last kind 16's settings (and its top-level persistent
-                     and virtualDisplayAvailable): prints EXPECT ok or EXPECT FAIL, exits 1 on failure
+                     and virtualDisplayAvailable; away from home, docs/remote-bundle-plan.md: its
+                     away's homeBitrate, homeCaptureScale, awayBitrate, awayCaptureScale,
+                     thisConnectionAway and awayRunning, missing when the host sent no away; and
+                     linkState, its link's state, "fine" when it sent none): prints EXPECT ok or
+                     EXPECT FAIL, exits 1 on failure
   --host=H           connect to H instead of 127.0.0.1 (an IPv4 or IPv6 address, or a name)
   --device=NAME      the name ClientStats reports (implies --stats); \n, \t, \xHH and \uXXXX escapes
                      are decoded, so control and bidi characters can be sent
@@ -33,6 +40,9 @@ usage: sillclient.py PORT [seconds] [desktop|none|window:ID] [flags...]
                      {"appVersion": VER, "protocol": PROTO, "device": the --device name, else "sillclient"};
                      --hello=none sends {} (a hello with nothing in it). Without it no hello is sent: an
                      older device, which a host with a device floor above 0 refuses
+  --hello-delay=S    with --hello (or --audio): send it S seconds after the connection is up (TLS
+                     included), and nothing before it: a device whose hello a host's device gate waits
+                     for while the Mac changes something (its gate gives up after 2 s)
   --audio            the hello (sent even without --hello) lists "aac-eld": this client plays the Mac's
                      sound, so a host with Send Audio on sends it kind 29. Each format (type 1) is printed
                      on one line; the packets (type 2) are counted each second (aud=) with their seq
@@ -78,6 +88,24 @@ The remote door (TLS 1.3, both keys pinned; PORT is the remote door's):
   --pin=FP|none      pin this base64url fingerprint instead of the saved one; none accepts any key
   --expect-tls-fail  the session must be refused (a TLS error, or closed before any message): exits 0
                      when it is, 1 when a session is served
+Pairing at home (a TLS home door: SillHost --pairing, or the bare app; PORT is the home door's):
+  --pair-ask[=cable] ask to pair first (kind 19 "ask", with "cable": true given =cable), taking any Mac
+                     key (or --pin's), and print kind 20. An ok with method "cable" is accepted only for
+                     =cable: its macID must be the Mac's key's and its recognition key 32 bytes; the Mac
+                     is saved, then the session runs
+  --then-code=FILE   after "shown", read the code from FILE (waiting up to 5 s for 12 digits) and pair with
+                     it over the same door, pinned to the key the ask saw; with --pair-url instead, pair by
+                     the link after "shown"
+  --pair-hold=S      open a pairing connection (ALPN sill-pair/1) that sends nothing for S seconds, then
+                     print whether the host closed it first (HOLD closed at T s, or HOLD open); nothing else
+  --pair-cancel      the device's Cancel: kind 19 "cancel" on a new pairing connection, after --pair-ask's
+                     "shown" pinned to the key the ask saw, or alone (any key, or --pin's); prints kind 20
+                     (always closed). The window that ask opened closes, withdrawn, its asker not quiet
+  --pair-v=N         the kind 19's v (1 unless given): a host answers any other closed, with no try
+                     counted (the compatibility floor: a later method or proof comes with a later v)
+  --expect-pair=R    the pairing's last kind 20 must be R: ok (a proof checked), cable, shown, openOnMac,
+                     locked, closed, code, busy, expired or stopped; prints EXPECT-PAIR ok or EXPECT-PAIR
+                     FAIL (exit 1). A match that is not a pairing ends the run with exit 0
 A pin mismatch exits 3 before sending a byte. Kinds 18 (verified with `openssl dgst -sha256 -verify`
 and against the Mac ID), 20 and 22 (its reason, then message, minimumVersion and reconnect when sent)
 are printed one line each; a session prints the order of the
@@ -88,7 +116,9 @@ same clock when both run on one Mac).
 Once a second it prints the frames, their payload in kB (the encoder's output), ticks, cursor
 shapes and the last ping's round trip. Every kind 16 (host settings) is printed on one line with
 its arrival time; dw= is Direct Wireless
-(1, 0, or - when the host did not report it: an older host). Flags may come in any
+(1, 0, or - when the host did not report it: an older host); away= (only when the host sent it) is
+h:HOME_BITRATE/SCALE,a:AWAY_BITRATE/SCALE,this=1|0,run=1|0, and link= (only while the host reports
+the link behind or stalled) STATE,withheld=N,bitrate=B,carried=KBPS|-,suggested=B/SCALE|-. Flags may come in any
 order after the positional arguments. Everything is checked before connecting: an unknown flag, a
 --set or --expect key that is not one of theirs, or a value that does not parse stops the script
 with status 2 (--raw17 and --input go out as written). Find PORT with: lsof -nP -iTCP -sTCP:LISTEN -a -p <pid>.
@@ -97,17 +127,22 @@ import json, re, socket, struct, sys, time
 
 KIND = {0:"ps",1:"frame",2:"list",3:"thumb",4:"icon",5:"apps",11:"pong",13:"tick",14:"cursor",16:"settings",18:"macinfo",20:"pairresult",22:"goodbye",24:"menu",26:"pointer",29:"audio"}
 BOOL = {"1": True, "0": False, "true": True, "false": False, "on": True, "off": False, "yes": True, "no": False}
-BOOL_KEYS = {"prioritizeSpeed", "virtualDisplay", "directWireless", "sendAudio", "persistent", "virtualDisplayAvailable"}
+BOOL_KEYS = {"prioritizeSpeed", "virtualDisplay", "directWireless", "sendAudio", "persistent", "virtualDisplayAvailable",
+             "thisConnectionAway", "awayRunning"}
 # What --set may send: HostSettingsChange's seven fields. The host drops any other key without a
 # word, so a misspelt one would only show up as an unchanged answer.
 SET_KEYS = {"maxFPS", "bitrate", "captureScale", "prioritizeSpeed", "virtualDisplay", "directWireless", "sendAudio"}
-EXPECT_KEYS = SET_KEYS | {"persistent", "virtualDisplayAvailable"}
+# Away from home (docs/remote-bundle-plan.md): read from the state's `away`, and its `link`'s state.
+AWAY_KEYS = {"homeBitrate", "homeCaptureScale", "awayBitrate", "awayCaptureScale", "thisConnectionAway", "awayRunning"}
+EXPECT_KEYS = SET_KEYS | {"persistent", "virtualDisplayAvailable", "linkState"} | AWAY_KEYS
 TIMED = ("set", "raw17", "pick", "fps-after", "stop-ping", "stop-read", "pairing-wanted", "fetch", "press", "raw25", "raw27",
          "move", "tap", "key", "input", "gesture", "raw28")
 INPUT = ("move", "tap", "key", "input")
 # What --gesture may send: TrackpadGesture's six names (Gesture.swift). Anything else goes with --raw28.
 GESTURES = ("swipeUp", "swipeDown", "swipeLeft", "swipeRight", "pinch", "spread")
-VALUED = ("host", "device", "big-payload", "flood", "identity", "pair-url", "pair-code", "pin", "hello", "expect-menus")
+VALUED = ("host", "device", "big-payload", "flood", "identity", "pair-url", "pair-code", "pin", "hello", "hello-delay", "then-code",
+          "pair-hold", "expect-pair", "pair-v", "expect-menus")
+PAIR_RESULTS = ("ok", "cable", "shown", "openOnMac", "locked", "closed", "code", "busy", "expired", "stopped")
 # Sends that read or press the host's menus: only against a host started with the fixture's pid.
 MENU_SENDS = ("fetch", "press", "raw25", "raw27")
 
@@ -128,7 +163,10 @@ def value(k, v):
     if k in BOOL_KEYS:
         if v.lower() not in BOOL: raise ValueError(f"{k}: not a boolean: {v!r} (1/0/true/false/on/off)")
         return BOOL[v.lower()]
-    if k == "captureScale":
+    if k == "linkState":
+        if v not in ("fine", "behind", "stalled"): raise ValueError(f"linkState: fine, behind or stalled, got {v!r}")
+        return v
+    if k in ("captureScale", "homeCaptureScale", "awayCaptureScale"):
         f = number(v, k, float); return int(f) if f.is_integer() else f   # an integer, as a device-less script would send it
     return number(v, k)
 
@@ -285,19 +323,25 @@ def verify_macinfo(payload, pin):
     fp = hashlib.sha256(spki_der).digest(); i = json.loads(info)
     ok = r.returncode == 0 and "Verified OK" in r.stdout and i.get("macID") == macid(fp) and (pin is None or fp == pin)
     return ok, i
-def pair():
-    """One pairing connection (ALPN sill-pair/1): kind 19 out, kind 20 back. Saves the Mac on ok."""
+pair_results = []      # every kind 20 of the pairing phase, in order (--expect-pair checks the last)
+def pair(url=None, code=None, pin=None):
+    """One pairing connection (ALPN sill-pair/1): kind 19 out, kind 20 back. Saves the Mac on ok.
+    `url` pairs by the QR link (pinned to its k), `code` by the typed code (pinned to `pin` when the
+    ask saw the Mac's key, else to nothing: the proofs bind both keys)."""
+    url = url if url is not None else pair_url
+    code = code if code is not None else pair_code
     key, cert, fp_dev = ensure_identity(identity_dir)
-    if pair_url:
-        s, fp_mac = tls_connect("sill-pair/1", link["fp"])
-        k, method = link["secret"], "qr"
+    if url:
+        lk = parse_link(url) if url != pair_url else link
+        s, fp_mac = tls_connect("sill-pair/1", lk["fp"])
+        k, method = lk["secret"], "qr"
     else:
-        s, fp_mac = tls_connect("sill-pair/1", None)
+        s, fp_mac = tls_connect("sill-pair/1", pin)
         t0 = time.time()
-        k = hashlib.pbkdf2_hmac("sha256", pair_code.encode(), b"sill-pair-v1" + fp_mac, 600_000, 32); method = "code"
+        k = hashlib.pbkdf2_hmac("sha256", code.encode(), b"sill-pair-v1" + fp_mac, 600_000, 32); method = "code"
         print(f"  code key derived in {1000 * (time.time() - t0):.0f} ms")
     proof = hmac.new(k, b"sill-pair-v1 device\x00" + fp_dev + fp_mac, hashlib.sha256).digest()
-    req = {"v": 1, "method": method, "proof": b64u(proof), "name": device, "model": "sillclient"}
+    req = {"v": pair_v, "method": method, "proof": b64u(proof), "name": device, "model": "sillclient"}
     s.sendall(msg(19, json.dumps(req).encode()))
     try:
         m = read_message(s, 15)
@@ -306,6 +350,7 @@ def pair():
     s.close()
     if m is None or m[0] != 20: print(f"PAIR FAIL: no kind 20 ({m[0] if m else 'EOF'})"); return False
     r = json.loads(m[1]); print(f"  pairResult: {json.dumps(r, sort_keys=True)}")
+    pair_results.append(r)
     if not r.get("ok"): print(f"PAIR FAIL: {r.get('reason')}"); return False
     want = hmac.new(k, b"sill-pair-v1 mac\x00" + fp_mac + fp_dev, hashlib.sha256).digest()
     if not hmac.compare_digest(b64u_decode(r.get("proof", "")), want): print("PAIR FAIL: proof_M does not check"); return False
@@ -314,6 +359,79 @@ def pair():
         json.dump({"fingerprint": b64u(fp_mac), "macID": r["macID"], "name": r.get("name"), "recognitionKey": r.get("recognitionKey")}, f)
     print(f"PAIR ok: {r.get('name')} ({r['macID']}), proof_M checked, pin saved")
     return True
+
+def ask(cable, pin=None):
+    """The home door's "pair me" (kind 19 "ask"): returns (kind 20 as a dict or None, the Mac's key).
+    A proof-less ok is taken only as the answer to an ask that said cable: true, with the macID of
+    the key this connection saw and a 32-byte recognition key; then the Mac is saved."""
+    ensure_identity(identity_dir)
+    s, fp_mac = tls_connect("sill-pair/1", pin)
+    req = {"v": pair_v, "method": "ask", "proof": "", "name": device, "model": "sillclient"}
+    if cable: req["cable"] = True
+    s.sendall(msg(19, json.dumps(req).encode()))
+    try:
+        m = read_message(s, 15)
+    except (OSError, ssl.SSLError) as e:
+        print(f"ASK FAIL: {e}"); return None, fp_mac
+    s.close()
+    if m is None or m[0] != 20: print(f"ASK FAIL: no kind 20 ({m[0] if m else 'EOF'})"); return None, fp_mac
+    r = json.loads(m[1]); print(f"  pairResult: {json.dumps(r, sort_keys=True)}")
+    if not r.get("ok"):
+        pair_results.append(r)
+        print(f"ASK {r.get('reason')}"); return r, fp_mac
+    # An ok this client refuses counts as "refused" for --expect-pair, never as a pairing.
+    if not cable or r.get("method") != "cable" or r.get("proof"):
+        pair_results.append({"ok": False, "reason": "refused"})
+        print("ASK FAIL: an ok without a proof for an ask that did not claim the cable; nothing saved"); return None, fp_mac
+    rk = b64u_decode(r.get("recognitionKey") or "")
+    if r.get("macID") != macid(fp_mac) or len(rk) != 32:
+        pair_results.append({"ok": False, "reason": "refused"})
+        print("ASK FAIL: the cable's ok names another Mac key, or no recognition key; nothing saved"); return None, fp_mac
+    pair_results.append(r)
+    with open(os.path.join(identity_dir, "mac.json"), "w") as f:
+        json.dump({"fingerprint": b64u(fp_mac), "macID": r["macID"], "name": r.get("name"), "recognitionKey": r.get("recognitionKey")}, f)
+    print(f"PAIR ok: {r.get('name')} ({r['macID']}) over the cable, pin saved")
+    return r, fp_mac
+
+def cancel_ask(pin=None):
+    """--pair-cancel: the device's Cancel (kind 19 "cancel"); the answer is always closed."""
+    ensure_identity(identity_dir)
+    s, fp_mac = tls_connect("sill-pair/1", pin)
+    req = {"v": pair_v, "method": "cancel", "proof": "", "name": device, "model": "sillclient"}
+    s.sendall(msg(19, json.dumps(req).encode()))
+    try:
+        m = read_message(s, 15)
+    except (OSError, ssl.SSLError) as e:
+        print(f"CANCEL FAIL: {e}"); return None
+    s.close()
+    if m is None or m[0] != 20: print(f"CANCEL FAIL: no kind 20 ({m[0] if m else 'EOF'})"); return None
+    r = json.loads(m[1]); print(f"  pairResult: {json.dumps(r, sort_keys=True)}")
+    pair_results.append(r)
+    print(f"CANCEL {r.get('reason')}")
+    return r
+
+def read_code(path, wait=5.0):
+    """--then-code: the 12 digits in `path`, waiting up to `wait` s for the file to hold them."""
+    deadline = time.time() + wait
+    while True:
+        try:
+            text = re.sub(r"[ -]", "", open(path).read().strip())
+            if re.fullmatch(r"\d{12}", text) and damm(text) == 0: return text
+        except OSError:
+            pass
+        if time.time() >= deadline: return None
+        time.sleep(0.05)
+
+def result_word(r):
+    if r is None: return None
+    if r.get("ok"): return "cable" if r.get("method") == "cable" else "ok"
+    return r.get("reason")
+
+def check_expect_pair():
+    """--expect-pair: the pairing phase's last kind 20 against the wanted word; exits 1 on a miss."""
+    got = result_word(pair_results[-1]) if pair_results else None
+    if got == expect_pair: print("EXPECT-PAIR ok"); return True
+    print(f"EXPECT-PAIR FAIL: want {expect_pair}, got {got}"); sys.exit(1)
 
 args = sys.argv[1:]
 pos = [a for a in args if not a.startswith("--")]
@@ -355,7 +473,8 @@ try:
         elif name in VALUED:
             if not body: raise ValueError(f"--{name} needs a value")
             if name in ("big-payload", "flood") and number(body, f"--{name}") < 1: raise ValueError(f"--{name} must be at least 1")
-        elif a not in ("--junk", "--stats", "--tls", "--expect-tls-fail", "--menus", "--pointer", "--audio") and not a.startswith(("--fps=", "--expect=")):
+        elif a not in ("--junk", "--stats", "--tls", "--expect-tls-fail", "--menus", "--pointer", "--audio", "--no-select", "--pair-ask",
+                       "--pair-ask=cable", "--pair-cancel") and not a.startswith(("--fps=", "--expect=")):
             raise ValueError(f"unknown flag {a!r}")
     events.sort(key=lambda e: (e[0], e[1]))
     expect = next((pairs(a[9:], EXPECT_KEYS, "--expect") for a in flags if a.startswith("--expect=")), None)
@@ -366,12 +485,26 @@ try:
     device = unescape(valued("device")) if valued("device") is not None else None
     big_payload = number(valued("big-payload"), "--big-payload") if valued("big-payload") else None
     flood = number(valued("flood"), "--flood") if valued("flood") else 0
-    tls = "--tls" in flags or valued("pair-url") is not None or valued("pair-code") is not None
+    pair_ask = "--pair-ask" in flags or "--pair-ask=cable" in flags
+    pair_cancel = "--pair-cancel" in flags
+    ask_cable = "--pair-ask=cable" in flags
+    then_code = valued("then-code"); expect_pair = valued("expect-pair")
+    pair_v = number(valued("pair-v"), "--pair-v") if valued("pair-v") is not None else 1
+    pair_hold = number(valued("pair-hold"), "--pair-hold", float) if valued("pair-hold") else None
+    tls = ("--tls" in flags or valued("pair-url") is not None or valued("pair-code") is not None or pair_ask or pair_cancel
+           or pair_hold is not None)
     identity_dir = valued("identity")
     pair_url = valued("pair-url"); pair_code = valued("pair-code"); pin_arg = valued("pin")
     expect_tls_fail = "--expect-tls-fail" in flags
-    if tls and not identity_dir: raise ValueError("--tls, --pair-url and --pair-code need --identity=DIR")
+    if tls and not identity_dir: raise ValueError("--tls, --pair-url, --pair-code, --pair-ask and --pair-hold need --identity=DIR")
     if pair_url and pair_code: raise ValueError("--pair-url or --pair-code, not both")
+    if then_code and not pair_ask: raise ValueError("--then-code needs --pair-ask")
+    if then_code and (pair_url or pair_code): raise ValueError("--then-code, --pair-url or --pair-code after an ask, not two")
+    if pair_ask and pair_code: raise ValueError("--pair-ask with --then-code=FILE (its code is read after the ask), not --pair-code")
+    if expect_pair is not None and expect_pair not in PAIR_RESULTS: raise ValueError(f"--expect-pair: one of {', '.join(PAIR_RESULTS)}")
+    if expect_pair is not None and not (pair_ask or pair_url or pair_code or pair_cancel): raise ValueError("--expect-pair needs --pair-ask, --pair-url, --pair-code or --pair-cancel")
+    if pair_cancel and (then_code or pair_url or pair_code): raise ValueError("--pair-cancel ends the pairing: not with --then-code, --pair-url or --pair-code")
+    if pair_hold is not None and (pair_hold <= 0 or pair_ask or pair_url or pair_code): raise ValueError("--pair-hold=S (S > 0) runs alone")
     if pair_url: link = parse_link(pair_url)
     if pair_code:
         pair_code = re.sub(r"[ -]", "", pair_code)
@@ -385,6 +518,9 @@ try:
         hv, _, hp = hello_arg.partition(",")
         if not hv: raise ValueError("--hello: VERSION[,PROTOCOL] or none")
         if hp: number(hp, "--hello's protocol")
+    hello_delay = number(valued("hello-delay"), "--hello-delay", float) if valued("hello-delay") else 0
+    if hello_delay and hello_arg is None and "--audio" not in flags: raise ValueError("--hello-delay needs --hello or --audio")
+    if hello_delay < 0: raise ValueError("--hello-delay must be 0 or more")
     # Input reaches only a host that never posts it: a --synthetic host on this Mac (every one is a
     # dry run). A variable in this client's environment would say nothing about the host it reaches;
     # the listener's own arguments do (neither Sill.app nor a real SillHost carries --synthetic).
@@ -422,9 +558,44 @@ if flood:
         f.close()
     print(f"  flood: {flood} connections opened and reset before sending")
 mac_pin = None
+if pair_hold is not None:
+    # A pairing connection still pending: TLS up (ALPN sill-pair/1), then silence. The host's
+    # admission deadline (10 s) or a Direct Wireless change may close it first.
+    ensure_identity(identity_dir)
+    hs, _ = tls_connect("sill-pair/1", b64u_decode(pin_arg) if pin_arg and pin_arg != "none" else None)
+    t_hold = time.time(); closed_at = None
+    hs.settimeout(0.1)
+    while time.time() - t_hold < pair_hold:
+        try:
+            c = hs.recv(65536)
+            if not c: closed_at = time.time() - t_hold; break
+        except socket.timeout: pass
+        except (OSError, ssl.SSLError): closed_at = time.time() - t_hold; break
+    hs.close()
+    print(f"HOLD closed at {closed_at:.2f} s" if closed_at is not None else f"HOLD open for {pair_hold:.0f} s")
+    sys.exit(0)
 if tls:
-    if pair_url or pair_code:
-        if not pair(): sys.exit(1)
+    ask_pin = b64u_decode(pin_arg) if pin_arg and pin_arg != "none" else None
+    if pair_ask:
+        r, asked_fp = ask(ask_cable, ask_pin)
+        word = result_word(r)
+        if word == "shown" and pair_cancel:
+            cancel_ask(asked_fp)
+        elif word == "shown" and then_code:
+            code_text = read_code(then_code)
+            if code_text is None: print(f"PAIR FAIL: no code in {then_code}"); sys.exit(1)
+            if not pair(code=code_text, pin=asked_fp) and expect_pair is None: sys.exit(1)
+        elif word == "shown" and pair_url:
+            if not pair() and expect_pair is None: sys.exit(1)
+        elif word != "cable" and expect_pair is None:
+            sys.exit(1)
+    elif pair_url or pair_code:
+        if not pair() and expect_pair is None: sys.exit(1)
+    elif pair_cancel:
+        cancel_ask(ask_pin)
+    if expect_pair is not None:
+        check_expect_pair()
+        if result_word(pair_results[-1] if pair_results else None) not in ("ok", "cable"): sys.exit(0)
     saved = os.path.join(identity_dir, "mac.json")
     if pin_arg == "none": mac_pin = None
     elif pin_arg: mac_pin = b64u_decode(pin_arg)
@@ -441,8 +612,10 @@ else:
 s.settimeout(0.25)
 try:
     if hello is not None:
-        s.sendall(msg(23, json.dumps(hello).encode())); print(f"  sent hello {json.dumps(hello)}")
-    s.sendall(msg(6, json.dumps(sel).encode()))
+        if hello_delay:
+            time.sleep(hello_delay)
+        s.sendall(msg(23, json.dumps(hello).encode())); print(f"  sent hello {json.dumps(hello)}" + (f" after {hello_delay:g} s" if hello_delay else ""))
+    if "--no-select" not in flags: s.sendall(msg(6, json.dumps(sel).encode()))
     if "--menus" in flags:
         # The subscription (kind 27 without an id); its token is the first of the shared counter.
         s.sendall(msg(27, json.dumps({"token": 1}).encode())); print("  sent menus subscription (token 1)")
@@ -475,10 +648,20 @@ def describe(d):
     note = d.get("virtualDisplayNote")
     dw = "-" if st.get("directWireless") is None else b(st.get("directWireless"))   # "-": an older host
     au = "-" if st.get("sendAudio") is None else b(st.get("sendAudio"))             # "-": a host without sound
+    away = d.get("away"); link = d.get("link")
+    dash = lambda x: "-" if x is None else x
+    extra = ""
+    if isinstance(away, dict):
+        extra += (f" away=h:{away.get('homeBitrate')}/{away.get('homeCaptureScale')},a:{away.get('awayBitrate')}/{away.get('awayCaptureScale')},"
+                  f"this={b(away.get('thisConnectionAway'))},run={b(away.get('awayRunning'))}")
+    if isinstance(link, dict):
+        suggested = "-" if link.get("suggestedBitrate") is None else f"{link.get('suggestedBitrate')}/{dash(link.get('suggestedCaptureScale'))}"
+        extra += (f" link={link.get('state')},withheld={link.get('withheldPerSecond')},bitrate={link.get('bitrate')},"
+                  f"carried={dash(link.get('carriedKbps'))},suggested={suggested}")
     return (f"maxFPS={st.get('maxFPS')} bitrate={st.get('bitrate')} scale={st.get('captureScale')} speed={b(st.get('prioritizeSpeed'))} "
             f"vd={b(st.get('virtualDisplay'))} dw={dw} audio={au} persistent={b(d.get('persistent'))} vdAvail={b(d.get('virtualDisplayAvailable'))} "
             f"sw={b(d.get('softwareEncoder'))} stream={running}" + (f" note={note!r}" if note else "")
-            + (f" audioNote={d['audioNote']!r}" if d.get("audioNote") else ""))
+            + (f" audioNote={d['audioNote']!r}" if d.get("audioNote") else "") + extra)
 
 buf = b""; t0 = time.time(); last = t0; nextping = t0; nextstats = t0
 per = {}; tot = {}; frames = 0; keys = 0; kb = 0; kb_sec = 0; rtt = None; first_frame = None; ps_seen = []
@@ -624,11 +807,11 @@ while time.time() - t0 < dur:
                       f"{f.get('framesPerPacket')} frames (priming {f.get('primingFrames')}), {f.get('bitrate')} bps, "
                       f"{f.get('source')}{' ' + f['app'] if f.get('app') else ''}, cookie {len(f.get('cookie') or '')} base64 chars")
             elif payload[0] == 2 and len(payload) >= 9:
-                epoch, seq, flags, count = struct.unpack(">HIBB", payload[1:9])
+                epoch, seq, pflags, count = struct.unpack(">HIBB", payload[1:9])
                 if epoch not in aud_epochs: aud_orphans += 1          # a packet before its epoch's format
                 if epoch in aud_next and seq != aud_next[epoch]: aud_gaps += 1
                 aud_next[epoch] = seq + count
-                if flags & 1: aud_starts += 1
+                if pflags & 1: aud_starts += 1
                 aud_sec += count; aud_total += count
                 aud_ages.append((time.time() - ts) * 1000)
                 if aud_first is None: aud_first = at; print(f"  first audio packet at {at:.3f}s (epoch {epoch}, seq {seq})")
@@ -707,8 +890,12 @@ if expect is not None:
         problems.append("no settings received")
     else:
         for k, want in expect.items():
-            got = last_state.get(k) if k in ("persistent", "virtualDisplayAvailable") else last_state.get("settings", {}).get(k)
-            same = (got == want) if isinstance(want, bool) else (got is not None and not isinstance(got, bool) and float(got) == float(want))
+            if k in ("persistent", "virtualDisplayAvailable"): got = last_state.get(k)
+            elif k in AWAY_KEYS: got = (last_state.get("away") or {}).get(k)
+            elif k == "linkState": got = (last_state.get("link") or {}).get("state", "fine")
+            else: got = last_state.get("settings", {}).get(k)
+            if isinstance(want, str): same = got == want
+            else: same = (got == want) if isinstance(want, bool) else (got is not None and not isinstance(got, bool) and float(got) == float(want))
             if not same: problems.append(f"{k}: want {want}, got {got}")
     print("EXPECT ok" if not problems else "EXPECT FAIL " + "; ".join(problems))
     if problems: sys.exit(1)

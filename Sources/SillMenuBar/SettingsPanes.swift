@@ -17,6 +17,7 @@ struct SettingsPane: View {
         Group {
             switch tab {
             case .general: GeneralPane(model: model, settings: model.settings, previewUpdates: previewUpdates)
+            case .devices: LiveDevicesPane(model: model, settings: model.settings)
             case .streaming: StreamingPane(model: model, settings: model.settings)
             case .virtualDisplay: VirtualDisplayPane(model: model, settings: model.settings)
             case .permissions: PermissionsPane(model: model)
@@ -27,10 +28,10 @@ struct SettingsPane: View {
         .frame(width: 520)
         // Permissions and the login item change behind Sill's back, in System Settings. Re-read
         // them once a second, only while this tab is on screen, and when Sill becomes active; an
-        // idle Sill with Settings closed wakes for nothing. The Remote Access pane follows the
-        // host's status, which is pushed, so it polls nothing.
+        // idle Sill with Settings closed wakes for nothing. The Devices and Remote Access panes
+        // follow the host's status, which is pushed, so they poll nothing.
         .task(id: model.visibleSettingsTab == tab) {
-            guard model.visibleSettingsTab == tab, tab != .streaming, tab != .remoteAccess else { return }
+            guard model.visibleSettingsTab == tab, tab != .streaming, tab != .devices, tab != .remoteAccess else { return }
             while !Task.isCancelled {
                 model.permissions.refresh()
                 model.loginItem.refresh()
@@ -55,6 +56,22 @@ struct Footnote: View {
             .multilineTextAlignment(.leading)
             .frame(maxWidth: .infinity, alignment: .leading)
     }
+}
+
+/// An orange problem line with its sign.
+struct Warning: View {
+    let text: String
+    init(_ text: String) { self.text = text }
+    var body: some View {
+        Label(text, systemImage: "exclamationmark.triangle.fill")
+            .foregroundStyle(.orange)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+}
+
+/// A system error message inside a sentence of ours: without its own full stop.
+func withoutFullStop(_ text: String) -> String {
+    text.hasSuffix(".") ? String(text.dropLast()) : text
 }
 
 // MARK: General
@@ -118,7 +135,7 @@ private struct GeneralPane: View {
             Section {
                 Toggle("Direct wireless connection", isOn: $settings.config.directWireless)
             } footer: {
-                Footnote("Lets your iPhone and iPad connect when they’re near this Mac, even without a shared Wi\u{2011}Fi network, the way AirDrop does. While it’s on, this Mac’s Wi\u{2011}Fi keeps stepping away from your network, so streaming over Wi\u{2011}Fi can stutter. Anyone nearby with Sill can find and connect to this Mac.")
+                Footnote("Lets your iPhone and iPad connect when they’re near this Mac, even without a shared Wi\u{2011}Fi network, the way AirDrop does. While it’s on, this Mac’s Wi\u{2011}Fi keeps stepping away from your network, so streaming over Wi\u{2011}Fi can stutter. Anyone nearby with Sill can find this Mac; only devices you paired can connect, unless Require pairing is off.")
             }
             if let preview = previewUpdates {
                 UpdatesSection(pane: preview, automatic: .constant(true))
@@ -225,6 +242,25 @@ private struct StreamingPane: View {
             } footer: {
                 Footnote("Each device asks for its own screen’s rate, up to this limit. Quality is per 60 fps; a 120 fps stream gets twice as much. \(QualityPreset.fastLinkNote) Changes apply at once: the current stream restarts for a moment.")
             }
+            // Away from home (docs/remote-bundle-plan.md §5): its own quality, which a device away
+            // sets too; the menu's Quality and Resolution stay the home ones.
+            Section {
+                Picker("Quality", selection: $settings.config.awayBitrate) {
+                    ForEach(QualityPreset.allCases) { Text($0.title).tag($0.rawValue) }
+                    if QualityPreset(rawValue: settings.config.awayBitrate) == nil {
+                        Text(QualityPreset.title(forBitrate: settings.config.awayBitrate)).tag(settings.config.awayBitrate)
+                    }
+                }
+                Picker("Resolution", selection: $settings.config.awayCaptureScale) {
+                    Text("Retina").tag(CGFloat(2))
+                    Text("Standard").tag(CGFloat(1))
+                }
+            } header: {
+                Text("Away from home")
+            } footer: {
+                Footnote("Sill streams at these while every connected device is away from home, through a VPN or over the internet, so a slow connection never starts at your home quality. A device away from home changes these, and never your Quality and Resolution above."
+                         + (model.coordinator?.status.snapshot.away == true ? " Streaming at these now." : ""))
+            }
             Section {
                 Toggle("Prioritize encoding speed", isOn: $settings.config.prioritizeSpeed)
             } footer: {
@@ -233,8 +269,7 @@ private struct StreamingPane: View {
             Section {
                 Toggle("Send audio", isOn: $settings.config.sendAudio)
                 if settings.config.sendAudio, let problem = model.coordinator?.status.snapshot.audio?.problem {
-                    Label("Sill \(problem). The picture is unaffected.", systemImage: "exclamationmark.triangle.fill")
-                        .foregroundStyle(.orange)
+                    Warning("Sill \(problem). The picture is unaffected.")
                 }
             } footer: {
                 Footnote("Devices play the sound of what you stream: all of the streamed window’s app, or every app for the Desktop. The Mac keeps playing it too, and each device can mute it with its Sound button. Nothing is recorded.")

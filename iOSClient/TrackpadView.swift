@@ -451,6 +451,11 @@ final class TrackpadSurface: UIView, UIGestureRecognizerDelegate {
         if window == nil {
             // This device's pointer is left alone: it outlives this view across a rotation.
             momentum.stop()
+            // A drag the pad is taken away in the middle of (a rotation) has ended by now: UIKit
+            // cancels the long press before the pad leaves its window, and its end (`handleLongPress`)
+            // sends the button's up and the modifiers' and spends the latch (a rig on a private
+            // simulator, 2026-09-27: the removal animated or not, the touch cancelled first, the long
+            // press taken off the pad first).
             #if DEBUG
             if InputScript.pad === self { InputScript.pad = nil }
             #endif
@@ -537,18 +542,12 @@ final class TrackpadSurface: UIView, UIGestureRecognizerDelegate {
     // released after it, each event carrying the flags in force at that moment.
 
     private func pressModifiers() {
-        held = []
-        for key in latchedModifiers.keys {
-            held.insert(key.flag)
-            send(.key(hidUsage: key.usage, down: true, modifiers: held.rawValue))
-        }
+        held = latchedModifiers
+        KeyChord.modifiersDown(held).forEach(send)
     }
 
     private func releaseModifiers() {
-        for key in held.keys.reversed() {
-            held.remove(key.flag)
-            send(.key(hidUsage: key.usage, down: false, modifiers: held.rawValue))
-        }
+        KeyChord.modifiersUp(held).forEach(send)
         held = []
     }
 
@@ -676,7 +675,8 @@ enum InputTest {
     static let enabled: Bool = {
         guard UserDefaults.standard.bool(forKey: "SillInputTest") else { return false }
         let host = (UserDefaults.standard.string(forKey: "SillConnect") ?? "").lowercased()
-        guard host.hasPrefix("127.0.0.1:") || host.hasPrefix("[::1]:") || host.hasPrefix("localhost:") else {
+        guard host.hasPrefix("127.0.0.1:") || host.hasPrefix("[::1]:") || host.hasPrefix("::1:")
+                || host.hasPrefix("localhost:") else {
             print("input test: not run: -SillInputTest needs a session -SillConnect dials on this Mac's loopback")
             return false
         }

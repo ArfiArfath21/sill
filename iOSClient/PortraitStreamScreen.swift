@@ -3,32 +3,6 @@ import StreamProtocol
 
 // MARK: - Keys
 
-/// The modifier bits an `InputEvent.key` carries: `UIKeyModifierFlags` raw values, which sit at the
-/// same bit positions as the `CGEventFlags` the host posts with, so they travel unchanged.
-struct KeyModifiers: OptionSet {
-    let rawValue: UInt64
-
-    static let shift   = KeyModifiers(rawValue: 1 << 17)
-    static let control = KeyModifiers(rawValue: 1 << 18)
-    static let option  = KeyModifiers(rawValue: 1 << 19)
-    static let command = KeyModifiers(rawValue: 1 << 20)
-
-    /// The three that make shortcuts instead of characters. Shift is not one of them: it changes
-    /// which character the keyboard produces, which the text path already handles.
-    static let shortcutMakers: KeyModifiers = [.control, .option, .command]
-
-    /// Each latched modifier as its own key: the HID usage to press, and the bit it contributes.
-    /// A pointer event has no modifier field, so a modified click has to hold these down around it.
-    var keys: [(usage: UInt16, flag: KeyModifiers)] {
-        var out: [(usage: UInt16, flag: KeyModifiers)] = []
-        if contains(.control) { out.append((0xE0, .control)) }
-        if contains(.shift)   { out.append((0xE1, .shift)) }
-        if contains(.option)  { out.append((0xE2, .option)) }
-        if contains(.command) { out.append((0xE3, .command)) }
-        return out
-    }
-}
-
 /// The USB HID usages the portrait key row sends, plus the small character table a latched
 /// ⌘/⌃/⌥ needs: those combinations never reach the software keyboard as text.
 enum HIDKey {
@@ -181,10 +155,15 @@ struct PortraitStreamScreen: View {
     let onPanelSize: (CGSize) -> Void
     /// Pair This iPad… in the panel (see `StreamScreen.openPairingOverlay`).
     var pairThisDevice: () -> Void = {}
+    /// The line over the stream while the link cannot carry the quality, as StreamScreen shows it
+    /// (docs/remote-bundle-plan.md §6.7); nil for none.
+    var linkLine: String? = nil
     /// Take the Tour in the panel (see `StreamScreen.takeTour`).
     var takeTour: () -> Void = {}
 
     private var streamShape: RoundedRectangle { RoundedRectangle(cornerRadius: 12, style: .continuous) }
+    /// The Duo's fold across this screen (StreamScreen, iOS 27.1): where the halves split.
+    @Environment(\.duoFold) private var duoFold
 
     var body: some View {
         GeometryReader { geo in
@@ -199,13 +178,17 @@ struct PortraitStreamScreen: View {
     // MARK: Two halves: the inner display, an iPad window
 
     private func halves(_ size: CGSize) -> some View {
-        let half = (size.height / 2).rounded()
+        // At the middle, as before; on the Duo (iOS 27.1) at the fold's real band half-folded, and
+        // open flat at the picture's own shape (docs/iphone-duo-plan.md, (b1) and (b2)).
+        let split = DuoPosture.portraitSplit(size, duoFold, aspect: client.duoPaneAspect(textScale: textScale),
+                                             controls: metrics.controlsHeight)
+        let half = split.picture
         return ZStack(alignment: .topLeading) {
             Color.black
 
-            VStack(spacing: 0) {
+            VStack(spacing: split.controls - half) {
                 picturePane.padding(8).frame(height: half)
-                controls(width: size.width).frame(height: size.height - half)
+                controls(width: size.width).frame(height: size.height - split.controls)
             }
 
             // Same order as landscape: the dim goes over the stream so a tap with the drawer
@@ -218,7 +201,7 @@ struct PortraitStreamScreen: View {
                     .frame(maxHeight: .infinity)
                     .padding(.leading, 22)
                     // Hangs from just under the window bar, so the button that opened it stays visible.
-                    .padding(.top, half + metrics.padTop + metrics.barHeight + 8)
+                    .padding(.top, split.controls + metrics.padTop + metrics.barHeight + 8)
                     .padding(.bottom, metrics.padBottom)
                     .transition(.opacity)
             }
@@ -229,7 +212,7 @@ struct PortraitStreamScreen: View {
             // halves, as the drawer's dim does, so a tap anywhere outside closes the panel first
             // and never reaches the Mac.
             if settingsOpen {
-                let top = half + metrics.padTop + metrics.barHeight + 8
+                let top = split.controls + metrics.padTop + metrics.barHeight + 8
                 catcher
 
                 settingsPanel
@@ -453,6 +436,7 @@ struct PortraitStreamScreen: View {
                          sendGesture: { client.sendGesture($0, fingers: $1) })
         }
         .background(Palette.panel)
+        .overlay(alignment: .top) { LinkLineView(text: linkLine) }
         .clipShape(streamShape)
         .overlay(streamShape.strokeBorder(Color.white.opacity(0.09), lineWidth: 1))
         .onGeometryChange(for: CGSize.self, of: { $0.size }, action: onPanelSize)
@@ -797,8 +781,7 @@ private struct KeyRow: View {
     /// escape, tab and the arrows: down and up, carrying whatever is latched, and the latch is
     /// spent — ⌥← is one tap on opt then one on the left arrow.
     private func press(_ usage: UInt16) {
-        send(.key(hidUsage: usage, down: true, modifiers: latched.rawValue))
-        send(.key(hidUsage: usage, down: false, modifiers: latched.rawValue))
+        KeyChord.press(usage, with: latched).forEach(send)
         latched = []
     }
 

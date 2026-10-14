@@ -19,8 +19,15 @@ import SillHostCore
 /// is its source of truth (LoginItem.swift).
 ///
 /// Remote Access, its port and the internet switch are the Mac's alone: they come from here (the
-/// menu, the Remote Access pane, -SillSetAfter), never from a device. The trust list and the keys
-/// never live here: any process of the same user can write these defaults (KeychainIdentityStore).
+/// menu, the Remote Access pane, -SillSetAfter), never from a device. The trust list, the keys and
+/// Require pairing never live here: any process of the same user can write these defaults
+/// (KeychainIdentityStore; docs/home-pairing-plan.md §6.5). `config.requirePairing` only carries
+/// the stored value to the host (AppModel.setRequirePairing), and `save(changedFrom:)` never writes it.
+///
+/// Away from home (docs/remote-bundle-plan.md §5): the away quality is saved under its own keys,
+/// `awayBitrate` and `awayCaptureScale`, never over `bitrate` and `captureScale`; a device away sets
+/// it, and so does Settings › Streaming's "Away from home" section. Until the first change the keys do
+/// not exist (`defaults read … awayBitrate` says so), which is how Low · Standard reads.
 ///
 /// `updateCheck` (automatic update checks) is here too, outside HostConfig: it moves no listener and
 /// no pipeline. What the checks found is UpdateChecker's own (updateLastCheck, updateETag,
@@ -29,6 +36,7 @@ import SillHostCore
 final class HostSettings {
     enum Key {
         static let maxFPS = "maxFPS", captureScale = "captureScale", bitrate = "bitrate"
+        static let awayBitrate = "awayBitrate", awayCaptureScale = "awayCaptureScale"
         static let prioritizeSpeed = "prioritizeSpeed", virtualDisplay = "virtualDisplay", directWireless = "directWireless"
         static let remoteAccess = "remoteAccess", remotePort = "remotePort", internetAccess = "internetAccess"
         static let remoteAddressName = "remoteAddressName", remoteDevicesSeen = "remoteDevicesSeen"
@@ -91,6 +99,8 @@ final class HostSettings {
             Key.maxFPS: standard.maxFPS,
             Key.captureScale: Double(standard.captureScale),
             Key.bitrate: standard.bitrate,
+            Key.awayBitrate: standard.awayBitrate,
+            Key.awayCaptureScale: Double(standard.awayCaptureScale),
             Key.prioritizeSpeed: standard.prioritizeSpeed,
             Key.virtualDisplay: standard.virtualDisplay,
             // Off, like the CLI: an existing install has no key, so it stops asking for AWDL.
@@ -107,12 +117,18 @@ final class HostSettings {
         config = HostConfig(maxFPS: defaults.integer(forKey: Key.maxFPS),
                             captureScale: CGFloat(defaults.double(forKey: Key.captureScale)),
                             bitrate: defaults.integer(forKey: Key.bitrate),
+                            awayBitrate: defaults.integer(forKey: Key.awayBitrate),
+                            awayCaptureScale: CGFloat(defaults.double(forKey: Key.awayCaptureScale)),
                             prioritizeSpeed: defaults.bool(forKey: Key.prioritizeSpeed),
                             virtualDisplay: defaults.bool(forKey: Key.virtualDisplay),
                             directWireless: defaults.bool(forKey: Key.directWireless),
                             remoteAccess: defaults.bool(forKey: Key.remoteAccess),
                             remotePort: defaults.integer(forKey: Key.remotePort),
                             internetAccess: defaults.bool(forKey: Key.internetAccess),
+                            // Never a default or a launch argument: it lives with the trust list
+                            // (the identity store), from which AppModel reads it at launch, before
+                            // the host starts, and to which the Devices pane saves it.
+                            requirePairing: HostConfig.standard.requirePairing,
                             sendAudio: defaults.bool(forKey: Key.sendAudio)).validated()
         remoteAddressName = defaults.string(forKey: Key.remoteAddressName) ?? ""
         updateCheck = defaults.bool(forKey: Key.updateCheck)
@@ -129,6 +145,8 @@ final class HostSettings {
         if config.maxFPS != old.maxFPS { defaults.set(config.maxFPS, forKey: Key.maxFPS) }
         if config.captureScale != old.captureScale { defaults.set(Double(config.captureScale), forKey: Key.captureScale) }
         if config.bitrate != old.bitrate { defaults.set(config.bitrate, forKey: Key.bitrate) }
+        if config.awayBitrate != old.awayBitrate { defaults.set(config.awayBitrate, forKey: Key.awayBitrate) }
+        if config.awayCaptureScale != old.awayCaptureScale { defaults.set(Double(config.awayCaptureScale), forKey: Key.awayCaptureScale) }
         if config.prioritizeSpeed != old.prioritizeSpeed { defaults.set(config.prioritizeSpeed, forKey: Key.prioritizeSpeed) }
         if config.virtualDisplay != old.virtualDisplay { defaults.set(config.virtualDisplay, forKey: Key.virtualDisplay) }
         if config.directWireless != old.directWireless { defaults.set(config.directWireless, forKey: Key.directWireless) }
