@@ -465,18 +465,24 @@ final class AudioOutput {
     }
 
     private func routeChanged(_ note: Notification) {
-        guard let e = engine, !e.manual,
-              let raw = note.userInfo?[AVAudioSessionRouteChangeReasonKey] as? UInt,
+        guard let raw = note.userInfo?[AVAudioSessionRouteChangeReasonKey] as? UInt,
               let reason = AVAudioSession.RouteChangeReason(rawValue: raw) else { return }
         if reason == .oldDeviceUnavailable {
-            // Headphones out: muted, as a video app pauses, and said (the client).
+            // Headphones out while the sound plays: muted here at once, as a video app pauses, and said
+            // (the client keeps it). Decided from the notification, not from the engine: a configuration
+            // change handled first has already let the engine go, and the next packet would start one
+            // on the speaker.
+            guard sessionLive, !muted, foreground, lastPacketAt != nil, SoundEngine.sinkFromLaunchArguments == .device else { return }
+            muted = true
+            updateSilence()
+            stopEngine(reason: nil, fade: true)
             #if DEBUG
             print("audio: muted (headphones disconnected)")
             #endif
             DispatchQueue.main.async { [weak self] in self?.onRouteMuted?() }
             return
         }
-        _ = reason
+        guard let e = engine, !e.manual else { return }
         let before = (route: routeSeen ?? e.routeName, output: model.outputLatency, io: model.ioBuffer)
         readLatencies()
         routeSeen = e.routeName
