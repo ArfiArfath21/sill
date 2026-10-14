@@ -95,3 +95,7 @@ try:
         time.sleep(1)
 finally:
     stop_all()
+# A device that never reached the host (audiocheck exits 3) means the run could not run.
+codes = [d.returncode for d in devices]
+if any(c == 3 for c in codes):
+    sys.exit(f"run.py {name}: a device never reached the host (exit {codes})")

@@ -252,6 +252,7 @@ func readNext() {
 connection.stateUpdateHandler = { state in
     switch state {
     case .ready:
+        everReady = true
         // The hello first, as a device from 2026-09-25 on sends it; with the codec, one from 2026-09-27 on.
         var hello: [String: Any] = ["appVersion": "0.6", "protocol": 1, "device": label]
         if playsAudio { hello["audio"] = ["aac-eld"] }
@@ -292,6 +293,9 @@ pinger.setEventHandler {
 pinger.resume()
 
 var finished = false
+/// The connection was ever ready: a device that never reached the host exits 3, so the run says it
+/// could not run (run.py), instead of a summary of zeros.
+var everReady = false
 func finish() {
     guard !finished else { return }
     finished = true
@@ -309,7 +313,7 @@ func finish() {
           + "model: placed=\(mt.placed) late=\(mt.late) lateAfter2=\(mt.lateAfter2) jumps=\(mt.jumps) jumpsAfter3=\(mt.jumpsAfter3) joins=\(mt.joins) "
           + "dups=\(mt.dups) coverMax=\(f1(mt.coverMax * 1000)) coverMaxAfter3=\(f1(mt.coverMaxAfter3 * 1000)) needMax=\(f1(mt.needMax * 1000)) "
           + "behindMedian=\(mt.behind.isEmpty ? "–" : String(mt.behind.sorted()[mt.behind.count / 2]))")
-    exit(0)
+    exit(everReady ? 0 : 3)
 }
 queue.asyncAfter(deadline: .now() + seconds) { finish() }
 dispatchMain()

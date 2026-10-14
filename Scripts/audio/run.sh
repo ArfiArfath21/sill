@@ -4,7 +4,10 @@
 # kind 29 and finds the tone's clicks (Scripts/audiocheck.swift), and on the away cases a shaped path
 # (Scripts/pacing/bottleneck.py, Scripts/sillrelay.py), all on 127.0.0.1. No encoder, no Screen
 # Recording, no sound captured or played, no device. Then summarize.py's table and gates; the exit
-# status is the number of gates that failed, plus one for each run that could not run.
+# status is the number of gates that failed, plus one for each run that could not run (a device that
+# never reached the host among them). H12's CPU gate (at most 1.5 points more with sound) fails on every
+# full run, a known failure and no regression: AAC-ELD at codec quality Medium measured +2.1 to +3.1
+# points (docs/audio-plan.md, Results, item 9), and Low or Medium is Noah's call (open question 16).
 #
 #   Scripts/audio/run.sh                   every case (about 7 minutes)
 #   Scripts/audio/run.sh --cases home,home-off
@@ -41,7 +44,7 @@ while [ $# -gt 0 ]; do
     case "$1" in
         --cases) only="$2"; shift 2 ;;
         --list) list=1; shift ;;
-        -h|--help) sed -n '2,33p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        -h|--help) sed -n '2,38p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
         *) echo "usage: Scripts/audio/run.sh [--cases a,b] [--list]" >&2; exit 2 ;;
     esac
 done
