@@ -170,6 +170,12 @@ fixed (012c5de to c2a1802, below) and verified in the simulator
   at volume 0 (every click within 0.2 ms of its place; mute, the switch, the
   background, Send Audio off from a second client, a move with its duplicate
   dropped); S1's photos of every bar against main's build.
+- The review (2026-10-14; docs/audio-plan.md, "The review"): seven verified
+  findings fixed, one commit each (2bbd134 to 68659b1: the hand's deadline
+  before a late packet, the engine's own wait out of the cover, the host's
+  source callbacks and AAC-ELD's failure, one session for every window's
+  engine, headphones out without an engine, a window in the background);
+  `audio-playout` 218 and 38 of 38 mutants, S2 again, `run-all.sh`, all 43.
 - **Untested, for Noah:** everything on the devices, the plan's P1–P16.
   Sill.app's menu and Settings rows can be looked at (previews), and
   `defaults read me.saffer.sill.mac sendAudio` is absent (off) until it is

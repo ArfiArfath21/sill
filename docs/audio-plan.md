@@ -1890,3 +1890,61 @@ copies of an older ledger): 778055b gives it twelve one-line ones, the sound's s
 them, and CI's mutants matrix lists it. Then `Tests/checks/run-all.sh`, all 43.
 
 Not done here: the iOS build with Xcode 27.1 and Noah's P1–P16.
+
+## The review (2026-10-14)
+
+Three lenses over `git diff origin/main...HEAD` (the sync model; the host's threads; the device's
+session, lifecycle and windows), each finding checked by an adversarial verifier and read again here
+before it was fixed: seven confirmed, none refuted, one commit each.
+- 2bbd134 (sync): **a packet past the hand's deadline followed the hand.** The deadline's timer and
+  the packets share `sill.audio`, and AudioOutput never ticks before a packet, so a packet taken just
+  after the deadline (the queue busy) sent the hand's tail out under the IO buffer + 2 ms before its
+  render, unfaded: an underrun with a click. `place` gives the deadline its turn first, and the
+  packet is placed by time with rule 6's test. `audio-playout`'s new case (a packet 4 ms past the
+  deadline, no tick) fails without it (M37).
+- 749d175 (sync): **the wait behind an engine start or stop counted as the link's jitter.** `receive`
+  starts the engine on `sill.audio` and took each packet's time after it, so the cover rose by the
+  block's length for 10 s after each unmute, return or idle restart, then a jump dropped packets; the
+  deferred stop did the same. Rule 6 exempts the engine starting. A packet the network queue handed
+  over before `sill.audio` last finished starting or stopping an engine gives the model when it came
+  (`packet`'s `arrival:`), for the floor and the cover; the late test and the placement keep `now`,
+  and departure 3 holds for every other packet. A by-hand case fails without it (M38).
+- 01b7d4a (host): **the source's callbacks were cleared under it.** `stopSource` and a failed start
+  set `onPCM` and `onStopped` to nil on the main actor while the source reads them on `sill.audio`
+  and ScreenCaptureKit's delegate queue: a race on a closure that property alone owns. They stay; the
+  generation makes a late call inert, and a failed start goes through `stopSource`.
+- 5002066 (host): **AAC-ELD's failure was said once.** The next source's start wrote a status with no
+  problem and returned, and nothing said it again; `encoderGone` keeps the words for every start. A
+  scratch build of AudioPipeline with a throwing encoder: Send Audio off and on showed no problem
+  before, the encoder's after.
+- e861076 (device): **one window's stop deactivated the session under another's engine.** Each
+  window has its own StreamClient, output and engine on the app's one session, and on iOS 26 and
+  later deactivating stops running I/O (AVAudioSession.h; the comment said it failed as busy), so the
+  other window went silent with nothing to notice it. `SharedSession` counts the engines on the
+  device under a lock held across the session's calls; the last one lets it go.
+- 85ceb22 (device): **headphones out was ignored without an engine.** A configuration change
+  handled first had let the engine go, and the next packet started one on the speaker. While the
+  sound plays, the output mutes itself on its queue at once (stopping with the fade), then tells the
+  client, which keeps the mute and says so.
+- 68659b1 (device): **a window in the background was heard.** Only the app's notifications stopped
+  the sound, so a second window minimized or swiped away kept playing. ContentView hands its scene's
+  phase to the output (`setSceneForeground`; inactive counts as on screen, as a headless simulator
+  reads it), which plays only with the app and the scene both in the foreground.
+
+Rerun: `swift build -c release`, no warning; `Scripts/audio/build.sh`, both binaries (not run: the
+send path did not change); `audio-playout` 218 checks and 38 of 38 mutants; the iOS app from the
+scratch copy (Debug for the generic simulator, and ad hoc signed), only the known warning; S2 again on
+a private iPad Pro 13" simulator (iOS 27.0, deleted after) against `SillHost --synthetic --audio` on
+loopback and the software encoder, rendering offline at volume 0, `no-device.sh` before and after:
+every click within 0.2 ms of its place after the first second, mute and unmute (the cover unchanged
+by the new engine's start), the background and back (one "engine off (in the background)", a new
+engine in front, clicks again); then `Tests/checks/run-all.sh`, all 43.
+
+Left open: in the background packets still count for the cover (§7.5), and the simulator's
+throttled background app raised it to 150 ms, kept 10 s past the return (the first S2 saw it too); a
+resumed app's backlog would do the same. Leaving the background's packets out of the cover changes
+§7.5, for Noah. In this S2 the host made its first AAC-ELD encoder 3.3 s after the tone's first chunk
+(beside the catalog's installed-apps scan, the Mac loaded by the mutants), the chunks waiting on
+`sill.audio` behind it, so the session's first second came as a burst of old stamps: 205 late and two
+jumps, then steady. A real capture's buffers would wait the same; making the encoder off `sill.audio`
+is not done.
