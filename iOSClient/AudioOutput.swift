@@ -10,14 +10,15 @@ import UIKit
 /// node schedules, and the real-time code is Apple's (AVAudioSourceNode's real-time block is not for
 /// Swift, AVAudioSourceNode.h).
 ///
-/// The engine runs while a format has come, sound is not muted, the app is in the foreground and a
-/// packet came within 10 s; the audio session (.playback, mixing with other audio, so it never stops
-/// the person's music and plays with the silent switch on, as a video app does) is active only while
-/// it runs, or another window's does (`SharedSession`). It stops on mute, in the background and at the session's end after a fade (the mixer's
-/// own ramp to the player's volume 0), after 10 s without a packet (rule 10's tail has faded it), and
-/// the next packet starts it again. While the sound cannot be heard (muted, in the background, the
-/// session refused during a call) nothing is decoded, and each packet still counts for the floor and
-/// the cover. Interruptions, route changes, a media services reset and the engine's configuration
+/// The engine runs while a format has come, sound is not muted, the app and this window's scene are
+/// in the foreground and a packet came within 10 s; the audio session (.playback, mixing with other
+/// audio, so it never stops the person's music and plays with the silent switch on, as a video app
+/// does) is active only while it runs, or another window's does (`SharedSession`). It stops on
+/// mute, in the background and at the session's end after a fade (the mixer's own ramp to the
+/// player's volume 0), after 10 s without a packet (rule 10's tail has faded it), and the next
+/// packet starts it again. While the sound cannot be heard (muted, in the background, the session
+/// refused during a call) nothing is decoded, and each packet still counts for the floor and the
+/// cover. Interruptions, route changes, a media services reset and the engine's configuration
 /// change are handled here; headphones taken out mute the sound and say so (`onRouteMuted`), as a
 /// video app pauses.
 ///
@@ -47,7 +48,11 @@ final class AudioOutput {
     private var kept: [Int: (left: [Float], right: [Float])] = [:]
     private var engine: SoundEngine?
     private var muted = false
-    private var foreground = true
+    /// The app in the foreground, and this window's scene not in the background (a second window
+    /// minimized or swiped away leaves the app active): heard only with both.
+    private var appForeground = true
+    private var sceneForeground = true
+    private var foreground: Bool { appForeground && sceneForeground }
     /// The session's connection is live (between `sessionStarted` and `sessionEnded`).
     private var sessionLive = false
     /// A session activation failed (a call): no start until the interruption ends or the app comes back.
@@ -82,10 +87,10 @@ final class AudioOutput {
         self.refresh = refresh
         let center = NotificationCenter.default
         center.addObserver(forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: nil) { [weak self] _ in
-            self?.queue.async { self?.foregroundChanged(false) }
+            self?.queue.async { self?.appForeground = false; self?.foregroundChanged() }
         }
         center.addObserver(forName: UIApplication.willEnterForegroundNotification, object: nil, queue: nil) { [weak self] _ in
-            self?.queue.async { self?.foregroundChanged(true) }
+            self?.queue.async { self?.appForeground = true; self?.foregroundChanged() }
         }
         center.addObserver(forName: UIApplication.didBecomeActiveNotification, object: nil, queue: nil) { [weak self] _ in
             self?.queue.async { self?.activationBlocked = false; self?.updateSilence() }
@@ -161,6 +166,16 @@ final class AudioOutput {
                 print("audio: unmuted")
                 #endif
             }
+        }
+    }
+
+    /// This window's scene went to the background (`false`) or came back: with several windows the app
+    /// stays active while one is hidden. Any thread.
+    func setSceneForeground(_ on: Bool) {
+        queue.async { [self] in
+            guard sceneForeground != on else { return }
+            sceneForeground = on
+            foregroundChanged()
         }
     }
 
@@ -413,10 +428,9 @@ final class AudioOutput {
         model.latency(output: e.outputLatency, io: e.ioBuffer, refresh: refresh, streamFPS: streamFPS)
     }
 
-    private func foregroundChanged(_ on: Bool) {
-        foreground = on
+    private func foregroundChanged() {
         updateSilence()
-        if !on { stopEngine(reason: "in the background", fade: true) }
+        if !foreground { stopEngine(reason: "in the background", fade: true) }
     }
 
     /// Nothing is decoded while the sound cannot be heard (§7.5): muted, in the background, or with the

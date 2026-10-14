@@ -7,9 +7,13 @@ struct ContentView: View {
     /// Tells the host what this device sees, once a second while connected. Also covers the DEBUG
     /// harness's `-SillLive 1` session, which runs on this same client.
     @StateObject private var statsReporter = ClientStatsReporter()
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         root.onAppear { statsReporter.attach(to: client) }
+            // This window's sound: a scene in the background is not heard, though another keeps the app
+            // active (inactive is still on screen: Control Center over it, a headless simulator).
+            .onChange(of: scenePhase, initial: true) { _, phase in client.sound.setSceneForeground(phase != .background) }
     }
 
     @ViewBuilder private var root: some View {
