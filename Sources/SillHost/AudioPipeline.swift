@@ -165,7 +165,8 @@ final class AudioPipeline: @unchecked Sendable {   // main-actor state, and stat
     }
 
     /// On the main actor: the source goes, and its chunks with it (a stopped source delivers none, and
-    /// a late one is of an old generation).
+    /// a late one is of an old generation). Its callbacks are left as they are: the source reads them on
+    /// its own queues, and the generation makes a late call inert (`took`, `ended`).
     @MainActor
     private func stopSource() async {
         generation += 1
@@ -173,8 +174,6 @@ final class AudioPipeline: @unchecked Sendable {   // main-actor state, and stat
         queue.async { self.live = g; self.packetizer = nil; self.encoder = nil }
         guard let s = source else { return }
         source = nil
-        s.onPCM = nil
-        s.onStopped = nil
         await s.stop()
     }
 
@@ -210,11 +209,8 @@ final class AudioPipeline: @unchecked Sendable {   // main-actor state, and stat
             try await s.start()
         } catch {
             guard g == generation else { return }
-            source = nil
-            s.onPCM = nil
-            s.onStopped = nil
-            await s.stop()
             failed(key, Self.describe(error))
+            await stopSource()   // a new generation: what the source still delivers is inert
             return
         }
         guard g == generation else { return }   // it ended by itself meanwhile (`ended` has said so)
