@@ -92,8 +92,8 @@ final class AudioPipeline: @unchecked Sendable {   // main-actor state, and stat
     }
     private var requested: Request?
     private var worker: Task<Void, Never>?
-    /// AAC-ELD could not be made (`encoderProblem`): no sound this run.
-    private var encoderGone = false
+    /// AAC-ELD could not be made (`encoderProblem`): no sound this run, and every source shows why.
+    private var encoderGone: String?
     /// "Audio stopped" was said for the source that runs.
     private var stopSaid = false
 
@@ -183,7 +183,7 @@ final class AudioPipeline: @unchecked Sendable {   // main-actor state, and stat
         phase = .starting
         stopSaid = false
         lastStartAt = HostClock.now()
-        sourceStatus = Status(source: Self.shown(key), capturing: false, problem: nil)
+        sourceStatus = Status(source: Self.shown(key), capturing: false, problem: encoderGone)
         generation += 1
         let g = generation
         // One transition at a time (`run`): nothing else starts or stops a source while this one is made
@@ -215,7 +215,7 @@ final class AudioPipeline: @unchecked Sendable {   // main-actor state, and stat
         }
         guard g == generation else { return }   // it ended by itself meanwhile (`ended` has said so)
         phase = .running
-        guard !encoderGone else { return }   // no sound this run: the status says why
+        guard encoderGone == nil else { return }   // no sound this run: the status says why
         sourceStatus = Status(source: Self.shown(key), capturing: true, problem: nil)
     }
 
@@ -356,10 +356,11 @@ final class AudioPipeline: @unchecked Sendable {   // main-actor state, and stat
 
     @MainActor
     private func encoderProblem(_ why: String) {
-        encoderGone = true
+        let problem = "couldn’t encode the sound: AAC-ELD is unavailable (\(why))"
+        encoderGone = problem
         guard var s = sourceStatus else { return }
         s.capturing = false
-        s.problem = "couldn’t encode the sound: AAC-ELD is unavailable (\(why))"
+        s.problem = problem
         sourceStatus = s
     }
 
