@@ -391,6 +391,9 @@ final class StreamClient: ObservableObject {
     @Published var soundMuted = UserDefaults.standard.bool(forKey: StreamClient.soundMutedKey) {
         didSet { if soundMuted != oldValue { sound.setMuted(soundMuted) } }
     }
+    /// Whether the Mac sent its sound when a move handed the session over: the Sound button and switch
+    /// stay until the new connection's first kind 16 says (the same Mac). Nil outside a move. Main.
+    var soundAcrossMove: Bool?
     /// The sound's output: its queue, the playout, the decoder and the engine.
     let sound = AudioOutput(refresh: 1 / Double(max(1, UIScreen.main.maximumFramesPerSecond)))
 
@@ -2104,6 +2107,7 @@ final class StreamClient: ObservableObject {
                 persistSavedMacs()
             }
             remoteRoute = nil
+            sound.setAway(false)   // the jitter cover takes home's bounds, and nothing else resets (rules 2 and 7)
             homeInfo = DiscoveryPolicy.HomeMoveInfo()
             failedHomeMoves = nil
             homeMoveTrust = nil
@@ -2116,6 +2120,7 @@ final class StreamClient: ObservableObject {
         lastPongAt = ProcessInfo.processInfo.systemUptime
         setRoute(from: c.currentPath, fresh: true)   // the new connection's, which carries the session now
         status = "Connected to \(hostName)"
+        soundAcrossMove = soundAvailable
         settings.reset()
         settingsProblem = nil
         settingsExpiry?.cancel()
@@ -2922,6 +2927,7 @@ final class StreamClient: ObservableObject {
         displayView.clear()
         // Nothing of a Mac's settings outlives its connection: the next one sends them afresh.
         settings.reset()
+        soundAcrossMove = nil
         settingsProblem = nil
         connectedAt = nil
         settingsExpiry?.cancel()

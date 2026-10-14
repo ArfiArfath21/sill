@@ -10,8 +10,9 @@ extension StreamClient {
     static let soundMutedKey = "Sill.soundMuted"
 
     /// The Mac sends its sound (Send Audio on, as its settings on this connection say): the Sound
-    /// button shows, and the panel's Sound switch. Nil from a Mac without sound reads as no.
-    var soundAvailable: Bool { settings.displayed?.sendAudio == true }
+    /// button shows, and the panel's Sound switch. Nil from a Mac without sound reads as no. Across a
+    /// move's hand-over, what the last connection said until the new one says (`soundAcrossMove`).
+    var soundAvailable: Bool { (settings.displayed.map { $0.sendAudio } ?? soundAcrossMove) == true }
 
     /// The Sound button and switch: mute or unmute this device alone, at once, without asking the Mac
     /// (it keeps sending), and remember it. Main thread.
