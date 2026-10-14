@@ -22,7 +22,7 @@ at 128 kbps, per device mute, and so on). Built here: the plan's steps 1 to 7,
 the device's playout model (6878c11), its output (aefe477) and the Sound button
 and the panel's rows (5f7b1ac) after the host's. The workflow stopped there
 (9288aa6, WIP); on 2026-10-13 the device's steps were reviewed against the plan,
-fixed (012c5de to c2a1802, below) and verified in the simulator
+fixed (5126215 to 8bbbe52, below) and verified in the simulator
 (docs/audio-plan.md, "Results: the device").
 - Wire (additive; `Audio.swift`): kind 29, host → device. Type 1 is a JSON
   `AudioFormat`: codec "aac-eld", 48 kHz stereo, 480 or 512 frames a packet,
@@ -92,11 +92,11 @@ fixed (012c5de to c2a1802, below) and verified in the simulator
     (an iPhone SE sideways, iPad windows under 532 pt upright) Menus keeps its
     place and Sound is the panel's switch alone, as in the iPhone Duo's book
     pose. A remote session by address takes home's cover, as the Mac counts it.
-  - The review's fixes (2026-10-13): 012c5de (the configuration change, nothing
+  - The review's fixes (2026-10-13): 5126215 (the configuration change, nothing
     decoded while silent, a start's reset, unmute retrying a refused session, a
-    DEBUG leak), fc90d44 (the fades), 2894057 (the console's "audio: jump -870
-    ms (off by over 40 ms)"), 63efd90 (by address), 400ffb0 (Sound and Menus),
-    2c5e42e and d237e83 (checks and harness), c2a1802 (the DEBUG click finder).
+    DEBUG leak), fca4c80 (the fades), 46cc7e4 (the console's "audio: jump -870
+    ms (off by over 40 ms)"), 8a7dc30 (by address), dd9e6fc (Sound and Menus),
+    25767ef and 720d21e (checks and harness), 8bbbe52 (the DEBUG click finder).
 - Checks:
   - `audio-packetizer`: 89 checks, 27 of 27 mutants.
   - `audio-codec`: 21 checks, 9 of 9 mutants. Each click lands at its whole
@@ -171,7 +171,7 @@ fixed (012c5de to c2a1802, below) and verified in the simulator
   background, Send Audio off from a second client, a move with its duplicate
   dropped); S1's photos of every bar against main's build.
 - The review (2026-10-14; docs/audio-plan.md, "The review"): seven verified
-  findings fixed, one commit each (2bbd134 to 68659b1: the hand's deadline
+  findings fixed, one commit each (e6bc0a0 to 3760b01: the hand's deadline
   before a late packet, the engine's own wait out of the cover, the host's
   source callbacks and AAC-ELD's failure, one session for every window's
   engine, headphones out without an engine, a window in the background);

@@ -1721,7 +1721,7 @@ sound, beyond §12's bullets:
   first kind 16 (`soundAcrossMove`): the settings ledger resets at every hand-over (from AWDL, to
   the cable or Wi-Fi, and #39's move home). In the iPhone Duo's book pose the right group is sized
   for Menus and four more buttons (`BarMetrics.clearing`), so Sound shows there only while the Mac's
-  menus do not; otherwise the Settings panel's switch is the way to it. (Since the review, 400ffb0:
+  menus do not; otherwise the Settings panel's switch is the way to it. (Since the review, dd9e6fc:
   Menus is counted whether or not it shows, so in the book pose Sound is the panel's switch alone.)
 - The sound harness (`Scripts/audio`) compiles the host files `Door` brought (Scripts/pacing's list)
   and serves as #37's `serve(_:route:hello:)`, the device's hello read in the receive loop.
@@ -1729,8 +1729,8 @@ sound, beyond §12's bullets:
 ## Results: the device (2026-10-13)
 
 Steps 6 and 7 of §12 were written on 2026-09-27 and stopped there (9288aa6, WIP: "the review and
-finalize steps never ran"); main at 985a733 merged in on 2026-10-13 (8ff5cfc), then the move home's
-bounds and the hand-over's button (482b70c). This is their review, the fixes and the gates:
+finalize steps never ran"); main at 985a733 merged in on 2026-10-13 (cfc760a), then the move home's
+bounds and the hand-over's button (a4b1d42). This is their review, the fixes and the gates:
 - 6878c11: iOS: the playout model.
 - aefe477: iOS: the Mac's sound.
 - 5f7b1ac: iOS: the Sound button and the panel's Send Audio row.
@@ -1738,7 +1738,7 @@ bounds and the hand-over's button (482b70c). This is their review, the fixes and
 
 **The review** (2026-10-13; two auditors against this plan, every finding checked here before it
 was fixed or left), one commit per theme:
-- 012c5de: **the engine's configuration change** was never observed (§7.4): an output at another rate
+- 5126215: **the engine's configuration change** was never observed (§7.4): an output at another rate
   (AirPods, Bluetooth's call profile, another app changing the session's rate) stops and
   uninitializes the engine while `engine` stayed set and packets kept the idle stop away, so the
   sound stayed silent until a mute and unmute. Now the change stops it on `sill.audio` (never in the
@@ -1750,27 +1750,27 @@ was fixed or left), one commit per theme:
   unmuting now tries a session refused during a call again (the person's tap is the resume signal);
   the DEBUG click finder no longer kept every stopped engine alive (a closure on the engine held the
   engine), and is set only in manual rendering.
-- fc90d44: **the fades** (§7.4): a mute turned the player to volume 0 and stopped the engine 20 ms
+- fca4c80: **the fades** (§7.4): a mute turned the player to volume 0 and stopped the engine 20 ms
   later; the background and a session's end stopped it at once, a cut. Measured in manual rendering
   (no output device): the main mixer ramps a change of the player's volume linearly over 1,200 of its
   frames, 25 ms at 48 kHz, whatever the render's size (240 or 1,024 frames), so the stop at 20 ms cut
   the sound at a fifth of its level. The fade is that ramp, and the engine stops 50 ms after it
   starts, on mute, in the background and at a session's end.
-- 2894057: **the console's jump line** (§7.8): "audio: jump -870 ms (off by over 40 ms)", "… (clock
+- 46cc7e4: **the console's jump line** (§7.8): "audio: jump -870 ms (off by over 40 ms)", "… (clock
   step)", "… (ahead of the picture)", "… (route)": the model keeps why a jump was owed while it
   counts, and the next placement by time measures it. The check holds the clock steps to it.
-- 63efd90: **a remote session by address** started with away's cover (rule 2); the Mac's AwayPolicy
+- 8a7dc30: **a remote session by address** started with away's cover (rule 2); the Mac's AwayPolicy
   counts it as home, and now so does the device.
-- 400ffb0: **Sound counts Menus whether or not it shows** (§7.6): the bars counted Menus only while
+- dd9e6fc: **Sound counts Menus whether or not it shows** (§7.6): the bars counted Menus only while
   the Mac's menus showed, so where only one of them fits (an iPhone SE sideways, iPad windows under
   532 pt upright) Sound showed until the menus' top level came and then went. In the book pose the
   buttons past the fold hold Menus and four more: Sound is the panel's switch alone there.
-- 2c5e42e and d237e83: the checks and the harness: a move home as a hand-over (both connections
+- 25767ef and 720d21e: the checks and the harness: a move home as a hand-over (both connections
   carrying the stream, away on the old one, home on the new); two whole thumbnails from 375 pt in
   phone-portrait's grid; the random runs' summary line, which passed whenever any run happened;
   audiocheck exits 3 when it never reached the host (it printed a summary of zeros and passed), and
   run.sh's header names H12's known failure.
-- c2a1802 (found by S2): the DEBUG click finder kept the last engine's timeline, so no click was
+- 8bbbe52 (found by S2): the DEBUG click finder kept the last engine's timeline, so no click was
   found after a mute and unmute; it starts afresh with each engine.
 
 Left as they are: the tail's timer hands the tail over at `max(now, deadline)`, early if a fresh
@@ -1797,7 +1797,7 @@ an early tail only costs a fade out and in); the DEBUG click finder copies TestT
 7. **A configuration change stops the engine and the next packet builds one**, rather than
    reconnecting the mixer in place: fewer lines, the same new format and latencies, one placement by
    time.
-8. **Sound counts Menus always, and the book pose shows it in the panel alone** (400ffb0; the merge's
+8. **Sound counts Menus always, and the book pose shows it in the panel alone** (dd9e6fc; the merge's
    §7.6 note said "only while the Mac's menus do not").
 9. **The simulator never opens an output**, in every build: manual rendering is the simulator's
    default, and `-SillSoundSink device` (DEBUG) opens it for a person at the simulator.
@@ -1854,7 +1854,7 @@ the software encoder, `no-device.sh` before and after each run):
   11 had closed a change of the cover (its fall from the 40 ms start, a rise as the app went to the
   background), 2 ms a second as designed; the Sound button
   (`-SillSoundToggle`): "engine off (muted)", then on again with one join and no jump (nothing played
-  to jump from), the clicks found again (after c2a1802); the panel's switch the same; in the
+  to jump from), the clicks found again (after 8bbbe52); the panel's switch the same; in the
   background (Settings brought to the front) "engine off (in the background)", and back in front a
   new engine, one join and "late 0"; a second client's `--set=sendAudio=0`: "Audio stopped: Send
   Audio is off." on the host, the Sound button gone from the portrait window bar (the strip one
@@ -1878,7 +1878,7 @@ the software encoder, `no-device.sh` before and after each run):
   switch first in the This iPad group, the Slide Over's only Sound control. The photos are in
   /tmp/sill-audio-s1 (not kept).
 
-**The mutants (2026-10-14, on 778055b):** every check whose compiled files differ between main and
+**The mutants (2026-10-14, on 1b7d6b0):** every check whose compiled files differ between main and
 this branch, 31 checks and 925 mutants, every one caught: `audio-playout` 36, `audio-packetizer` 27,
 `audio-codec` 9, `compatibility` 31, `protocol` 33, `phone-portrait` 35, `tour` 72, `menus` 43,
 `pointer-control` 33, `away-wire` 9, `ledger` 12; and, for StreamProtocol's changed files, `away-copy`
@@ -1886,7 +1886,7 @@ this branch, 31 checks and 925 mutants, every one caught: `audio-playout` 36, `a
 `goodbye` 18, `device-gate` 14, `addresses` 15, `ask-limits` 20, `cable-link` 20, `door-policy` 58,
 `home-model` 21, `home-records` 21, `home-txt` 24, `pairing-address` 35, `pointer-watch` 40,
 `remote-rules` 72, `fence` 32, `message-reader` 17. `ledger` had no mutants (its old ones were whole
-copies of an older ledger): 778055b gives it twelve one-line ones, the sound's seventh field among
+copies of an older ledger): 1b7d6b0 gives it twelve one-line ones, the sound's seventh field among
 them, and CI's mutants matrix lists it. Then `Tests/checks/run-all.sh`, all 43.
 
 Not done here: the iOS build with Xcode 27.1 and Noah's P1–P16.
@@ -1896,37 +1896,37 @@ Not done here: the iOS build with Xcode 27.1 and Noah's P1–P16.
 Three lenses over `git diff origin/main...HEAD` (the sync model; the host's threads; the device's
 session, lifecycle and windows), each finding checked by an adversarial verifier and read again here
 before it was fixed: seven confirmed, none refuted, one commit each.
-- 2bbd134 (sync): **a packet past the hand's deadline followed the hand.** The deadline's timer and
+- e6bc0a0 (sync): **a packet past the hand's deadline followed the hand.** The deadline's timer and
   the packets share `sill.audio`, and AudioOutput never ticks before a packet, so a packet taken just
   after the deadline (the queue busy) sent the hand's tail out under the IO buffer + 2 ms before its
   render, unfaded: an underrun with a click. `place` gives the deadline its turn first, and the
   packet is placed by time with rule 6's test. `audio-playout`'s new case (a packet 4 ms past the
   deadline, no tick) fails without it (M37).
-- 749d175 (sync): **the wait behind an engine start or stop counted as the link's jitter.** `receive`
+- 81d43fe (sync): **the wait behind an engine start or stop counted as the link's jitter.** `receive`
   starts the engine on `sill.audio` and took each packet's time after it, so the cover rose by the
   block's length for 10 s after each unmute, return or idle restart, then a jump dropped packets; the
   deferred stop did the same. Rule 6 exempts the engine starting. A packet the network queue handed
   over before `sill.audio` last finished starting or stopping an engine gives the model when it came
   (`packet`'s `arrival:`), for the floor and the cover; the late test and the placement keep `now`,
   and departure 3 holds for every other packet. A by-hand case fails without it (M38).
-- 01b7d4a (host): **the source's callbacks were cleared under it.** `stopSource` and a failed start
+- 1de43aa (host): **the source's callbacks were cleared under it.** `stopSource` and a failed start
   set `onPCM` and `onStopped` to nil on the main actor while the source reads them on `sill.audio`
   and ScreenCaptureKit's delegate queue: a race on a closure that property alone owns. They stay; the
   generation makes a late call inert, and a failed start goes through `stopSource`.
-- 5002066 (host): **AAC-ELD's failure was said once.** The next source's start wrote a status with no
+- adccdeb (host): **AAC-ELD's failure was said once.** The next source's start wrote a status with no
   problem and returned, and nothing said it again; `encoderGone` keeps the words for every start. A
   scratch build of AudioPipeline with a throwing encoder: Send Audio off and on showed no problem
   before, the encoder's after.
-- e861076 (device): **one window's stop deactivated the session under another's engine.** Each
+- 2b3c5dc (device): **one window's stop deactivated the session under another's engine.** Each
   window has its own StreamClient, output and engine on the app's one session, and on iOS 26 and
   later deactivating stops running I/O (AVAudioSession.h; the comment said it failed as busy), so the
   other window went silent with nothing to notice it. `SharedSession` counts the engines on the
   device under a lock held across the session's calls; the last one lets it go.
-- 85ceb22 (device): **headphones out was ignored without an engine.** A configuration change
+- 0fa7ab7 (device): **headphones out was ignored without an engine.** A configuration change
   handled first had let the engine go, and the next packet started one on the speaker. While the
   sound plays, the output mutes itself on its queue at once (stopping with the fade), then tells the
   client, which keeps the mute and says so.
-- 68659b1 (device): **a window in the background was heard.** Only the app's notifications stopped
+- 3760b01 (device): **a window in the background was heard.** Only the app's notifications stopped
   the sound, so a second window minimized or swiped away kept playing. ContentView hands its scene's
   phase to the output (`setSceneForeground`; inactive counts as on screen, as a headless simulator
   reads it), which plays only with the app and the scene both in the foreground.
