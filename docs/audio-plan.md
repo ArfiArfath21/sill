@@ -1878,4 +1878,15 @@ the software encoder, `no-device.sh` before and after each run):
   switch first in the This iPad group, the Slide Over's only Sound control. The photos are in
   /tmp/sill-audio-s1 (not kept).
 
-Not done here: the iOS build with Xcode 27.1, the mutants (a later stage), and Noah's P1–P16.
+**The mutants (2026-10-14, on 778055b):** every check whose compiled files differ between main and
+this branch, 31 checks and 925 mutants, every one caught: `audio-playout` 36, `audio-packetizer` 27,
+`audio-codec` 9, `compatibility` 31, `protocol` 33, `phone-portrait` 35, `tour` 72, `menus` 43,
+`pointer-control` 33, `away-wire` 9, `ledger` 12; and, for StreamProtocol's changed files, `away-copy`
+17, `away-quality` 16, `link-judge` 26, `key-strokes` 72, `menu-state` 29, `update-policy` 18,
+`goodbye` 18, `device-gate` 14, `addresses` 15, `ask-limits` 20, `cable-link` 20, `door-policy` 58,
+`home-model` 21, `home-records` 21, `home-txt` 24, `pairing-address` 35, `pointer-watch` 40,
+`remote-rules` 72, `fence` 32, `message-reader` 17. `ledger` had no mutants (its old ones were whole
+copies of an older ledger): 778055b gives it twelve one-line ones, the sound's seventh field among
+them, and CI's mutants matrix lists it. Then `Tests/checks/run-all.sh`, all 43.
+
+Not done here: the iOS build with Xcode 27.1 and Noah's P1–P16.

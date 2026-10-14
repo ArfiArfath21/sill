@@ -91,7 +91,10 @@ is the `spotlight-modifier-fix` branch's after its review, and `home-device`, `h
 and `audio-playout`, and added the sound's cases to `compatibility` (130 with the gestures'),
 `protocol` (218) and the kind tables (`pointer-control` 157); at its merge with main at 985a733,
 `compatibility`'s 131 and 31 and `protocol`'s 220 + 8 and 33 are both sides' cases and mutants
-together, not yet counted by a run.
+together. After its device's review (2026-10-14) the mutants of the 31 checks whose compiled files
+differ from main's ran there, 925 in all, every one caught: the three audio checks, `ledger` (its
+12 new), `phone-portrait`, `tour`, and every check that compiles one of StreamProtocol's changed
+files.
 
 A mutant changes the checked file in one place and must make the check fail: `run.sh --mutants`
 (or `run-all.sh --mutants`) passes only when the script's last line counts every mutant as caught.

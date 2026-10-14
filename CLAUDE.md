@@ -103,8 +103,7 @@ fixed (012c5de to c2a1802, below) and verified in the simulator
     second, 0 frames off, at 480 and 512 frames a packet and across gaps. A
     busy signal runs at 130.2 kbps.
   - `compatibility`: 130 checks, 31 of 31 mutants. `protocol`: 218 + 8, 30 of
-    30 (on 2b114e1; on 985a733 131 and 220 + 8, their 31 and 33 mutants not
-    run).
+    30 (on 2b114e1; on 985a733 131 and 220 + 8, 31 of 31 and 33 of 33).
   - The kind checks say 28 gesture, 29 audio, 30 unknown. The mutants that
     renumber a kind use 250–254.
   - H0 again on this Mac: ELD 480 and 512 have 240 and 256 frames of priming,
@@ -159,7 +158,9 @@ fixed (012c5de to c2a1802, below) and verified in the simulator
   app from a scratch copy with the 27.1 names stubbed, Debug and Release for the
   simulator and Debug for a device, only the known warning (Xcode 27.1's build,
   CI's, owed); `audio-playout` 214, `phone-portrait` 169, `tour`, `ledger`,
-  `duo` (mutants owed); the sound harness, every gate but H12 (now +3.9 to +4.4
+  `duo`; the mutants of the 31 checks whose compiled files differ from main's,
+  925, every one caught (`audio-playout` 36, `phone-portrait` 35, `tour` 72,
+  `ledger` 12, new: it had none), then `run-all.sh`, all 43; the sound harness, every gate but H12 (now +3.9 to +4.4
   points of a core: open question 16); the pacing harness with sound (every
   gate but over8's "≥ its base fps", 4.8 against 4.9: the sound is 1.9 % of
   that overfilled 8 Mbit/s link) and without it against main (every gate);
