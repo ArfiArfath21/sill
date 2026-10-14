@@ -14,9 +14,11 @@ import UIKit
 /// packet came within 10 s; the audio session (.playback, mixing with other audio, so it never stops
 /// the person's music and plays with the silent switch on, as a video app does) is active only while
 /// it runs. It stops on mute (after a short fade), in the background, at the session's end and after
-/// 10 s without a packet, and the next packet starts it again. Interruptions, route changes, a media
-/// services reset and the engine's configuration change are handled here; headphones taken out mute
-/// the sound and say so (`onRouteMuted`), as a video app pauses.
+/// 10 s without a packet, and the next packet starts it again. While the sound cannot be heard (muted,
+/// in the background, the session refused during a call) nothing is decoded, and each packet still
+/// counts for the floor and the cover. Interruptions, route changes, a media services reset and the engine's configuration
+/// change are handled here; headphones taken out mute the sound and say so (`onRouteMuted`), as a
+/// video app pauses.
 ///
 /// In the simulator, and in a DEBUG build asked with `-SillSoundSink manual`, the engine renders in
 /// manual (offline) mode instead: it never opens an output device and never activates the session, so
@@ -80,7 +82,7 @@ final class AudioOutput {
             self?.queue.async { self?.foregroundChanged(true) }
         }
         center.addObserver(forName: UIApplication.didBecomeActiveNotification, object: nil, queue: nil) { [weak self] _ in
-            self?.queue.async { self?.activationBlocked = false }
+            self?.queue.async { self?.activationBlocked = false; self?.updateSilence() }
         }
         center.addObserver(forName: AVAudioSession.interruptionNotification, object: nil, queue: nil) { [weak self] note in
             self?.queue.async { self?.interrupted(note) }
@@ -90,6 +92,13 @@ final class AudioOutput {
         }
         center.addObserver(forName: AVAudioSession.mediaServicesWereResetNotification, object: nil, queue: nil) { [weak self] _ in
             self?.queue.async { self?.servicesReset() }
+        }
+        // The output's format changed (a route at another rate, Bluetooth's call profile, another app
+        // changing the session's rate): the engine has stopped and uninitialized itself. Never torn
+        // down in the handler (Apple: it can deadlock there): on `queue`.
+        center.addObserver(forName: .AVAudioEngineConfigurationChange, object: nil, queue: nil) { [weak self] note in
+            let changed = note.object as AnyObject?
+            self?.queue.async { self?.configurationChanged(changed) }
         }
     }
 
@@ -136,12 +145,12 @@ final class AudioOutput {
         queue.async { [self] in
             guard muted != on else { return }
             muted = on
-            model.mute(on)
+            // Unmuting is the person asking for sound: a session refused during a call is tried again.
+            if !on { activationBlocked = false }
+            updateSilence()
             if on {
                 stopEngine(reason: "muted", fade: true)
             } else {
-                // The decoder's state is stale: the next packet starts it afresh (rule 9).
-                apply(model.reset(.playback))
                 #if DEBUG
                 print("audio: unmuted")
                 #endif
@@ -335,11 +344,16 @@ final class AudioOutput {
         switch made.start() {
         case .success:
             engine = made
-            _ = model.reset(.playback)   // a new timeline
+            apply(model.reset(.playback))   // a new timeline: what waited for the last one goes
             readLatencies()
             routeSeen = made.routeName
             #if DEBUG
-            made.onRendered = { [weak self] samples, from in self?.clicks.rendered(samples, from: from, engine: made, model: self?.model) }
+            if made.manual {
+                made.onRendered = { [weak self, weak made] samples, from in
+                    guard let self, let made else { return }
+                    self.clicks.rendered(samples, from: from, engine: made, model: self.model)
+                }
+            }
             let lag = model.pictureLag(now: CACurrentMediaTime())
             let need = model.need(now: CACurrentMediaTime())
             print("audio: engine on, \(made.routeName), output \(Self.ms(made.outputLatency)), IO \(Self.ms(made.ioBuffer)), "
@@ -349,6 +363,7 @@ final class AudioOutput {
             #endif
         case .failure(let reason):
             activationBlocked = true
+            updateSilence()
             print("audio: no sound: \(reason)")
         }
     }
@@ -387,7 +402,27 @@ final class AudioOutput {
 
     private func foregroundChanged(_ on: Bool) {
         foreground = on
+        updateSilence()
         if !on { stopEngine(reason: "in the background") }
+    }
+
+    /// Nothing is decoded while the sound cannot be heard (§7.5): muted, in the background, or with the
+    /// session refused (a call). Each packet still counts for the floor and the cover, so it comes
+    /// back quickly; and once it can be heard again, the decoder's state is stale, so the next packet
+    /// starts it afresh (a `.playback` reset, rule 9).
+    private func updateSilence() {
+        let silent = muted || !foreground || activationBlocked
+        guard silent != model.muted else { return }
+        model.mute(silent)
+        if !silent { apply(model.reset(.playback)) }
+    }
+
+    /// AVAudioEngineConfigurationChange: the engine has stopped and uninitialized itself, its nodes
+    /// keeping their old formats. It goes, and the next packet builds one in the output's new format
+    /// and reads its latencies (placed by time: one jump). Not in manual rendering, which has no output.
+    private func configurationChanged(_ object: AnyObject?) {
+        guard let e = engine, !e.manual, e.owns(object) else { return }
+        stopEngine(reason: "the output's configuration changed")
     }
 
     private func interrupted(_ note: Notification) {
@@ -397,14 +432,17 @@ final class AudioOutput {
         case .began:
             // The system has stopped the engine; nothing starts it again until the interruption ends.
             activationBlocked = true
+            updateSilence()
             stopEngine(reason: "interrupted")
             #if DEBUG
             print("audio: interrupted")
             #endif
         case .ended:
             let options = (note.userInfo?[AVAudioSessionInterruptionOptionKey] as? UInt).map { AVAudioSession.InterruptionOptions(rawValue: $0) } ?? []
-            // With "should resume" the next packet starts it; without, once the app is active again.
+            // With "should resume" the next packet starts it; without, once the app is active again or
+            // the person unmutes.
             activationBlocked = !options.contains(.shouldResume)
+            updateSilence()
             #if DEBUG
             print(options.contains(.shouldResume) ? "audio: resumed" : "audio: interruption over; waiting for the app to be active")
             #endif
@@ -566,6 +604,9 @@ private final class SoundEngine {
 
     /// The player down at once (the mixer applies it at its next render), before a stop.
     func turnDown() { player.volume = 0 }
+
+    /// Whether a configuration change's object is this engine.
+    func owns(_ object: AnyObject?) -> Bool { object === engine }
 
     /// Stops the player and the engine; the output lets the session go.
     func stop() {
