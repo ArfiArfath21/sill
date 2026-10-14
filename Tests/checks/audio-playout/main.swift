@@ -539,6 +539,15 @@ do {
     check(abs(lone.cover(now: 12.6) - 0.300) < 1e-9, "the same away: 300 ms (away's bounds 60–600)")
     _ = lone.packet(epoch: 1, seq: 3, stamp: 12.7 - 0.910, segmentStart: false, now: 12.7)
     check(abs(lone.cover(now: 12.7) - 0.600) < 1e-9, "900 ms over away: held at 600 ms")
+    // Rule 6: a packet taken 80 ms after it came, behind Sill's own engine starting, gives when it came:
+    // the floor and the cover take that (taken when the playout took it, the cover would be 81 ms).
+    var waited = AudioPlayout()
+    _ = waited.format(epoch: 1, framesPerPacket: 480, primingFrames: 240, cookie: Data())
+    _ = waited.packet(epoch: 1, seq: 0, stamp: 9.990, segmentStart: true, now: 10)
+    _ = waited.packet(epoch: 1, seq: 1, stamp: 12.5 - 0.011, segmentStart: false, now: 12.5)
+    _ = waited.packet(epoch: 1, seq: 2, stamp: 12.6 - 0.011, segmentStart: false, arrival: 12.6, now: 12.68)
+    check(abs(waited.cover(now: 12.68) - 0.020) < 1e-9 && abs((waited.floor ?? 0) - 0.010) < 1e-9,
+          "a packet that waited 80 ms behind the engine starting: the cover and the floor take when it came: \(ms(waited.cover(now: 12.68)))")
     // The floor window: 10 s of 1 s buckets, and kept when nothing comes.
     var fl = AudioPlayout()
     _ = fl.format(epoch: 1, framesPerPacket: 480, primingFrames: 240, cookie: Data())

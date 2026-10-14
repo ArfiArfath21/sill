@@ -86,6 +86,8 @@ MUTANTS = {
                                             "                if arrival - run.since >= 0.2 {"),
     "M37 a packet past the hand's deadline follows it (the timer's turn not given first)": (
         "        if hand != nil, let d = deadline, now >= d { out.add(handOver(fadeOut: true)) }\n", ""),
+    "M38 a packet that waited behind the engine counted when the playout took it": (
+        "        let arrival = came ?? now\n", "        let arrival = now\n"),
 }
 caught = 0
 for name, (old, new) in MUTANTS.items():

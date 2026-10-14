@@ -14,8 +14,9 @@ import Foundation
 ///
 /// The rules, the plan's numbers:
 /// 1. The floor is the smallest (arrival − stamp) of the packets of the last 10 s, kept in 1 s
-///    buckets, a packet's arrival being when the playout takes it (`packet`). With no packet for 10 s
-///    it keeps its last value.
+///    buckets, a packet's arrival being when the playout takes it (`packet`), or when it came for one
+///    that waited behind Sill's own engine starting or stopping (rule 6). With no packet for 10 s it
+///    keeps its last value.
 /// 2. The need is what a packet needs between arriving and being heard: the jitter cover (the largest
 ///    arrival − stamp − floor of the last 10 s; 40 ms at home and 150 ms away until the session's
 ///    first 2 s of packets have come, which the window leaves out; home 20–150 ms, away 60–600 ms),
@@ -402,9 +403,12 @@ struct AudioPlayout {
     /// One packet of kind 29's type 2, with its own stamp (the message's + its place × F ÷ rate), taken
     /// `now`. Its (arrival − stamp) is taken now too, not when the network queue read it: what the
     /// packet in hand waits for is the next packet reaching the playout (rule 10), so the hop between
-    /// the two queues is part of what the cover must cover.
-    mutating func packet(epoch: Int, seq: UInt32, stamp: Double, segmentStart: Bool, now: Double) -> Plan {
-        let arrival = now
+    /// the two queues is part of what the cover must cover. But a packet that waited behind Sill's own
+    /// engine starting or stopping gives `arrival`, when it came: that wait is not the link's, and the
+    /// floor and the cover take `arrival`, the late test and the placement `now` (rule 6).
+    mutating func packet(epoch: Int, seq: UInt32, stamp: Double, segmentStart: Bool, arrival came: Double? = nil,
+                         now: Double) -> Plan {
+        let arrival = came ?? now
         guard let playing = self.epoch, epoch == playing, stamp.isFinite, arrival.isFinite else { return Plan() }
         // Rule 7: before anything counts.
         let key = Int64(epoch & 0xFFFF) << 32 | Int64(seq)

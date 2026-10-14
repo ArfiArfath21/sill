@@ -53,6 +53,9 @@ final class AudioOutput {
     /// A session activation failed (a call): no start until the interruption ends or the app comes back.
     private var activationBlocked = false
     private var lastPacketAt: Double?
+    /// When this queue last finished starting or stopping an engine: a packet that came before then
+    /// waited for Sill, not the link, and the floor and the cover take when it came (rule 6).
+    private var engineBusyUntil = 0.0
     private var deadlineTimer: DispatchSourceTimer?
     private var secondTimer: DispatchSourceTimer?
     private var refresh = 1.0 / 60
@@ -180,9 +183,10 @@ final class AudioOutput {
         queue.async { [self] in receive(f) }
     }
 
-    /// A kind 29 packets message and its header's stamp.
+    /// A kind 29 packets message and its header's stamp, as the network queue took it.
     func packets(_ p: AudioPackets, stamp: Double) {
-        queue.async { [self] in receive(p, stamp: stamp) }
+        let came = CACurrentMediaTime()
+        queue.async { [self] in receive(p, stamp: stamp, came: came) }
     }
 
     /// For the stats sent to the Mac once a second (`ClientStats.audioBehindMs`, `audioLate`): the last
@@ -220,7 +224,7 @@ final class AudioOutput {
         #endif
     }
 
-    private func receive(_ p: AudioPackets, stamp: Double) {
+    private func receive(_ p: AudioPackets, stamp: Double, came: Double) {
         guard sessionLive, let fmt = playing, p.epoch == fmt.epoch, fmt.playable, let decoder else { return }
         let now = CACurrentMediaTime()
         lastPacketAt = now
@@ -230,7 +234,7 @@ final class AudioOutput {
             let now = CACurrentMediaTime()
             feedReading(now)
             let plan = model.packet(epoch: p.epoch, seq: p.seq &+ UInt32(i), stamp: stamp + Double(i * fmt.framesPerPacket) / AudioPlayout.rate,
-                                    segmentStart: p.segmentStart && i == 0, now: now)
+                                    segmentStart: p.segmentStart && i == 0, arrival: came < engineBusyUntil ? came : nil, now: now)
             if plan.decode {
                 if plan.resetFirst { decoder.reset() }
                 let decoded = decoder.decode(data)
@@ -374,6 +378,7 @@ final class AudioOutput {
             updateSilence()
             print("audio: no sound: \(reason)")
         }
+        engineBusyUntil = CACurrentMediaTime()
     }
 
     /// Stops the engine and lets the session go; `fade` turns the player down first and stops the engine
@@ -391,6 +396,7 @@ final class AudioOutput {
         engine = nil
         let release = { [weak self] in
             e.stop()
+            defer { self?.engineBusyUntil = CACurrentMediaTime() }
             guard let self, self.engine == nil, !e.manual else { return }
             try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
         }
