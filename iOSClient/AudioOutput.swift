@@ -13,10 +13,11 @@ import UIKit
 /// The engine runs while a format has come, sound is not muted, the app is in the foreground and a
 /// packet came within 10 s; the audio session (.playback, mixing with other audio, so it never stops
 /// the person's music and plays with the silent switch on, as a video app does) is active only while
-/// it runs. It stops on mute (after a short fade), in the background, at the session's end and after
-/// 10 s without a packet, and the next packet starts it again. While the sound cannot be heard (muted,
-/// in the background, the session refused during a call) nothing is decoded, and each packet still
-/// counts for the floor and the cover. Interruptions, route changes, a media services reset and the engine's configuration
+/// it runs. It stops on mute, in the background and at the session's end after a fade (the mixer's
+/// own ramp to the player's volume 0), after 10 s without a packet (rule 10's tail has faded it), and
+/// the next packet starts it again. While the sound cannot be heard (muted, in the background, the
+/// session refused during a call) nothing is decoded, and each packet still counts for the floor and
+/// the cover. Interruptions, route changes, a media services reset and the engine's configuration
 /// change are handled here; headphones taken out mute the sound and say so (`onRouteMuted`), as a
 /// video app pauses.
 ///
@@ -71,6 +72,8 @@ final class AudioOutput {
 
     /// Idle: no packet for this long stops the engine (rule 14).
     static let idleAfter = 10.0
+    /// A fading stop: the mixer's 25 ms ramp to the player's volume 0, and an IO buffer and more.
+    static let fadeWait = 0.05
 
     init(refresh: Double) {
         self.refresh = refresh
@@ -108,7 +111,7 @@ final class AudioOutput {
     /// move's hand-over is not one. Any thread.
     func sessionStarted(away: Bool) {
         queue.async { [self] in
-            stopEngine(reason: nil)
+            stopEngine(reason: nil, fade: true)
             _ = model.reset(.session)
             kept = [:]
             decoder = nil
@@ -127,7 +130,7 @@ final class AudioOutput {
     func sessionEnded() {
         queue.async { [self] in
             sessionLive = false
-            stopEngine(reason: nil)
+            stopEngine(reason: nil, fade: true)
             _ = model.reset(.session)
             kept = [:]
             decoder = nil
@@ -368,10 +371,12 @@ final class AudioOutput {
         }
     }
 
-    /// Stops the engine and lets the session go; `fade` turns the player down first (a mute), and the
-    /// engine stops 20 ms later. The session is let go only once the engine has stopped (with it
-    /// running, deactivating fails as busy), and not if another engine has started meanwhile (a mute
-    /// undone at once).
+    /// Stops the engine and lets the session go; `fade` turns the player down first and stops the engine
+    /// once the mixer has ramped it to silence. The mixer ramps a volume change linearly over 1,200 of
+    /// its frames (25 ms at 48 kHz; measured in manual rendering, whatever the render's size), so a
+    /// stop 20 ms in cut the sound at a fifth of its level: it waits 50 ms. The session is let go only
+    /// once the engine has stopped (with it running, deactivating fails as busy), and not if another
+    /// engine has started meanwhile (a mute undone at once).
     private func stopEngine(reason: String?, fade: Bool = false) {
         deadlineTimer?.cancel()
         deadlineTimer = nil
@@ -386,7 +391,7 @@ final class AudioOutput {
         }
         if fade {
             e.turnDown()
-            queue.asyncAfter(deadline: .now() + 0.02, execute: release)
+            queue.asyncAfter(deadline: .now() + Self.fadeWait, execute: release)
         } else {
             release()
         }
@@ -403,7 +408,7 @@ final class AudioOutput {
     private func foregroundChanged(_ on: Bool) {
         foreground = on
         updateSilence()
-        if !on { stopEngine(reason: "in the background") }
+        if !on { stopEngine(reason: "in the background", fade: true) }
     }
 
     /// Nothing is decoded while the sound cannot be heard (§7.5): muted, in the background, or with the
@@ -602,7 +607,7 @@ private final class SoundEngine {
         return .success
     }
 
-    /// The player down at once (the mixer applies it at its next render), before a stop.
+    /// The player down, before a stop: the mixer ramps to it over 25 ms from its next render.
     func turnDown() { player.volume = 0 }
 
     /// Whether a configuration change's object is this engine.
