@@ -246,11 +246,12 @@ struct PortraitStreamScreen: View {
     /// it; the strip's end and the Desktop button fade while it is open. `width`: the bar's row.
     private func windowBar(width: CGFloat) -> some View {
         // Apps, Menus, Aa, Desktop, Sound, Settings, and the strip: Menus only where the row holds it and
-        // still a whole thumbnail (not in a 320 pt Slide Over), then Sound where it holds one more.
+        // still a whole thumbnail (not in a 320 pt Slide Over), then Sound where it holds one more, Menus
+        // counted whether or not it shows (as landscape: Sound never comes and goes with the menus).
         let menusFit = MacMenuButton.fits(width: width, buttons: 5, buttonWidth: metrics.buttonWidth, gap: 12,
                                           thumbWidth: metrics.thumbWidth)
-        let soundFits = MacMenuButton.fits(width: width, buttons: client.menus.hasMenus && menusFit ? 6 : 5,
-                                           buttonWidth: metrics.buttonWidth, gap: 12, thumbWidth: metrics.thumbWidth)
+        let soundFits = MacMenuButton.fits(width: width, buttons: 6, buttonWidth: metrics.buttonWidth, gap: 12,
+                                           thumbWidth: metrics.thumbWidth)
         return HStack(spacing: 12) {
             appsButton()
 

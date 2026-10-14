@@ -412,7 +412,10 @@ do {
             CGRect(x: soundX, y: by, width: bw, height: bh))
     }
     var worst: String?
-    for (w, h) in [(1000, 710), (1133, 744), (1376, 1032), (710, 500), (667, 375), (932, 430), (710, 1000), (744, 1133), (1032, 1376), (560, 800)] as [(CGFloat, CGFloat)] {
+    // The iPad's, a phone's sideways, the halves', and the iPhone Duo's inner display both ways and its cover
+    // sideways (the book pose has no Sound button: its buttons past the fold hold Menus and four more).
+    for (w, h) in [(1000, 710), (1133, 744), (1376, 1032), (710, 500), (667, 375), (932, 430), (710, 1000), (744, 1133), (1032, 1376), (560, 800),
+                   (951, 669), (669, 951), (678, 466)] as [(CGFloat, CGFloat)] {
         let (s, sound) = withSound(w, h)
         for topic in all {
             guard let t = s.union(topic), let lit = TourPolicy.cutout([t], screen: s.size) else { continue }

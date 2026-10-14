@@ -821,20 +821,15 @@ struct StreamScreen: View {
         // The book pose (docs/iphone-duo-plan.md, (a)): nothing on the fold's band; elsewhere as before.
         let (bar, stripWidth) = plain.clearing(fold, width: width)
         // Apps, Menus, Aa, Keyboard, Desktop, Sound, Settings, and the strip: Menus where the row holds it
-        // and a whole thumbnail, then Sound where it holds that one more.
+        // and a whole thumbnail, then Sound where it holds that one more, Menus counted whether or not
+        // it shows (a Mac that sends its sound takes menus), so Sound never comes and goes with the
+        // Mac's menus. Where only one fits (an iPhone SE sideways), Menus keeps its place and Sound is
+        // the Settings panel's switch alone (docs/audio-plan.md §7.6). So it is in the book pose, whose
+        // buttons past the fold are sized for Menus and four more (BarMetrics.clearing).
         let row = width - 2 * bar.padding
         let menusFit = MacMenuButton.fits(width: row, buttons: 6, buttonWidth: bar.buttonWidth, gap: bar.gap, thumbWidth: bar.thumbWidth)
-        let menusShown = client.menus.hasMenus && menusFit
-        let soundFits: Bool
-        if stripWidth != nil, let band = fold.verticalBand {
-            // The book pose: the buttons past the fold, sized for Menus and four more (BarMetrics.clearing);
-            // Sound only where that page holds it too, else the Settings panel's switch alone.
-            let buttons: CGFloat = menusShown ? 6 : 5
-            soundFits = width - bar.padding - buttons * bar.buttonWidth - (buttons - 1) * bar.gap >= band.maxX
-        } else {
-            soundFits = MacMenuButton.fits(width: row, buttons: menusShown ? 7 : 6, buttonWidth: bar.buttonWidth,
-                                           gap: bar.gap, thumbWidth: bar.thumbWidth)
-        }
+        let soundFits = stripWidth == nil
+            && MacMenuButton.fits(width: row, buttons: 7, buttonWidth: bar.buttonWidth, gap: bar.gap, thumbWidth: bar.thumbWidth)
         return VStack(spacing: 0) {
             TopBar(client: client, metrics: bar, stripWidth: stripWidth, drawerOpen: $drawerOpen,
                    keyboardShown: $keyboardShown,
