@@ -13,7 +13,7 @@ import UIKit
 /// The engine runs while a format has come, sound is not muted, the app is in the foreground and a
 /// packet came within 10 s; the audio session (.playback, mixing with other audio, so it never stops
 /// the person's music and plays with the silent switch on, as a video app does) is active only while
-/// it runs. It stops on mute, in the background and at the session's end after a fade (the mixer's
+/// it runs, or another window's does (`SharedSession`). It stops on mute, in the background and at the session's end after a fade (the mixer's
 /// own ramp to the player's volume 0), after 10 s without a packet (rule 10's tail has faded it), and
 /// the next packet starts it again. While the sound cannot be heard (muted, in the background, the
 /// session refused during a call) nothing is decoded, and each packet still counts for the floor and
@@ -381,12 +381,11 @@ final class AudioOutput {
         engineBusyUntil = CACurrentMediaTime()
     }
 
-    /// Stops the engine and lets the session go; `fade` turns the player down first and stops the engine
-    /// once the mixer has ramped it to silence. The mixer ramps a volume change linearly over 1,200 of
-    /// its frames (25 ms at 48 kHz; measured in manual rendering, whatever the render's size), so a
-    /// stop 20 ms in cut the sound at a fifth of its level: it waits 50 ms. The session is let go only
-    /// once the engine has stopped (with it running, deactivating fails as busy), and not if another
-    /// engine has started meanwhile (a mute undone at once).
+    /// Stops the engine, which lets the session go once no engine of the app plays (`SharedSession`);
+    /// `fade` turns the player down first and stops the engine once the mixer has ramped it to silence.
+    /// The mixer ramps a volume change linearly over 1,200 of its frames (25 ms at 48 kHz; measured in
+    /// manual rendering, whatever the render's size), so a stop 20 ms in cut the sound at a fifth of its
+    /// level: it waits 50 ms.
     private func stopEngine(reason: String?, fade: Bool = false) {
         deadlineTimer?.cancel()
         deadlineTimer = nil
@@ -396,9 +395,7 @@ final class AudioOutput {
         engine = nil
         let release = { [weak self] in
             e.stop()
-            defer { self?.engineBusyUntil = CACurrentMediaTime() }
-            guard let self, self.engine == nil, !e.manual else { return }
-            try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+            self?.engineBusyUntil = CACurrentMediaTime()
         }
         if fade {
             e.turnDown()
@@ -528,6 +525,8 @@ private final class SoundEngine {
     private let format = AVAudioFormat(standardFormatWithSampleRate: AudioPlayout.rate, channels: 2)!
     private let pool = BufferPool()
     private(set) var running = false
+    /// This engine counts in `SharedSession` (it plays on the device, and has not stopped).
+    private var holdsSession = false
 
     // Manual rendering: the stand-in output's clock (engine sample 0 goes out at t0), and what has been
     // rendered. The player starts with the engine, so its timeline is the engine's.
@@ -596,12 +595,8 @@ private final class SoundEngine {
             running = true
             return .success
         }
-        let session = AVAudioSession.sharedInstance()
         do {
-            try session.setCategory(.playback, mode: .default, options: [.mixWithOthers])
-            try? session.setPreferredSampleRate(AudioPlayout.rate)
-            try? session.setPreferredIOBufferDuration(0.005)
-            try session.setActive(true)
+            try SharedSession.take()
         } catch {
             return .failure("the audio session: \(error.localizedDescription)")
         }
@@ -610,9 +605,10 @@ private final class SoundEngine {
         do {
             try engine.start()
         } catch {
-            try? session.setActive(false, options: .notifyOthersOnDeactivation)
+            SharedSession.give()
             return .failure("the engine: \(error.localizedDescription)")
         }
+        holdsSession = true
         player.play()
         running = true
         return .success
@@ -624,7 +620,7 @@ private final class SoundEngine {
     /// Whether a configuration change's object is this engine.
     func owns(_ object: AnyObject?) -> Bool { object === engine }
 
-    /// Stops the player and the engine; the output lets the session go.
+    /// Stops the player and the engine, and gives the app's session back (`SharedSession`).
     func stop() {
         renderTimer?.cancel()
         renderTimer = nil
@@ -635,6 +631,7 @@ private final class SoundEngine {
         #endif
         player.stop()
         engine.stop()
+        giveSession()
     }
 
     /// The media services went away: nothing of this engine may be touched again.
@@ -642,6 +639,13 @@ private final class SoundEngine {
         renderTimer?.cancel()
         renderTimer = nil
         running = false
+        giveSession()
+    }
+
+    private func giveSession() {
+        guard holdsSession else { return }
+        holdsSession = false
+        SharedSession.give()
     }
 
     /// The player's timeline: a sample of it and the device time it goes out at.
@@ -695,6 +699,36 @@ private final class SoundEngine {
 
     /// When an engine sample goes out (manual rendering).
     func outTime(ofEngineSample e: AVAudioFramePosition) -> Double { t0 + Double(e) / AudioPlayout.rate }
+}
+
+/// The app's one audio session, under every window's engine (each window's StreamClient has its own
+/// AudioOutput): active while any of them plays on the device. Deactivating it stops every engine's I/O,
+/// running or not (AVAudioSession.h), so it goes only when the last one stops. The lock is held across
+/// the session's calls, so one window's deactivation never lands after another's activation.
+private enum SharedSession {
+    private static let lock = NSLock()
+    private static var engines = 0
+
+    /// Activated (.playback, mixing with other audio) for one more engine.
+    static func take() throws {
+        try lock.withLock {
+            let session = AVAudioSession.sharedInstance()
+            try session.setCategory(.playback, mode: .default, options: [.mixWithOthers])
+            try? session.setPreferredSampleRate(AudioPlayout.rate)
+            try? session.setPreferredIOBufferDuration(0.005)
+            try session.setActive(true)
+            engines += 1
+        }
+    }
+
+    /// One engine fewer; the last lets the session go.
+    static func give() {
+        lock.withLock {
+            engines = max(0, engines - 1)
+            guard engines == 0 else { return }
+            try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        }
+    }
 }
 
 /// AVAudioPCMBuffers of the player's format, a packet and a frame long (a frame gained fits), 32 to
