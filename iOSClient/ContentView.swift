@@ -811,6 +811,9 @@ struct ConnectScreen: View {
     @Environment(\.duoEnvironment) private var duoEnvironment
     /// Rows or tiles on the connect screen (ConnectionList).
     @AppStorage(ConnectionList.styleKey) private var styleRaw = ConnectionList.Style.list.rawValue
+    /// The saved Mac whose New Group… alert is up, and the name typed there.
+    @State private var newGroupFor: String?
+    @State private var newGroupName = ""
 
     private var style: ConnectionList.Style {
         #if DEBUG
@@ -912,6 +915,11 @@ struct ConnectScreen: View {
             .duoLog(posture, size: geo.size, screen: "connect screen")
         }
         .ignoresSafeArea(.keyboard, edges: .bottom)
+        .alert("New Group", isPresented: Binding(get: { newGroupFor != nil }, set: { if !$0 { newGroupFor = nil } })) {
+            TextField("Name", text: $newGroupName)
+            Button("Add") { if let id = newGroupFor { client.setGroup(newGroupName, for: id) } }
+            Button("Cancel", role: .cancel) {}
+        }
         .onChange(of: client.pairing) { old, new in
             // Paired but no session came (10 s): the card closes, and the Mac is a saved row.
             if case .paired = old, new == .idle, !client.connected { fold() }
@@ -1124,6 +1132,10 @@ struct ConnectScreen: View {
                         if currentGroup == group { Label(group, systemImage: "checkmark") } else { Text(group) }
                     }
                 }
+                Divider()
+                Button { newGroupName = ""; newGroupFor = id } label: {
+                    Label("New Group…", systemImage: "folder.badge.plus")
+                }
             } label: {
                 Label(currentGroup.map { "Group: \($0)" } ?? "Group", systemImage: "folder")
             }
@@ -1150,7 +1162,7 @@ struct ConnectScreen: View {
         // the cable) or cannot connect ("Update Sill"), with VoiceOver's label and hint for it
         // (DiscoveryPolicy.RowWord). The row a tap's ask is waiting on is lit, as the drawer
         // lights the app on screen, while the status line says "Pairing with…".
-        DrawerRow(height: 50, highlighted: client.homeAsk.map { $0.phase == .asking && $0.target.row == mac.id } ?? false,
+        DrawerRow(height: 50, highlighted: asking(mac),
                   title: mac.name, trailing: mac.word,
                   action: { client.connect(to: mac) }) {
             ZStack {
@@ -1161,14 +1173,27 @@ struct ConnectScreen: View {
             }
             .frame(width: 32, height: 32)
         }
-        .accessibilityLabel(mac.route == .remote ? "\(mac.name), Remote" : mac.homeWord.label(name: mac.name))
-        .accessibilityHint(mac.route == .remote ? "Connects through your VPN or the internet."
-                           : mac.homeWord.hint(name: mac.name, device: device, direct: mac.direct))
+        .accessibilityLabel(rowLabel(mac))
+        .accessibilityHint(rowHint(mac))
         .contextMenu { menu(for: mac) }
     }
 
+    /// The row or tile a tap's ask is waiting on.
+    private func asking(_ mac: FoundMac) -> Bool {
+        client.homeAsk.map { $0.phase == .asking && $0.target.row == mac.id } ?? false
+    }
+
+    private func rowLabel(_ mac: FoundMac) -> String {
+        mac.route == .remote ? "\(mac.name), Remote" : mac.homeWord.label(name: mac.name)
+    }
+
+    private func rowHint(_ mac: FoundMac) -> String {
+        mac.route == .remote ? "Connects through your VPN or the internet."
+            : mac.homeWord.hint(name: mac.name, device: device, direct: mac.direct)
+    }
+
     private func macTile(_ mac: FoundMac) -> some View {
-        let highlighted = client.homeAsk.map { $0.phase == .asking && $0.target.row == mac.id } ?? false
+        let highlighted = asking(mac)
         let preview = mac.macID.flatMap { client.macPreviews[$0] }
         return Button(action: { client.connect(to: mac) }) {
             VStack(alignment: .leading, spacing: 0) {
@@ -1212,9 +1237,8 @@ struct ConnectScreen: View {
             .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(mac.route == .remote ? "\(mac.name), Remote" : mac.homeWord.label(name: mac.name))
-        .accessibilityHint(mac.route == .remote ? "Connects through your VPN or the internet."
-                           : mac.homeWord.hint(name: mac.name, device: device, direct: mac.direct))
+        .accessibilityLabel(rowLabel(mac))
+        .accessibilityHint(rowHint(mac))
         .contextMenu { menu(for: mac) }
     }
 
