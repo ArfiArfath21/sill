@@ -3126,7 +3126,8 @@ final class StreamClient: ObservableObject {
         resetHomeMove()
         // Off screen (in the background) the snapshot is blank and would replace a good picture.
         if connected, videoSize != .zero, UIApplication.shared.applicationState == .active,
-           let macID = session?.macID, savedMac(macID) != nil, let preview = displayView.previewImage() {
+           let macID = session?.macID, savedMac(macID) != nil,
+           let preview = displayView.snapshot(maxWidth: 320, includePointer: false) {
             savePreview(preview, for: macID)
         }
         queue.async { self.lastParameterSets = nil; self.pendingMove = nil; self.stopMeasuring() }
