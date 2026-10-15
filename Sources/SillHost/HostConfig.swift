@@ -51,7 +51,7 @@ package struct HostConfig: Equatable, Sendable {
     package var requirePairing: Bool
     /// Send Audio: every connected device that plays the Mac's sound (its hello lists a codec) gets the
     /// sound of what streams, the streamed window's app or every app for the Desktop (AudioPipeline,
-    /// kind 29). Off by default: the Mac keeps playing its own sound, so a device beside it would
+    /// kind 43). Off by default: the Mac keeps playing its own sound, so a device beside it would
     /// double every sound a moment late. The sound's own stream's, not the pipeline's: a change starts
     /// or stops that stream and never restarts the picture (absent from `restartNeeded`). One value
     /// home or away: a device away sets it through `applyingAway` like any other field but the quality.

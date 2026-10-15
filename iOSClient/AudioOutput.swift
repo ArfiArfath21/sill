@@ -4,7 +4,7 @@ import QuartzCore
 import StreamProtocol
 import UIKit
 
-/// The Mac's sound on this device (docs/audio-plan.md §7.3, §7.4): kind 29's formats and packets in,
+/// The Mac's sound on this device (docs/audio-plan.md §7.3, §7.4): kind 43's formats and packets in,
 /// through the playout model (AudioPlayout, which decides) and the decoder (AudioDecoder), onto an
 /// AVAudioPlayerNode → the main mixer → the output. Every line of Sill's runs on `queue`: the player
 /// node schedules, and the real-time code is Apple's (AVAudioSourceNode's real-time block is not for
@@ -193,12 +193,12 @@ final class AudioOutput {
         queue.async { [self] in model.frame(stamp: stamp, arrival: arrival) }
     }
 
-    /// A kind 29 format.
+    /// A kind 43 format.
     func format(_ f: AudioFormat) {
         queue.async { [self] in receive(f) }
     }
 
-    /// A kind 29 packets message and its header's stamp, as the network queue took it.
+    /// A kind 43 packets message and its header's stamp, as the network queue took it.
     func packets(_ p: AudioPackets, stamp: Double) {
         let came = CACurrentMediaTime()
         queue.async { [self] in receive(p, stamp: stamp, came: came) }

@@ -24,8 +24,9 @@ and the panel's rows (5f7b1ac) after the host's. The workflow stopped there
 (9288aa6, WIP); on 2026-10-13 the device's steps were reviewed against the plan,
 fixed (5126215 to 8bbbe52, below) and verified in the simulator
 (docs/audio-plan.md, "Results: the device").
-- Wire (additive; `Audio.swift`): kind 29, host → device. Type 1 is a JSON
-  `AudioFormat`: codec "aac-eld", 48 kHz stereo, 480 or 512 frames a packet,
+- Wire (additive; `Audio.swift`): kind 43, host → device (29 until 2026-10-14,
+  when PR #66's 29–42 were found: docs/audio-plan.md, "Kind 43"). Type 1 is a
+  JSON `AudioFormat`: codec "aac-eld", 48 kHz stereo, 480 or 512 frames a packet,
   the priming, the bitrate, the epoch, the cookie and what the sound is of.
   Type 2 is `AudioPackets`: epoch, seq, the segment flag and 1–255
   length-prefixed packets, with the header's stamp on the wall clock of the
@@ -104,8 +105,8 @@ fixed (5126215 to 8bbbe52, below) and verified in the simulator
     busy signal runs at 130.2 kbps.
   - `compatibility`: 130 checks, 31 of 31 mutants. `protocol`: 218 + 8, 30 of
     30 (on 2b114e1; on 985a733 131 and 220 + 8, 31 of 31 and 33 of 33).
-  - The kind checks say 28 gesture, 29 audio, 30 unknown. The mutants that
-    renumber a kind use 250–254.
+  - The kind checks say 28 gesture, 43 audio, and 29 to 42 and 44 unknown. The
+    mutants that renumber a kind use 250–254.
   - H0 again on this Mac: ELD 480 and 512 have 240 and 256 frames of priming,
     the same after a reset. They take 15.0 and 25.3 ms end to end. A late
     join's fourth packet decodes exactly.
@@ -137,7 +138,8 @@ fixed (5126215 to 8bbbe52, below) and verified in the simulator
     Desktop, and with a hello that lists the codec, with and without
     `--direct-wireless`, twice each: every run printed the same lines. 4 of the
     12 differed only in how many once-a-second stats lines came before the host
-    was stopped. There was no `Audio` line, no `aud.` key and no kind 29.
+    was stopped. There was no `Audio` line, no `aud.` key and no kind 29 (the
+    sound's number then; 43 since 2026-10-14).
   - H12 was not met. The harness host used +2.1 to +3.1 points of a core with
     sound, against the plan's 1.5. AAC-ELD itself takes about 1 point on the
     test tone (82–101 µs a packet; 53 on a busy signal), and each packet's
@@ -4601,7 +4603,8 @@ good.
   messages the host had read on the connection). `Gesture.swift` —
   `TrackpadGesture` (kind 28, device → host: a three- or four-finger gesture
   by name, and its fingers), sent only to a host whose `WindowList.gestures`
-  is 1 or more. `Audio.swift` — the Mac's sound (kind 29, host → device):
+  is 1 or more. `Audio.swift` — the Mac's sound (kind 43, host → device;
+  29 to 42 are PR #66's and #78's):
   `AudioMessage`, type 1 a JSON `AudioFormat` (codec, rate, channels, packet
   size, priming, bitrate, epoch, cookie, what it is of), type 2 binary
   `AudioPackets` (epoch, seq, the segment flag, 1–255 packets); `AudioCodec`
@@ -4767,7 +4770,7 @@ good.
   (blocks, stamps and segments, `AudioSourceRule`, `PCMLayout`,
   `AudioBufferTally`; pure, `Tests/checks/audio-packetizer`) and `AudioEncoder`
   (AAC-ELD, AudioToolbox only; `Tests/checks/audio-codec`). StreamServer sends
-  kind 29 to the devices that play it on a send path of its own
+  kind 43 to the devices that play it on a send path of its own
   (`broadcastAudio`: never `inflight`; its bytes in every client's `pendingBytes`
   and `takenThisSecond`, so each device's LinkJudge sees them; `paceRemote`
   drops only frames).
@@ -4901,7 +4904,7 @@ good.
   `.build/audio/host` (the working tree's StreamServer and the sound's host
   files with `main.swift`: fake frames, the test tone, both doors on
   127.0.0.1) and `.build/audio/audiocheck` (`Scripts/audiocheck.swift`, the
-  harness's device: every kind 29 decoded with iOSClient/AudioDecoder.swift and
+  harness's device: every kind 43 decoded with iOSClient/AudioDecoder.swift and
   each click found at its stamp), refusing a binary that links a media
   framework but AudioToolbox; `run.sh [--cases a,b]` runs the gate cases and
   `summarize.py` judges them. `Scripts/sillrelay.py` is a
@@ -5630,9 +5633,9 @@ device keeps working with Macs from the first public build on, or each says why
   PressMenuItem's `version`, `id`, `title`, `token`); a trackpad gesture (kind 28, Gesture.swift)
   goes only to a host whose window list says `gestures` 1 or more, as one of its six names with
   `fingers`, and a later generation of gestures says 2 and goes only to a host that says so; the
-  Mac's sound (kind 29, Audio.swift), once a public build ships it: its two types (a JSON
+  Mac's sound (kind 43, Audio.swift), once a public build ships it: its two types (a JSON
   AudioFormat, then packets whose layout never changes: a new layout is a new type), AudioFormat's
-  fields, the hello's `audio`, `sendAudio` and `audioNote`, and kind 29 only to a device whose hello
+  fields, the hello's `audio`, `sendAudio` and `audioNote`, and kind 43 only to a device whose hello
   lists a codec the host makes.
 - Pairing as 1.0 does it (docs/home-pairing-plan.md §3): the Bonjour TXT keys `r` (the recognition
   tag) and `p` ("1" pairing required, "0" open, no `p` a plain door, any other value read as "1");

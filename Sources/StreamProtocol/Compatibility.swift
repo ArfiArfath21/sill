@@ -15,7 +15,7 @@ import Foundation
 
 /// The wire's generation. 1: the 14-byte header, kinds 0–23, and any later kind an older peer can
 /// skip (24, 25 and 27, the Mac's menus: MacMenu.swift; 26, the Mac's pointer: Pointer.swift; 28,
-/// the trackpad gesture: Gesture.swift; 29, the Mac's sound: Audio.swift, sent only to a device
+/// the trackpad gesture: Gesture.swift; 43, the Mac's sound: Audio.swift, sent only to a device
 /// whose hello lists a codec), and the JSON rules of HostSettings.swift, inside TLS 1.3 with both
 /// keys pinned at both doors, whose session protocol is the ALPN `sill/1` (RemoteTLS.sessionALPN):
 /// the home door pairs as the remote door does, as the first public builds ship it
@@ -112,7 +112,7 @@ public struct Hello: Codable, Sendable, Equatable {
     public var device: String?
     /// The codecs of the Mac's sound this device plays, best first (`AudioCodec.devicePlays`:
     /// ["aac-eld"]). Nil from a device that plays none, every device before 2026-09-27: a host sends
-    /// it no kind 29 (Audio.swift).
+    /// it no kind 43 (Audio.swift).
     public var audio: [String]?
 
     public init(appVersion: String? = nil, build: String? = nil, protocol: Int? = nil, device: String? = nil,

@@ -44,7 +44,7 @@ public struct ClientStats: Codable, Hashable {
     public var frameAgeMaxMs: Int?
     /// The slowest round trip among that second's pongs, -1 when none came back. nil from an older client.
     public var rttMaxMs: Int?
-    /// The Mac's sound (kind 29): that second's median of how far the sound trailed the picture as the
+    /// The Mac's sound (kind 43): that second's median of how far the sound trailed the picture as the
     /// device sees it, in ms, -1 for a second in which no sound played. Nil from a device that has
     /// played none this session, and from an older client.
     public var audioBehindMs: Int?

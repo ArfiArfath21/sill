@@ -385,7 +385,7 @@ final class StreamClient: ObservableObject {
     /// re-measuring; nil once the session ends (`forgetViewport`). Main thread.
     var lastViewport: Viewport?
 
-    // The Mac's sound (kind 29; docs/audio-plan.md §7.5, StreamClient+Audio.swift, AudioOutput).
+    // The Mac's sound (kind 43; docs/audio-plan.md §7.5, StreamClient+Audio.swift, AudioOutput).
     /// This device's mute, the Sound button's and switch's: local, remembered (`Sill.soundMuted`; the
     /// controls save it through `setSoundMuted`), never sent to the Mac. Main thread.
     @Published var soundMuted = UserDefaults.standard.bool(forKey: StreamClient.soundMutedKey) {
@@ -1520,7 +1520,7 @@ final class StreamClient: ObservableObject {
         if let v = UserDefaults.standard.string(forKey: "SillHelloVersion"), !v.isEmpty { version = v }
         #endif
         let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String
-        // The codecs of the Mac's sound it plays: a Mac sends kind 29 only to a device that lists one.
+        // The codecs of the Mac's sound it plays: a Mac sends kind 43 only to a device that lists one.
         return Wire.encode(Hello(appVersion: version, build: build, protocol: SillProtocol.current, device: ClientStatsReporter.deviceName,
                                  audio: AudioCodec.devicePlays))
     }()

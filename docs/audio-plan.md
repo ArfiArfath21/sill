@@ -299,7 +299,7 @@ the device's own delays.
 ### 1. Scope
 
 **In this step:**
-1. **The wire.** Kind 29 carries a format (JSON) and packets (binary) of the sound (§3). The hello
+1. **The wire.** Kind 43 carries a format (JSON) and packets (binary) of the sound (§3). The hello
    lists what the device plays; kinds 16 and 17 gain `sendAudio`; ClientStats gains two optional
    fields.
 2. **The host.** An audio-only ScreenCaptureKit stream that follows the streamed app (or a test
@@ -328,10 +328,10 @@ the device's own delays.
  │             AudioPacketizer: 480/512-frame blocks, stamps, gaps → segments (pure)      │
  │             AudioEncoder: AAC-ELD, 128 kbps (AudioToolbox) ─▶ packet, wall-clock stamp │
  │ sill.net    StreamServer.broadcastAudio: devices whose hello plays "aac-eld";          │
- │             the format first; not in `inflight`; in `pendingBytes` away; a cap ────────┼─▶ kind 29
+ │             the format first; not in `inflight`; in `pendingBytes` away; a cap ────────┼─▶ kind 43
  └────────────────────────────────────────────────────────────────────────────────────────┘
  ┌──────────────────────────────── device ────────────────────────────────────────────────┐
- │ network q.  MessageReader; kind 29 parsed, frames: both stamped on arrival, handed on  │
+ │ network q.  MessageReader; kind 43 parsed, frames: both stamped on arrival, handed on  │
  │ sill.audio  AudioPlayout (pure): floor, need, picture's lag, dedupe → late? place?     │
  │             a frame more or less? a jump?                                              │
  │             AudioDecoder (AAC-ELD → float) ─▶ fades, ±1 frame ─▶ AVAudioPlayerNode     │
@@ -342,14 +342,15 @@ the device's own delays.
 
 ### 3. Wire protocol
 
-#### 3.1 Kind 29 (`Sources/StreamProtocol/StreamMessage.swift`, continuing the enum)
+#### 3.1 Kind 43 (`Sources/StreamProtocol/StreamMessage.swift`, continuing the enum)
 
 ```swift
-    // The Mac's sound (Audio.swift), after the menus' 24, 25 and 27, the pointer's 26 and the trackpad
-    // gesture's 28 (Gesture.swift, PR #38). Older readers map it to `.unknown` and skip it.
-    case audio = 29          // host → device: AudioMessage — the sound of what streams: a format (JSON AudioFormat),
-                             // then packets (binary). Only to a device whose hello lists the codec, and only while Send
-                             // Audio is on
+    // The Mac's sound (Audio.swift), after the menus' 24, 25 and 27, the pointer's 26 and the trackpad gesture's 28,
+    // and after 29–42, which PR #66 (Sill Viewer, with #72 and #73) and #78 (the clipboard) take. Older readers map it
+    // to `.unknown` and skip it.
+    case audio = 43          // host → device: AudioMessage — the sound of what streams: a format (JSON AudioFormat),
+                             // then packets (binary AudioPackets). Only to a device whose hello lists the codec
+                             // (Hello.audio), and only while Send Audio is on
 ```
 
 - **Who skips it.** Every device and test client since b67f87d (2026-09-23): `parseHeader` maps an
@@ -359,21 +360,24 @@ the device's own delays.
 - **Its size.** A format is under 1 KB and a packets message under 1 KB at 128 kbps, far under
   `maxOtherHostPayload` (4 MB, MessageReader's cap for anything but frames); §3.2's parser caps
   them at 4 KB and 16 KB.
-- **Nothing else changes** in kinds 0–28. If a branch has taken 29 by the time this starts, the next
-  free number, and this section follows it (H0, Q12). On 2026-09-27 24 to 27 are on main (PRs #31
-  and #36), 28 is PR #38's `gesture`, and no branch, worktree or plan holds 29 or above.
-- **The checks that name the free kinds.** On main `protocol` and `menus` say 28 reads as unknown
-  and `pointer-control` that every kind from 28 to 254 does. #38 (its head 0c8d5a6, main merged in)
-  moves them on to 29, and its `compatibility` says 29 is not this build's. With the sound, 29 is
-  `audio` and they move on to 30. Mutants that renumber a kind onto 29 (with #38: `menus`' "the
-  fetch at 29", `pointer-control`'s "kind 26 numbered 29" and `compatibility`'s "kind 28 as 29";
-  on main today only the second) would no longer compile, as a kind renumbered onto a taken one
-  does not: they move to numbers no plan will take (250 to 254), and `pointer-control`'s "numbered
-  30" with them, so the next kind moves none of them (H3).
+- **Nothing else changes** in kinds 0–42. The sound takes the next free number, and this section
+  follows it (H0, Q12). On 2026-09-27 24 to 27 were on main (PRs #31 and #36), 28 was PR #38's
+  `gesture`, and no branch held 29 or above, so the sound took 29. By 2026-10-14 PR #66 (Sill
+  Viewer; #72 and #73 build on it) held 29 to 42 and #78 (the clipboard) 32, so the sound moved to
+  43 (the last section, "Kind 43").
+- **The checks that name the free kinds.** On main `protocol` and `menus` say 29 reads as unknown,
+  `pointer-control` that every kind from 29 to 254 does, and `compatibility` that 29 is not this
+  build's. With the sound, 43 is `audio`, and 29 (PR #66's) and 44 read as unknown
+  (`pointer-control`: 29 to 42 and 44 to 254; `compatibility`: 29, 42 and 44). Mutants that
+  renumber a kind onto 29 (with #38: `menus`' "the fetch at 29", `pointer-control`'s "kind 26
+  numbered 29" and `compatibility`'s "kind 28 as 29"; on main on 2026-09-27 only the second) would
+  no longer compile, as a kind renumbered onto a taken one does not: they move to numbers no plan
+  will take (250 to 254), and `pointer-control`'s "numbered 30" with them, so the next kind moves
+  none of them (H3).
 
 #### 3.2 The payloads (`Sources/StreamProtocol/Audio.swift`, new; the iOS app gets it through the package, no pbxproj entry)
 
-A kind 29 payload's first byte says what follows. A type this build does not know is skipped.
+A kind 43 payload's first byte says what follows. A type this build does not know is skipped.
 
 ```
 type 1  format:   JSON AudioFormat
@@ -383,7 +387,7 @@ type 2  packets:  epoch UInt16 · seq UInt32 · flags UInt8 · count UInt8 · co
 ```
 
 ```swift
-/// Host → device (kind 29, type 1): how to decode what follows. Sent to each device before its first
+/// Host → device (kind 43, type 1): how to decode what follows. Sent to each device before its first
 /// packet of an epoch, and again for every new epoch (a new encoder: the app changed, Send Audio
 /// came on, the capture restarted). JSON; every field optional (HostSettings.swift's rules).
 public struct AudioFormat: Codable, Hashable, Sendable {
@@ -401,7 +405,7 @@ public struct AudioFormat: Codable, Hashable, Sendable {
     public var app: String?              // "Safari": SafeText.label, at most 64 characters
 }
 
-/// Host → device (kind 29, type 2): one or more codec packets of one epoch, back to back.
+/// Host → device (kind 43, type 2): one or more codec packets of one epoch, back to back.
 public struct AudioPackets: Hashable, Sendable {
     public var epoch: Int                // UInt16 on the wire, wraps
     public var seq: UInt32               // the first packet's number in its epoch, from 0
@@ -448,7 +452,7 @@ public enum AudioMessage: Hashable, Sendable {
 
 | Where | Field | Meaning |
 |---|---|---|
-| `Hello` (Compatibility.swift:94-108) | `audio: [String]?` | The codecs this device plays, best first: `["aac-eld"]`. Nil: an older device, which gets no kind 29 |
+| `Hello` (Compatibility.swift:94-108) | `audio: [String]?` | The codecs this device plays, best first: `["aac-eld"]`. Nil: an older device, which gets no kind 43 |
 | `StreamSettings` (HostSettings.swift:49-70) | `sendAudio: Bool?` | Send Audio. Nil: a host without sound, so the device shows no row and never sends it (the ledger's rule 9) |
 | `HostSettingsChange` (HostSettings.swift:126-164) | `sendAudio: Bool?` | A device turns it on or off; `isEmpty` and `applied(to:)` include it |
 | `HostSettingsState` (HostSettings.swift:92-120) | `audioNote: String?` | Why no sound comes although Send Audio is on ("couldn't capture the sound of Safari"); nil when all is well. The Mac's, the same for every connection (PR #39's `away` and `link` beside it are each connection's own) |
@@ -458,12 +462,12 @@ public enum AudioMessage: Hashable, Sendable {
 
 | Device | Host | Result |
 |---|---|---|
-| Older (any build since b67f87d) | This host, Send Audio on | Its hello has no `audio`, so it is sent no kind 29 (it would skip one). It ignores `sendAudio` and `audioNote` in kind 16. Nothing changes for it |
-| This device | Older host (Sill for Mac 0.3.1, the public release; any CLI before this) | No kind 29; `sendAudio` nil: no row, no Sound button or switch |
-| This device | This host, Send Audio off | The row shows off; no button; no kind 29 |
+| Older (any build since b67f87d) | This host, Send Audio on | Its hello has no `audio`, so it is sent no kind 43 (it would skip one). It ignores `sendAudio` and `audioNote` in kind 16. Nothing changes for it |
+| This device | Older host (Sill for Mac 0.3.1, the public release; any CLI before this) | No kind 43; `sendAudio` nil: no row, no Sound button or switch |
+| This device | This host, Send Audio off | The row shows off; no button; no kind 43 |
 | This device | This host, Send Audio on | This plan |
-| The base's `sillclient.py` | This host | No hello, or one without `audio`: no kind 29. Kind 16 carries two more keys |
-| A test client whose hello lists `audio` but that does not decode | This host | Gets kind 29 and may skip it |
+| The base's `sillclient.py` | This host | No hello, or one without `audio`: no kind 43. Kind 16 carries two more keys |
+| A test client whose hello lists `audio` but that does not decode | This host | Gets kind 43 and may skip it |
 
 #### 3.6 Rules for later changes
 
@@ -473,15 +477,15 @@ public enum AudioMessage: Hashable, Sendable {
 - A new codec is a new `codec` string, listed in the hello by the devices that play it. A host
   picks the first of a device's list that it can make; this host makes only "aac-eld".
 - The first public builds set the compatibility floor for good (CLAUDE.md). If the sound ships in
-  them, kind 29's two types, `AudioFormat`'s fields, the hello's `audio`, `sendAudio` and
-  `audioNote` join it: kept as they are, and a later host still sends kind 29 only to a device
+  them, kind 43's two types, `AudioFormat`'s fields, the hello's `audio`, `sendAudio` and
+  `audioNote` join it: kept as they are, and a later host still sends kind 43 only to a device
   whose hello lists the codec.
 
 ### 4. Host (`SillHostCore`, folder `Sources/SillHost`), file by file
 
 **Base.** main at 643af6b. Remote pacing (#34) is in: §4.6 builds on its `pendingBytes`, H6 on its
 harness (`Scripts/pacing`: the fake encoder, bottleneck.py, its cases; `Scripts/sillrelay.py` for
-the remote door's slow link), and the device reads kind 29 through its MessageReader. Since the critique (150f781) main has also gained the Mac's pointer
+the remote door's slow link), and the device reads kind 43 through its MessageReader. Since the critique (150f781) main has also gained the Mac's pointer
 (#31: kind 26, sent from StreamServer's tick; `PointerTestHooks`, whose `SILL_TEST_SOFTWARE_ENCODER`
 and `SILL_TEST_LOOPBACK` every test host now runs with), the menus (#36: kinds 24, 25 and 27,
 `MenuMirror`, which follows the source from `active`'s didSet as the sound will), the iPhone's
@@ -802,7 +806,7 @@ time), and a direct `mach_absolute_time` is covered by its System boot time reas
 | `AudioPlayout.swift` (new) | The playout model: floor, need, the picture's lag and the guard, dedupe, placement, frames added or dropped, fades. Pure: checked with swiftc (`audio-playout`) | Foundation |
 | `AudioDecoder.swift` (new) | AAC-ELD → 48 kHz stereo float, from the format's cookie | AudioToolbox |
 | `AudioOutput.swift` (new) | AVAudioEngine, the player node, a buffer pool, the session and its notifications | AVFAudio, UIKit |
-| `StreamClient.swift` | Kind 29, the hello's `audio`, frames' stamps to the model, stats, resets | |
+| `StreamClient.swift` | Kind 43, the hello's `audio`, frames' stamps to the model, stats, resets | |
 | `StreamScreen.swift` (`TopBar`), `PortraitStreamScreen.swift` (the window bar, the phone's row 2), `MacMenuButton.swift` (`fits`, which Sound shares) | The Sound button in every bar | |
 | `PhonePortraitLayout.swift` | The phone's row 2 with Sound at its end (`Tests/checks/phone-portrait`; `tour` compiles it too) | CoreGraphics |
 | `HostSettingsPanel.swift`, `HostSettingsLedger.swift`, `MockCatalog.swift`, `ContentView.swift`, `DiagnosticsHUD.swift` | The Send Audio row and the Sound switch, the field, the harness, the HUD | |
@@ -817,7 +821,7 @@ Sill's runs on ordinary queues, and the real-time code is Apple's.
 
 - **Clocks.** Device times are seconds of the monotonic clock (`CACurrentMediaTime`, the host clock
   whose ticks AVAudioTime's `hostTime` counts); host stamps are wall-clock seconds.
-- **Queue.** It runs on `sill.audio`. The network queue stamps each frame and each kind 29 with its
+- **Queue.** It runs on `sill.audio`. The network queue stamps each frame and each kind 43 with its
   arrival as MessageReader delivers them whole, and hands them over. The few a move's probe read
   on its new connection before the hand-over are handled there, at the hand-over (`finishMove`
   replays them), and stamped then, a few ms late: nearly all duplicate what the old connection
@@ -989,7 +993,7 @@ and dropped, jumps.
 - **The hello** (`helloPayload`, StreamClient.swift:1116-1123) gains `audio: ["aac-eld"]`. It is the
   first message of every session connection (a tap's, a reconnect's, a wired dial's, every move's),
   inside TLS with PR #37.
-- **Kind 29** in `handle` (:2632): `AudioMessage.parse`, stamped with its arrival, handed to
+- **Kind 43** in `handle` (:2632): `AudioMessage.parse`, stamped with its arrival, handed to
   `sill.audio`. A format for a new epoch gets a new decoder (one for the epoch already playing,
   with the same cookie, as a move's new connection sends, is ignored); packets get the model's
   decision, then decode, fades, a frame more or less, and the schedule. Muted or in the background,
@@ -1150,7 +1154,7 @@ thumbnail strip, as the Menus button (#36) takes its own.
 | The app goes to the background | The engine stops; back in front, the next packet starts it |
 | Send Audio turned off (on the Mac or a device) | The stream stops; kind 16 says so; the button and the switch go (on a phone upright Menus moves back under Settings); the device plays out and idles |
 | A device away | Its need starts at 150 ms and follows the link; frames drop first (§Decision) |
-| A kind 29 of an unknown type or codec | Skipped |
+| A kind 43 of an unknown type or codec | Skipped |
 | An older device, or an older host | §3.5 |
 
 ### 11. Test gates
@@ -1185,16 +1189,16 @@ thumbnail strip, as the Menus button (#36) takes its own.
 
 | # | Check | Pass when |
 |---|---|---|
-| H0 | **Preflight** (no commit). Record the base. The sound's number still free and 24–28 still held as §3.1 says, and which checks and mutants name 29: `git grep` over every ref, and every worktree's working tree and docs/, committed or not; the pbxproj block AA01–AA03 free the same way; which of PRs #37, #38 and #39 have landed; the codec probe, and the critique's reset and join probe, again on the build Mac | Recorded; ELD 480 and 512 give §Decision's F, P and end-to-end numbers within 1 ms, the same P after a reset, and a late join's first packet unusable, its fourth exact |
+| H0 | **Preflight** (no commit). Record the base. The sound's number still free and 24–28 still held as §3.1 says, and which checks and mutants name it: `git grep` over every ref, and every worktree's working tree and docs/, committed or not; the pbxproj block AA01–AA03 free the same way; which of PRs #37, #38 and #39 have landed; the codec probe, and the critique's reset and join probe, again on the build Mac | Recorded; ELD 480 and 512 give §Decision's F, P and end-to-end numbers within 1 ms, the same P after a reset, and a late join's first packet unusable, its fourth exact |
 | H1 | **Builds.** `swift build -c release`; iOS Debug and Release for the simulator and Debug for a generic device | Only the known warnings |
-| H2 | **The CLI byte for byte.** Base and new `SillHost --synthetic`, both with `SILL_TEST_LOOPBACK=1 SILL_TEST_SOFTWARE_ENCODER=1`: idle 35 s; with `sillclient.py PORT 8 desktop`; with `sillclient.py … --hello=0.6 --audio` (a hello that lists "aac-eld"); all again with `--direct-wireless`; digits masked, sorted | Identical; no `Audio` line and no `aud.` key; no kind 29 in the client's `kinds=` |
-| H3 | **Pure checks, each with its mutants caught.** `audio-packetizer` (Sources/SillHost/AudioPacketizer.swift), at least 30 cases: F from the first chunk (480, 1024, 441 and 960 frames), stamps against the anchors (±1 µs), the continuity tolerance at a quarter chunk ± 0.1 ms, a whole chunk missing, a chunk early, a format change, a segment ended with nothing flushed, `AudioSourceRule`'s table (a running stream kept, an ended one restarted after 10 s and not before); a gap emits nothing, and each block goes out with the chunk that completes it; at least 10 mutants (`>` for `≥` at the tolerance, the priming's sign, a gap that starts no segment, zeros filled into a gap, the tail flushed, an ended stream never restarted, a running one restarted). `audio-playout` (iOSClient/AudioPlayout.swift), at least 40 scenarios on a simulated clock (a steady home link; a 40 ms burst every 4 s; ±100 ppm for an hour; host clock steps of ±1 s; a 2 s stall, then a burst; duplicates; a seq gap; a join mid-segment; a still window; a link away at 80 ± 50 ms; a picture 1 s late; output latencies of 10 ms, 180 ms (AirPods) and 2 s (AirPlay) at home; IO buffers of 5 and 23 ms; a move's hand-over, both connections carrying the same packets and the new one 30 ms faster, its first packets handled late at the hand-over; a move home, away's bounds to home's; mute and unmute) and 5,000 random runs, with the invariants: nothing plays before it arrives; no two packets overlap; the sound never leads the picture as the model sees it; nothing is scheduled less than the IO buffer + 2 ms before its render; with any output latency up to 2 s and any IO buffer, a steady link loses no packet as late after its first 2 s; a packet decoded on a reset decoder in the middle of a segment is never played; a hand-over plays no packet twice and resets nothing, and a duplicate never counts toward the floor or the need; after a disturbance under 40 ms the error falls at 1.9 ms a second or better until under 5 ms; at most one frame added or dropped a packet; at least 18 mutants (max for min in the floor, no dedupe, no guard, the late test's sign, the jump at 400 ms, no step test, no fades, the need not rising at once, and the critique's: the output latency left out of the need, the late test without the IO buffer, a segment's first packet placed without its P, the packet after a seq gap played, a hand-over resetting the dedupe; and the refresh's: a duplicate counted before it is dropped). Wire cases: `compatibility` (AudioFormat and the new fields round trip; `{}` decodes; unknown keys ignored; the old `Hello`, `StreamSettings` and `ClientStats` decode the new JSON) and `protocol` (type 2 serialized and parsed; every malformed payload gives nil and never traps; 1,000 random byte strings). The kind checks (`protocol`, `menus`, `pointer-control`, and `compatibility` once #38 is in): 29 is `audio` and 30 reads as unknown; the mutants that renumbered a kind onto 29 (and `pointer-control`'s onto 30) do so onto numbers from 250 to 254, each still caught (§3.1). `phone-portrait`: row 2 with Sound at its end, with and without Menus, at every width from 300 to 599 pt (Sound under Settings; Menus under Desktop beside it, under Settings without it; the strip ending 8 pt before the first; a whole thumbnail left at 320 pt, two from 375), with mutants (Sound under Desktop, the strip not shortened, Menus not moved aside); `tour`, which compiles the layout: its lit areas never take in Sound | All pass; every mutant caught |
+| H2 | **The CLI byte for byte.** Base and new `SillHost --synthetic`, both with `SILL_TEST_LOOPBACK=1 SILL_TEST_SOFTWARE_ENCODER=1`: idle 35 s; with `sillclient.py PORT 8 desktop`; with `sillclient.py … --hello=0.6 --audio` (a hello that lists "aac-eld"); all again with `--direct-wireless`; digits masked, sorted | Identical; no `Audio` line and no `aud.` key; no kind 43 in the client's `kinds=` |
+| H3 | **Pure checks, each with its mutants caught.** `audio-packetizer` (Sources/SillHost/AudioPacketizer.swift), at least 30 cases: F from the first chunk (480, 1024, 441 and 960 frames), stamps against the anchors (±1 µs), the continuity tolerance at a quarter chunk ± 0.1 ms, a whole chunk missing, a chunk early, a format change, a segment ended with nothing flushed, `AudioSourceRule`'s table (a running stream kept, an ended one restarted after 10 s and not before); a gap emits nothing, and each block goes out with the chunk that completes it; at least 10 mutants (`>` for `≥` at the tolerance, the priming's sign, a gap that starts no segment, zeros filled into a gap, the tail flushed, an ended stream never restarted, a running one restarted). `audio-playout` (iOSClient/AudioPlayout.swift), at least 40 scenarios on a simulated clock (a steady home link; a 40 ms burst every 4 s; ±100 ppm for an hour; host clock steps of ±1 s; a 2 s stall, then a burst; duplicates; a seq gap; a join mid-segment; a still window; a link away at 80 ± 50 ms; a picture 1 s late; output latencies of 10 ms, 180 ms (AirPods) and 2 s (AirPlay) at home; IO buffers of 5 and 23 ms; a move's hand-over, both connections carrying the same packets and the new one 30 ms faster, its first packets handled late at the hand-over; a move home, away's bounds to home's; mute and unmute) and 5,000 random runs, with the invariants: nothing plays before it arrives; no two packets overlap; the sound never leads the picture as the model sees it; nothing is scheduled less than the IO buffer + 2 ms before its render; with any output latency up to 2 s and any IO buffer, a steady link loses no packet as late after its first 2 s; a packet decoded on a reset decoder in the middle of a segment is never played; a hand-over plays no packet twice and resets nothing, and a duplicate never counts toward the floor or the need; after a disturbance under 40 ms the error falls at 1.9 ms a second or better until under 5 ms; at most one frame added or dropped a packet; at least 18 mutants (max for min in the floor, no dedupe, no guard, the late test's sign, the jump at 400 ms, no step test, no fades, the need not rising at once, and the critique's: the output latency left out of the need, the late test without the IO buffer, a segment's first packet placed without its P, the packet after a seq gap played, a hand-over resetting the dedupe; and the refresh's: a duplicate counted before it is dropped). Wire cases: `compatibility` (AudioFormat and the new fields round trip; `{}` decodes; unknown keys ignored; the old `Hello`, `StreamSettings` and `ClientStats` decode the new JSON) and `protocol` (type 2 serialized and parsed; every malformed payload gives nil and never traps; 1,000 random byte strings). The kind checks (`protocol`, `menus`, `pointer-control`, and `compatibility` once #38 is in): 43 is `audio` (29 until 2026-10-14), and 29 to 42 and 44 read as unknown; the mutants that renumbered a kind onto 29 (and `pointer-control`'s onto 30) do so onto numbers from 250 to 254, each still caught (§3.1). `phone-portrait`: row 2 with Sound at its end, with and without Menus, at every width from 300 to 599 pt (Sound under Settings; Menus under Desktop beside it, under Settings without it; the strip ending 8 pt before the first; a whole thumbnail left at 320 pt, two from 375), with mutants (Sound under Desktop, the strip not shortened, Menus not moved aside); `tour`, which compiles the layout: its lit areas never take in Sound | All pass; every mutant caught |
 | H4 | **`audio-codec`** (a new check): Sources/SillHost/AudioEncoder.swift and iOSClient/AudioDecoder.swift in memory; the test tone through the encoder at F 480 and 512, each packet decoded at once | F and P as §3.2; with the first P frames dropped, each click lands at its stamp's sample ±2 frames; 5 s of the busy signal at 120–140 kbps; nothing but AudioToolbox linked |
 | H5 | **The harness at home** (`Scripts/audio/`, step 4: the real StreamServer and sound files with the test tone and fake frames; no VideoToolbox, ScreenCaptureKit or CoreMedia). 60 s of Balanced-sized fake frames at 60 fps; `Scripts/audiocheck.swift` on the home door (a hello with "aac-eld"; it decodes and finds the clicks); the same run with Send Audio off | 100 ± 1 packets a second (93.75 with `SILL_TEST_AUDIO_CHUNK=1024`); no gap in seq; 60 clicks at whole seconds of their stamps ±1 ms; `net.dropped`, `net.sent` and the frames' age the same with and without sound, within run-to-run noise |
 | H6 | **The harness away:** Scripts/pacing's `bottleneck.py` (on main since #34) at 8 and 4 Mbps with 1.5 MB keyframes, and a 12 s dip to 0.5 Mbps; the remote door's slow link through `Scripts/sillrelay.py` at 2 Mbit/s and +150 ms; and the pacing harness's own gate cases (kf25m32, real24, restartkf, stillend) with sound, against the same without | `aud.drop` 0 at 8 and 4 Mbps while `net.dropped` > 0 in the keyframe case; every packet's age at most the frames' age + 20 ms; in the dip, sound and frames arrive late together, and 2 s after it ends the packets' age is back; the pacing cases' fps and drops within their run-to-run noise with sound on (the keyframe asked for while at most 16 KB waits is not held back) |
 | H7 | **Send Audio over the wire.** `sillclient.py --audio --set=sendAudio=1@3 --set=sendAudio=0@8 --expect=sendAudio=0` against a synthetic host started without `--audio` | The answers carry it; the first packet within 300 ms of the first answer, the last within 100 ms of the second; "Settings from sillclient: send audio off → on" and "… on → off"; no "Streaming …" line (the picture never restarted) |
 | H8 | **Epochs and segments** in the harness: the tone paused for 50 ms, then for 500 ms (`SILL_TEST_AUDIO_PAUSE=0.05@3,0.5@6`), and a source change | Each pause: nothing sent for the gap, a segment start at the resumed chunk placed at its stamp ±1 ms, no packet sent more than 40 ms after its stamp, and audiocheck's model keeps its jitter cover; the source change: a new epoch, its format before its first packet on every client |
-| H9 | **Compatibility.** The base's `sillclient.py` against an `--audio` host; the base's StreamProtocol (swiftc) against a kind 29 header and the new kind 16; the new device decoder against the base host's messages | No kind 29 to the old client; `.unknown`; the old kind 16 decode ignores the keys; nothing new decoded |
+| H9 | **Compatibility.** The base's `sillclient.py` against an `--audio` host; the base's StreamProtocol (swiftc) against a kind 43 header and the new kind 16; the new device decoder against the base host's messages | No kind 43 to the old client; `.unknown`; the old kind 16 decode ignores the keys; nothing new decoded |
 | H10 | **Previews.** The bare app's `-SillRenderPreviews` before and after | Only the Streaming and Permissions panes, menu.txt's Send Audio and the new `sound` card sample differ |
 | H11 | **Hard rules** (grep) | No `captureMicrophone`, `AudioHardwareCreateProcessTap`, `updateConfiguration` or `assumeIsolated` in Sources/SillHost; no `UIBackgroundModes` in the iOS Info.plist; `HostConfig.standard` has `sendAudio: false`; the sound's send path never calls the counting `send(_:to:isFrame:isKeyframe:)` and never touches `keyframesInFlight` or `backlogFloor`; no AVFoundation or CoreMedia import in AudioEncoder, AudioPacketizer, AudioPipeline or SyntheticAudio; no render block in iOSClient; `-SillSoundSink` and `-SillSoundVolume` only under `#if DEBUG` |
 | H12 | **Cost.** The harness host's CPU (`ps`, 60 s) with and without sound | At most 1.5 percentage points more |
@@ -1209,7 +1213,7 @@ serve, it reuses them rather than copying. Like the pacing harness, it refuses a
 VideoToolbox, ScreenCaptureKit, CoreMedia or AVFoundation. `Scripts/audiocheck.swift`
 is its device: StreamProtocol, iOSClient/AudioDecoder.swift and iOSClient/AudioPlayout.swift (the
 model without a player: its floor, need and late decisions on real arrivals), a hello with
-"aac-eld", every kind 29 decoded, the clicks found, one line a second and a summary at the end.
+"aac-eld", every kind 43 decoded, the clicks found, one line a second and a summary at the end.
 
 **Simulator (S):**
 
@@ -1248,7 +1252,7 @@ Commit messages end with the session's attribution lines.
 | Step | Commit | Files | Gates | Size |
 |---|---|---|---|---|
 | 0 | Preflight (no commit) | — | H0 | 1 h |
-| 1 | "Protocol: kind 29, the Mac's sound" | StreamMessage.swift, Audio.swift (new), Compatibility.swift, HostSettings.swift, Viewport.swift; the `compatibility` and `protocol` cases; the kind checks and mutants that name 29 (§3.1), and Tests/checks/README.md's paragraph on them | H1, H3 (wire), H9 (decode) | ½ day |
+| 1 | "Protocol: kind 29, the Mac's sound" (43 since 2026-10-14, the last section) | StreamMessage.swift, Audio.swift (new), Compatibility.swift, HostSettings.swift, Viewport.swift; the `compatibility` and `protocol` cases; the kind checks and mutants that name the sound's kind (§3.1), and Tests/checks/README.md's paragraph on them | H1, H3 (wire), H9 (decode) | ½ day |
 | 2 | "Host: the sound's blocks and stamps" | AudioPacketizer.swift (new) with `AudioSourceRule`; `Tests/checks/audio-packetizer` | H3 | ½ day |
 | 3 | "Host and device: the AAC-ELD encoder and decoder" | AudioEncoder.swift (new); iOSClient/AudioDecoder.swift (new, not yet in the Xcode project); `Tests/checks/audio-codec` | H4 | ½ day |
 | 4 | "Host: Send Audio, the sound's stream and its send path" | AudioCapture, SyntheticAudio, AudioPipeline (new); StreamServer, StreamCoordinator, HostConfig, DeviceSettings, HostStatus; the CLI's `--audio`; `sillclient.py --audio` and `sendAudio`; `Scripts/audio/` and `Scripts/audiocheck.swift` | H1, H2, H5–H9, H11, H12 | 2 days |
@@ -1294,8 +1298,9 @@ Commit messages end with the session's attribution lines.
 - **Never `MainActor.assumeIsolated`** in core code. ScreenCaptureKit calls bounded (2 s).
 - **The CLI's stdout byte for byte** without `--audio`, idle and streaming, whatever the devices'
   hellos.
-- **Kinds 0–28 untouched.** 29 is the sound's (or the next free, H0). Additive only: kind 29 goes
-  only to a device whose hello lists the codec; every new field is optional.
+- **Kinds 0–42 untouched** (29 to 42 are PR #66's and #78's). 43 is the sound's (the next free, H0;
+  29 until 2026-10-14). Additive only: kind 43 goes only to a device whose hello lists the codec;
+  every new field is optional.
 - **No Swift on a real-time audio thread:** the player node schedules; Sill writes no render block.
 - **Tests never capture Noah's sound and never make a sound** (§11's hard rules): the test tone,
   the harness, the engine's manual rendering on the simulator; never `/Applications/Sill.app`,
@@ -1318,7 +1323,7 @@ Commit messages end with the session's attribution lines.
   step of its own.
 - **The picture's own delay, V,** if P6 ever finds the sound ahead: HEVCEncoder passes each output's
   capture time (nil for a re-encode of a still frame, which carries its last capture's), the
-  coordinator keeps the smallest (encode-out − capture) of the last second, a kind 29 type 3 carries
+  coordinator keeps the smallest (encode-out − capture) of the last second, a kind 43 type 3 carries
   it once a second (older devices skip the type), and the device adds it to the picture's lag.
 - **Opus** (Q2) and a lower bitrate away (Q3).
 - **The picture delayed for Bluetooth** (Q7), if anyone asks.
@@ -1365,7 +1370,8 @@ rewritten for the layouts main has since #30 and #36, and Q12 says where the kin
     alternative: keep playing on the speaker.
 12. **The kind number.** Default: **29**. 24, 25 and 27 are the Mac's menus and 26 its pointer, on
     main; 28 is the trackpad gesture of PR #38; no branch holds 29 (2026-09-27). If another branch
-    takes it first, the next free.
+    takes it first, the next free. Taken: **43** since 2026-10-14, when PR #66 held 29 to 42 (the
+    last section).
 13. **When.** Answered by Noah on 2026-09-27: **now** ("Audio: the plan is done and parked as a v2
     feature by your earlier decision", first in what he wants worked on). The plan's default was
     after v1 ships; BRIEF.md and CLAUDE.md say so until step 8 records the decision.
@@ -1386,8 +1392,8 @@ Checked against Apple's documentation, the SDK headers, the code (main at 150f78
 b4b315e) and every other branch and worktree, with the in-memory probe named at the top. Fixed in
 place:
 
-1. **Kind 29, not 28.** trackpad-gestures-plan.md (branch `trackpad-gestures`, 8dd3539, a local
-   branch) reserves 28 for its Tier 2 gestures (§4.2: "reserve it in the comment only"); the survey
+1. **Kind 29, not 28** (43 since 2026-10-14, the last section). trackpad-gestures-plan.md (branch
+   `trackpad-gestures`, 8dd3539, a local branch) reserves 28 for its Tier 2 gestures (§4.2: "reserve it in the comment only"); the survey
    missed it. 29 is free on every ref and worktree. The menu bar's 24, 25 and 27 exist only
    uncommitted in its worktree, so H0 now reads working trees too.
 2. **The pbxproj IDs.** A021–A023 sat next to remote-pacing's A020 and to the pair home-pairing
@@ -1490,8 +1496,8 @@ spotlight-modifier-fix among them. Nothing was built or run. Changed in place:
 1. **Noah's decision.** Now, not after v1 (Q13; the header, "Reading of it"); step 8 records it in
    BRIEF.md and CLAUDE.md. Every other open question takes its default.
 2. **Line numbers** are 643af6b's throughout; the critique's own stay 150f781's.
-3. **Kind 29, confirmed.** 24 to 27 are on main (#31, #36) and 28 is #38's `gesture`; no ref,
-   worktree or plan holds 29 or above. New: the checks that name the free kinds say 29 is `audio`
+3. **Kind 29, confirmed** (43 since 2026-10-14, the last section). 24 to 27 are on main (#31, #36)
+   and 28 is #38's `gesture`; no ref, worktree or plan holds 29 or above. New: the checks that name the free kinds say 29 is `audio`
    and 30 unknown, and the mutants that renumber a kind onto 29 move to 250–254 (§3.1, H3, step 1).
 4. **The send path on main's StreamServer** (§Decision, §4.6). Remote pacing's names and numbers:
    the sound counts in `pendingBytes` and so in the budget, the slack, the hold and the idle mark,
@@ -1548,7 +1554,7 @@ and pipeline, the costs (but for TLS), and the P-list (but for P8 and P15).
 
 Steps 1 to 5 of §12, one commit each, on branch `audio` (from main at 643af6b with the plan merged
 in; main at da43f6b, PR #38 the trackpad gestures, merged in at 2b114e1):
-- 91ce847: Protocol: kind 29, the Mac's sound.
+- 91ce847: Protocol: kind 29, the Mac's sound (renumbered 43 on 2026-10-14).
 - 6d1695b: Host: the sound's blocks and stamps.
 - 5d0ef5c: Host and device: the AAC-ELD encoder and decoder.
 - 4001e8e: Host: Send Audio, the sound's stream and its send path.
@@ -1560,8 +1566,8 @@ late", the late packets summed since the line before).
 
 Steps 6 and 7 (the device's playout model, its output, the Sound button and the panel's rows) come
 next. Until they land, no device plays the sound: no device's hello lists a codec, so no host sends
-kind 29. Step 8's docs are done as far as these steps go: BRIEF.md and CLAUDE.md record Noah's
-decision, and CLAUDE.md, DEVELOPMENT.md, Tests/checks/README.md and `ci.yml` cover the new files.
+kind 29 (the sound's kind then; 43 since 2026-10-14, the last section). Step 8's docs are done as
+far as these steps go: BRIEF.md and CLAUDE.md record Noah's decision, and CLAUDE.md, DEVELOPMENT.md, Tests/checks/README.md and `ci.yml` cover the new files.
 The README, the App Store text and the privacy policy wait for the release that carries the sound.
 
 **Where the build departs from the plan, and why:**
@@ -1612,8 +1618,8 @@ device; test hosts on 127.0.0.1 and the software encoder, `no-device.sh` before 
   - End to end with 480-frame chunks, 15.0 and 25.3 ms.
   - A late join: the first packet −4.6 to −6.3 dB, the second about −42, the third about −65, the
     fourth exact.
-  - Kind 29 was still free on every ref and worktree, and AA01–AA03 in every project file (A901 went
-    to `spotlight-modifier-fix`).
+  - Kind 29 (the sound's kind then; 43 since 2026-10-14, the last section) was still free on every
+    ref and worktree, and AA01–AA03 in every project file (A901 went to `spotlight-modifier-fix`).
 - **H1.** `swift build -c release` of each commit's state: only the CaptureProbe warning. On the
   merge, iOS Debug and Release for the simulator and Debug for a generic device all build, with only
   the known `StreamClient` capture warning. `AudioDecoder.swift` is not yet in the project.
@@ -1668,9 +1674,10 @@ device; test hosts on 127.0.0.1 and the software encoder, `no-device.sh` before 
   - "Settings from sillclient: send audio off → on" and "… on → off", then "Audio stopped: Send
     Audio is off.";
   - one "Streaming" line: the picture never restarted.
-- **H9.** Main's `sillclient.py` against an `--audio` host: no kind 29 in its `kinds=`, and the
-  sound never started (no device played it). This branch's client, playing sound, against main's
-  host: `audio=-` in its settings, and no kind 29. Main's StreamProtocol (da43f6b) read everything:
+- **H9.** Main's `sillclient.py` against an `--audio` host: no kind 29 (the sound's kind then; 43
+  since 2026-10-14, the last section) in its `kinds=`, and the sound never started (no device played
+  it). This branch's client, playing sound, against main's host: `audio=-` in its settings, and no
+  kind 29. Main's StreamProtocol (da43f6b) read everything:
   - a kind 29 header, as unknown with its length (skipped whole);
   - this host's kind 16 with `sendAudio` and `audioNote`;
   - a hello with codecs;
@@ -1685,7 +1692,7 @@ device; test hosts on 127.0.0.1 and the software encoder, `no-device.sh` before 
   8 of the 12 pairs are identical line for line. In the other 4, the same lines appear on both
   sides, and only the number of once-a-second stats lines around the run's end differs (one or two
   more on either side, from when the host was stopped). There is no `Audio` line, no `aud.` key, and
-  no kind 29 in any client's `kinds=`.
+  no kind 29 (the sound's kind then; 43 since 2026-10-14) in any client's `kinds=`.
 - **H10.** The bare app's previews from main's build and this branch's, rendered from the same
   path (the General pane shows it): only menu.txt (Send Audio in every sample's menu, the new
   `sound` sample), the Streaming and Permissions panes, and the new `card-sound` differ.
@@ -1843,7 +1850,7 @@ the software encoder, `no-device.sh` before and after each run):
   Desktop, and a hello that lists aac-eld, with and without `--direct-wireless`: 4 of 6 identical,
   masked and sorted; the other two only in when the host was stopped (one more 30 s idle line) and
   one stats second with an `enc.mailboxDrop` (the software encoder beside the S1 photos). No Audio
-  line, no `aud.` key, no kind 29.
+  line, no `aud.` key, no kind 29 (the sound's kind then; 43 since 2026-10-14).
 - **H10** (the bare SillMenuBar's previews from one path, 985a733's and HEAD's): only menu.txt, the
   Streaming and Permissions panes and the new `card-sound` and `card-remote-sound` differ.
 - **H11** (the device's): no `UIBackgroundModes`; no render block or source node in iOSClient;
@@ -1948,3 +1955,37 @@ resumed app's backlog would do the same. Leaving the background's packets out of
 `sill.audio` behind it, so the session's first second came as a burst of old stamps: 205 late and two
 jumps, then steady. A real capture's buffers would wait the same; making the encoder off `sill.audio`
 is not done.
+
+## Kind 43 (2026-10-14)
+
+A review of PR #94 found the sound's kind 29 taken: PR #66 (Sill Viewer, a Mac controlling another
+Mac; #72 and #73 build on it) numbers 29 `sideStreams`, 30 `sideParameterSets`, 31 `sideFrame`, 32
+`clipboard`, 33 its own `audio`, and 34 to 42 (`fileChunk`, `fileDrop`, `dragOffer`, `fileRequest`,
+`liveDrag`, `dockMenu`, `pickDisplay`, `takenBack`, `rebuildDesk`), and #78 (the clipboard) takes 32
+and keeps 29 to 31 free for #66. Read from main and from StreamMessage.swift at the head of every
+open pull request on 2026-10-14 (21, #100 the newest, this one among them; #89's Android client numbers nothing
+above 28): the highest kind any of them uses is 42 (#66, #72, #73), #78's is 32, and the rest stop
+at 28, as main does. So the sound moved to 43, the next number nobody holds. Kind numbers are never reused, and a gap is
+harmless: 29 to 42 read as unknown on this branch, as 29 and up do on main, and are skipped whole.
+
+What changed, in one commit: `case audio = 43` in StreamMessage.swift (its comment places it after
+#66's 29–42); every comment and doc string that named kind 29 for the sound (Audio.swift,
+Compatibility.swift, HostSettings.swift, Viewport.swift, the host's AudioPipeline, HostConfig,
+StreamCoordinator and StreamServer, the device's AudioOutput, AudioPlayout, StreamClient and
+StreamClient+Audio, Scripts/audio/run.sh and Scripts/audiocheck.swift); the scripts that read the
+number themselves (`sillclient.py`'s kinds table, its first-kinds filter and its parser;
+Scripts/pacing/device.py's parser); the kind checks (`compatibility`: 43 is audio, 29, 42 and 44
+are not this build's; `protocol` and `menus`: 29 and 44 read as unknown, 43 as audio;
+`pointer-control`: 43 is audio and every kind from 29 to 42 and 44 to 254 is unknown); the mutants
+that renumbered the sound now start from 43 (`compatibility`'s "kind 43 as 253", `protocol`'s "kind
+43 as 254"; every renumbering mutant still lands on 250 to 254, which no plan takes); this plan
+(§3.1, the tables, the gates and Q12), CLAUDE.md, docs/DEVELOPMENT.md and Tests/checks/README.md.
+Nothing else on the wire moved: the payloads, the hello's `audio`, `sendAudio`, `audioNote` and the
+stats are as they were. Results above that record a step run before this one keep 29 and say so.
+
+Verified: `Tests/checks/run-all.sh` for the four kind checks, `compatibility` 131, `protocol` all
+pass (220 and crosscheck.py's 8), `menus` 309, `pointer-control` 157; their mutants, `compatibility`
+31 of 31, `protocol` 33 of 33, `menus` 43 of 43, `pointer-control` 33 of 33, every one caught; live,
+`SillHost --synthetic --audio` on loopback (the software encoder, no router) with
+`sillclient.py --audio --set=sendAudio=1`: 584 kind 43 messages, one format, epoch 1, no seq gap;
+`Scripts/encoder-check/no-device.sh` passing before and after.

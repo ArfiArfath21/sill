@@ -71,7 +71,7 @@ public struct StreamSettings: Codable, Hashable, Sendable {
     /// and never sends it).
     public var directWireless: Bool?
     /// Send Audio: every connected device whose hello lists a codec it plays gets the sound of what
-    /// streams (kind 29, Audio.swift): the streamed window's app, or every app for the Desktop. The Mac
+    /// streams (kind 43, Audio.swift): the streamed window's app, or every app for the Desktop. The Mac
     /// keeps playing it too. Off by default. Optional because it came seventh: nil is a host without
     /// sound (the device shows no row and no Sound button, and never sends it).
     public var sendAudio: Bool?

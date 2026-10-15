@@ -133,7 +133,7 @@ final class StreamServer {
         var lastPointer: MacPointer?
         /// The codec of the Mac's sound it gets, from its hello (`AudioCodec.choose`); nil for a device
         /// that plays none (every device before 2026-09-27, a test client without --audio), which is
-        /// sent no kind 29.
+        /// sent no kind 43.
         var audioCodec: String?
         /// The epoch whose format it was sent: a packet of another epoch goes after that epoch's format.
         var audioEpochSent: Int?
@@ -1522,7 +1522,7 @@ final class StreamServer {
         }
     }
 
-    // MARK: The Mac's sound (kind 29; docs/audio-plan.md §4.6)
+    // MARK: The Mac's sound (kind 43; docs/audio-plan.md §4.6)
     //
     // A send path of its own, as the tick and kind 26 have: never counted in `inflight`,
     // `inflightFrames` or the drain eviction, which stay the picture's, so a hundred small messages a
@@ -1555,13 +1555,13 @@ final class StreamServer {
         onAudioListenersChanged?(n)
     }
 
-    /// The format message of a new epoch (a whole kind 29): kept, and sent to each device before its
+    /// The format message of a new epoch (a whole kind 43): kept, and sent to each device before its
     /// first packet of that epoch, never skipped. Thread-safe.
     func broadcastAudio(format: Data, epoch: Int) {
         queue.async { [self] in audioFormat = (epoch, format) }
     }
 
-    /// One packets message (a whole kind 29) of `epoch`, to every ready device that plays the sound:
+    /// One packets message (a whole kind 43) of `epoch`, to every ready device that plays the sound:
     /// the epoch's format first to a device that has not had it, then the packet, unless the device
     /// has `audioCap` messages untaken. Thread-safe.
     func broadcastAudio(packets: Data, epoch: Int) {

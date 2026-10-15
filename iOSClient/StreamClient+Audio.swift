@@ -36,7 +36,7 @@ extension StreamClient {
         UIAccessibility.post(notification: .announcement, argument: "Sound muted: headphones disconnected.")
     }
 
-    /// A kind 29 on the session's connection, handed to the sound's queue as it came. On `queue`.
+    /// A kind 43 on the session's connection, handed to the sound's queue as it came. On `queue`.
     func receiveAudio(_ header: StreamHeader, _ data: Data) {
         guard let message = AudioMessage.parse(data) else { return }
         switch message {

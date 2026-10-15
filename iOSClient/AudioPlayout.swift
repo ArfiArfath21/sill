@@ -339,7 +339,7 @@ struct AudioPlayout {
 
     // MARK: - Inputs
 
-    /// A format message (kind 29, type 1). True for a new epoch (a new decoder); false for the epoch
+    /// A format message (kind 43, type 1). True for a new epoch (a new decoder); false for the epoch
     /// playing with the same cookie, as a move's new connection sends it again (rule 7): ignored.
     mutating func format(epoch: Int, framesPerPacket: Int, primingFrames: Int, cookie: Data) -> Bool {
         if self.epoch == epoch, self.cookie == cookie, self.framesPerPacket == framesPerPacket,
@@ -400,7 +400,7 @@ struct AudioPlayout {
         return out
     }
 
-    /// One packet of kind 29's type 2, with its own stamp (the message's + its place × F ÷ rate), taken
+    /// One packet of kind 43's type 2, with its own stamp (the message's + its place × F ÷ rate), taken
     /// `now`. Its (arrival − stamp) is taken now too, not when the network queue read it: what the
     /// packet in hand waits for is the next packet reaching the playout (rule 10), so the hop between
     /// the two queues is part of what the cover must cover. But a packet that waited behind Sill's own

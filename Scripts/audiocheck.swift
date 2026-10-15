@@ -5,7 +5,7 @@ import Network
 // compiles it with Sources/StreamProtocol, iOSClient/AudioDecoder.swift, iOSClient/AudioPlayout.swift and
 // Sources/SillHost/TestTone.swift as one module, so nothing here imports StreamProtocol). What the device's StreamClient does with the
 // Mac's sound, minus a speaker: a hello that lists "aac-eld" first, pings every 0.25 s and stats every
-// second (so a remote door never takes it for gone), every message read, every kind 29 parsed, each
+// second (so a remote door never takes it for gone), every message read, every kind 43 parsed, each
 // epoch's decoder made from its format, every packet decoded, and each decoded sample placed by its
 // packet's stamp, where the test tone's click must sit at each whole second of the wall clock. The host
 // runs on this Mac, so its stamps and this clock are one clock: a packet's age (arrival minus stamp) is
@@ -18,7 +18,7 @@ import Network
 //
 // usage: audiocheck HOST PORT SECONDS [--tls] [--no-audio] [--label NAME]
 //   --tls       the remote door (TLS 1.3, ALPN sill/1, a throwaway key; the harness admits any)
-//   --no-audio  a hello without the codec: the host must send no kind 29
+//   --no-audio  a hello without the codec: the host must send no kind 43
 // One line a second ("t=3 frames=60 fage=1.2/3.4 aud=100 aage=15.2/17.0 clicks=1 model late=0 …"), then
 // one summary line, "AUDIOCHECK …", with every number the gates read.
 

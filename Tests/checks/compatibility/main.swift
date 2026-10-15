@@ -163,7 +163,7 @@ check(!json(list).contains("gestures"), "a list without them leaves the key out:
 check(decodedOld != nil && decodedOld?.gestures == nil, "an older host's list decodes, gestures nil")
 check(Wire.decode(WindowList.self, from: Wire.encode(takes))?.gestures == 1, "gestures round-trips")
 check(StreamMessageKind.gesture.rawValue == 28 && StreamMessageKind(rawValue: 28) == .gesture, "kind 28 is gesture")
-check(StreamMessageKind(rawValue: 27) == .fetchMenu && StreamMessageKind(rawValue: 29) == .audio, "27 is the menus' fetch, 29 the Mac's sound")
+check(StreamMessageKind(rawValue: 27) == .fetchMenu && StreamMessageKind(rawValue: 43) == .audio, "27 is the menus' fetch, 43 the Mac's sound")
 let gestureMessage = StreamMessage(kind: .gesture, timestamp: 1, isKeyframe: false, payload: Wire.encode(gesture)).serialized()
 check(StreamMessage.parseHeader(gestureMessage)?.kind == .gesture, "the gesture's header parses")
 check(gestureMessage.count == StreamMessage.headerLength + Wire.encode(gesture).count, "one header, then the JSON")
@@ -252,9 +252,10 @@ check(Wire.decode(OldClientStats.self, from: Wire.encode(heard))
 let quiet = ClientStats(fps: 60, frameAgeMs: 9, rttMs: 7, device: "iPad")
 check(!json(quiet).contains("audio") && Wire.decode(ClientStats.self, from: Wire.encode(quiet))?.audioLate == nil,
       "a device that played no sound sends neither")
-// Kind 29.
-check(StreamMessageKind.audio.rawValue == 29 && StreamMessageKind(rawValue: 29) == .audio, "kind 29 is audio")
-check(StreamMessageKind(rawValue: 30) == nil, "kind 30 is not this build's")
+// Kind 43.
+check(StreamMessageKind.audio.rawValue == 43 && StreamMessageKind(rawValue: 43) == .audio, "kind 43 is audio")
+check(StreamMessageKind(rawValue: 29) == nil && StreamMessageKind(rawValue: 42) == nil && StreamMessageKind(rawValue: 44) == nil,
+      "kinds 29 to 42 (#66's and #78's) and 44 are not this build's")
 
 // For H4: what cb0ec55's StreamProtocol must read.
 let out = CommandLine.arguments.count > 1 ? CommandLine.arguments[1] : nil

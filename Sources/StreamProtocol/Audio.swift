@@ -1,10 +1,10 @@
 import Foundation
 
-// The Mac's sound on the device (kind 29, docs/audio-plan.md §3). A kind 29 payload's first byte
+// The Mac's sound on the device (kind 43, docs/audio-plan.md §3). A kind 43 payload's first byte
 // says what follows: type 1, how to decode what follows (JSON `AudioFormat`); type 2, codec packets
 // of one epoch (binary `AudioPackets`). A reader skips a type it does not know.
 //
-// Who gets it: a host sends kind 29 only to a device whose hello (kind 23, `Hello.audio`) lists a
+// Who gets it: a host sends kind 43 only to a device whose hello (kind 23, `Hello.audio`) lists a
 // codec it makes (`AudioCodec.choose`), and only while Send Audio is on (`StreamSettings.sendAudio`).
 // A device from before 2026-09-27 lists none, so it is never sent one; it would skip it anyway (an
 // unknown kind reads as `.unknown`).
@@ -29,14 +29,14 @@ public enum AudioCodec {
 
     /// The codec a host sends a device: the first of the device's list (best first) that the host
     /// makes. Nil for no list (a device that plays no sound, every device before 2026-09-27) and for
-    /// a list with nothing the host makes: that device gets no kind 29.
+    /// a list with nothing the host makes: that device gets no kind 43.
     public static func choose(offered: [String]?, makes: [String] = hostMakes) -> String? {
         guard let offered else { return nil }
         return offered.first { makes.contains($0) }
     }
 }
 
-/// Host → device (kind 29, type 1): how to decode what follows. Sent to each device before its first
+/// Host → device (kind 43, type 1): how to decode what follows. Sent to each device before its first
 /// packet of an epoch, and so again for every new epoch (a new encoder: another app, Send Audio
 /// coming on, the capture starting again). JSON; every field optional (HostSettings.swift's rules), so
 /// `{}` decodes and a reader of a later host skips the keys it does not know.
@@ -79,7 +79,7 @@ public struct AudioFormat: Codable, Hashable, Sendable {
     }
 }
 
-/// Host → device (kind 29, type 2): one or more codec packets of one epoch, back to back. The
+/// Host → device (kind 43, type 2): one or more codec packets of one epoch, back to back. The
 /// message header's time stamp is the host's wall clock (seconds since 1970, as the video's) of the
 /// first decoded sample of its first packet; the packets after it follow `framesPerPacket /
 /// sampleRate` apart. Binary, big endian like the header:
@@ -128,7 +128,7 @@ public struct AudioPackets: Hashable, Sendable {
     }
 }
 
-/// A kind 29 payload, either type.
+/// A kind 43 payload, either type.
 public enum AudioMessage: Hashable, Sendable {
     case format(AudioFormat)
     case packets(AudioPackets)

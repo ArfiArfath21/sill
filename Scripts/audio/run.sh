@@ -1,7 +1,7 @@
 #!/bin/bash
 # The encoder-free sound harness (docs/audio-plan.md §11: H5, H6, H8, H12): the real StreamServer and
 # the sound's host files with the test tone and fake frames (build.sh), a device that decodes every
-# kind 29 and finds the tone's clicks (Scripts/audiocheck.swift), and on the away cases a shaped path
+# kind 43 and finds the tone's clicks (Scripts/audiocheck.swift), and on the away cases a shaped path
 # (Scripts/pacing/bottleneck.py, Scripts/sillrelay.py), all on 127.0.0.1. No encoder, no Screen
 # Recording, no sound captured or played, no device. Then summarize.py's table and gates; the exit
 # status is the number of gates that failed, plus one for each run that could not run (a device that

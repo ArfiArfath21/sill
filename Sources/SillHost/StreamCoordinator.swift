@@ -248,7 +248,7 @@ package final class StreamCoordinator {
     /// The streamed app's menus, for the devices that asked for them (kinds 24, 25 and 27,
     /// MenuMirror). Reads and presses nothing for a device that never asked.
     let menus: MenuMirror
-    /// The Mac's sound (kind 29, AudioPipeline): the sound of what streams, to the devices that play
+    /// The Mac's sound (kind 43, AudioPipeline): the sound of what streams, to the devices that play
     /// it, while Send Audio is on. It follows the source from `active`'s didSet, as the pointer and
     /// the menus do, so the picture always starts first, and nothing of it waits on the picture or the
     /// other way round.

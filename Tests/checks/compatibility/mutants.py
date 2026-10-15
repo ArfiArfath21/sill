@@ -36,7 +36,7 @@ MUTANTS = [
     ("a change's Send Audio never kept", "HostSettings.swift", "        self.directWireless = directWireless\n        self.sendAudio = sendAudio\n    }\n\n    /// All setting", "        self.directWireless = directWireless\n        self.sendAudio = nil\n    }\n\n    /// All setting"),
     ("the audio note never kept", "HostSettings.swift", "self.audioNote = audioNote", "self.audioNote = nil"),
     ("the late count never kept", "Viewport.swift", "self.audioBehindMs = audioBehindMs; self.audioLate = audioLate", "self.audioBehindMs = audioBehindMs; self.audioLate = nil"),
-    ("kind 29 as 253", "StreamMessage.swift", "    case audio = 29 ", "    case audio = 253 "),
+    ("kind 43 as 253", "StreamMessage.swift", "    case audio = 43 ", "    case audio = 253 "),
 ]
 caught = 0
 for name, file, old, new in MUTANTS:

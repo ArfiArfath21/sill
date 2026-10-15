@@ -44,7 +44,7 @@ usage: sillclient.py PORT [seconds] [desktop|none|window:ID] [flags...]
                      included), and nothing before it: a device whose hello a host's device gate waits
                      for while the Mac changes something (its gate gives up after 2 s)
   --audio            the hello (sent even without --hello) lists "aac-eld": this client plays the Mac's
-                     sound, so a host with Send Audio on sends it kind 29. Each format (type 1) is printed
+                     sound, so a host with Send Audio on sends it kind 43. Each format (type 1) is printed
                      on one line; the packets (type 2) are counted each second (aud=) with their seq
                      gaps, and summed at exit (AUDIO line: packets, epochs, segment starts, seq gaps,
                      the first and last packet's arrival, their age: arrival minus stamp)
@@ -125,7 +125,7 @@ with status 2 (--raw17 and --input go out as written). Find PORT with: lsof -nP 
 The --synthetic hosts do not advertise over Bonjour, so this is the only way to reach them."""
 import json, re, socket, struct, sys, time
 
-KIND = {0:"ps",1:"frame",2:"list",3:"thumb",4:"icon",5:"apps",11:"pong",13:"tick",14:"cursor",16:"settings",18:"macinfo",20:"pairresult",22:"goodbye",24:"menu",26:"pointer",29:"audio"}
+KIND = {0:"ps",1:"frame",2:"list",3:"thumb",4:"icon",5:"apps",11:"pong",13:"tick",14:"cursor",16:"settings",18:"macinfo",20:"pairresult",22:"goodbye",24:"menu",26:"pointer",43:"audio"}
 BOOL = {"1": True, "0": False, "true": True, "false": False, "on": True, "off": False, "yes": True, "no": False}
 BOOL_KEYS = {"prioritizeSpeed", "virtualDisplay", "directWireless", "sendAudio", "persistent", "virtualDisplayAvailable",
              "thisConnectionAway", "awayRunning"}
@@ -678,7 +678,7 @@ def menu_line(it):
     if it.get("enabled") is False: t += " (off)"
     return t
 pinging = True; reading = True; rtts = []; key_times = []; window_frames = {}; first_kinds = []; served = False; ages = []
-# The Mac's sound (kind 29): packets this second, and in all; each epoch's next seq; gaps; the arrival
+# The Mac's sound (kind 43): packets this second, and in all; each epoch's next seq; gaps; the arrival
 # times of the first and the last packet; each packet's age (arrival minus its stamp: the same clock
 # when the host runs on this Mac).
 aud_sec = 0; aud_total = 0; aud_epochs = []; aud_next = {}; aud_gaps = 0; aud_starts = 0; aud_first = None; aud_last = None; aud_ages = []
@@ -764,7 +764,7 @@ while time.time() - t0 < dur:
         if len(buf) < 14 + ln: break
         payload = buf[14:14+ln]; buf = buf[14+ln:]
         name = KIND.get(kind, str(kind)); bump(name); served = True
-        if len(first_kinds) < 400 and kind not in (0, 1, 3, 11, 13, 26, 29): first_kinds.append(kind)
+        if len(first_kinds) < 400 and kind not in (0, 1, 3, 11, 13, 26, 43): first_kinds.append(kind)
         if kind == 1:
             frames += 1; kb += ln / 1024; kb_sec += ln / 1024
             ages.append((time.time() - ts) * 1000)       # the host's clock is this Mac's: a true age
@@ -793,7 +793,7 @@ while time.time() - t0 < dur:
             where = (f"x={d['x']:.4f} y={d['y']:.4f} inside=1" if d.get("inside") and isinstance(d.get("x"), (int, float))
                      and isinstance(d.get("y"), (int, float)) else "inside=0")
             print(f"  pointer at {time.time()-t0:.3f}s {where} seen={d.get('seen') or 0}")
-        elif kind == 29:
+        elif kind == 43:
             at = time.time() - t0
             if not payload: continue
             if payload[0] == 1:

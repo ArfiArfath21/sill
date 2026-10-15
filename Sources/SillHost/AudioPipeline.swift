@@ -48,10 +48,10 @@ final class AudioPipeline: @unchecked Sendable {   // main-actor state, and stat
     /// Where the sound is made: the source's buffers, the tone's timer, the packetizer, the encoder.
     let queue = DispatchQueue(label: "sill.audio", qos: .userInteractive)
 
-    /// A whole kind 29 message: the format of an epoch (type 1), on `queue`, before that epoch's first
+    /// A whole kind 43 message: the format of an epoch (type 1), on `queue`, before that epoch's first
     /// packet; the server keeps it for the devices that join the epoch later.
     var onFormat: ((Data, Int) -> Void)?
-    /// A whole kind 29 message of one packet (type 2) of an epoch, on `queue`, the moment it is made.
+    /// A whole kind 43 message of one packet (type 2) of an epoch, on `queue`, the moment it is made.
     var onPackets: ((Data, Int) -> Void)?
 
     /// What the Mac shows of the sound while it is wanted: its source ("Safari", "Whole Mac", "Test
