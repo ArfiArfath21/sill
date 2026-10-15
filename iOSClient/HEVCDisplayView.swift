@@ -65,6 +65,35 @@ final class HEVCDisplayView: UIView {
                       width: size.width, height: size.height)
     }
 
+    /// A small picture of the video as it shows now (up to 320 pt wide, no letterbox, no pointer
+    /// sprite), for the connect screen's tile of a saved Mac. Nil while no video has arrived. Main thread.
+    func previewImage() -> UIImage? {
+        let rect = Self.videoRect(in: bounds, videoSize: pointerVideoSize)
+        guard rect.width > 0, rect.height > 0 else { return nil }
+        let width: CGFloat = min(320, rect.width)
+        let size = CGSize(width: width, height: (width * rect.height / rect.width).rounded())
+        guard size.width > 0, size.height > 0 else { return nil }
+        let format = UIGraphicsImageRendererFormat.preferred()
+        format.scale = 2
+        let scale = width / rect.width
+        let wasHidden = cursorLayer.isHidden
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        cursorLayer.isHidden = true
+        CATransaction.commit()
+        defer {
+            CATransaction.begin()
+            CATransaction.setDisableActions(true)
+            cursorLayer.isHidden = wasHidden
+            CATransaction.commit()
+        }
+        return UIGraphicsImageRenderer(size: size, format: format).image { _ in
+            drawHierarchy(in: CGRect(x: -rect.minX * scale, y: -rect.minY * scale,
+                                     width: bounds.width * scale, height: bounds.height * scale),
+                          afterScreenUpdates: false)
+        }
+    }
+
     override init(frame: CGRect) {
         super.init(frame: frame)
         backgroundColor = .black
