@@ -40,6 +40,9 @@ package final class StreamCoordinator {
     private var prioritizeSpeed: Bool { config.prioritizeSpeed }
 
     let server: StreamServer
+    /// Wake and hold the physical display while a device is watching; released when the last
+    /// session leaves, so an idle Mac keeps its normal Energy Saver behavior.
+    private let displayActivity = DisplayActivity()
     let catalog = WindowCatalog()
     let capture = WindowCapture()
     /// `--synthetic`: the Desktop source streams a test pattern instead of the screen.
@@ -419,6 +422,7 @@ package final class StreamCoordinator {
                 guard let self else { return }
                 let wasEmpty = self.catalog.clientCount == 0
                 self.catalog.clientCount = count          // the catalog idles itself at 0
+                self.displayActivity.setStreaming(count > 0)
                 // Nobody is watching: stop capturing and encoding. The next client picks afresh.
                 if count == 0 { self.viewport = nil; self.clientFPS = [:] }   // the next device starts from scratch
                 if count == 0 { self.gestureChords.forget() }                 // and did not open a view it could close
