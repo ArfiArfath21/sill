@@ -275,7 +275,8 @@ the device's own delays.
     saves it (Q8).
 - **Sound: a button in the device's bars,** only while the Mac sends sound: in every bar that holds
   it, and on a phone held upright at the end of the thumbnails' row, row 1's approved five kept
-  (§7.6); and a switch for the same thing in the Settings panel's group for this device, on every
+  (§7.6; with Larger Picture, which has no thumbnails' row, row 1 before Settings from 384 pt:
+  "Merged with main at 5c323e6"); and a switch for the same thing in the Settings panel's group for this device, on every
   layout, the only one where no bar holds the button (a Slide Over). It mutes this device alone, at
   once, without asking the Mac. The Mac keeps sending (16 KB/s), so unmuting is quick too (about
   0.1 s, while the device's audio engine starts). The device remembers it.
@@ -346,8 +347,8 @@ the device's own delays.
 
 ```swift
     // The Mac's sound (Audio.swift), after the menus' 24, 25 and 27, the pointer's 26 and the trackpad gesture's 28,
-    // and after 29–42, which PR #66 (Sill Viewer, with #72 and #73) and #78 (the clipboard) take. Older readers map it
-    // to `.unknown` and skip it.
+    // and after 29–42, which PR #66 (Sill Viewer, with #72 and #73) and #78 (the clipboard's 32) take. Older readers
+    // map it to `.unknown` and skip it.
     case audio = 43          // host → device: AudioMessage — the sound of what streams: a format (JSON AudioFormat),
                              // then packets (binary AudioPackets). Only to a device whose hello lists the codec
                              // (Hello.audio), and only while Send Audio is on
@@ -368,7 +369,8 @@ the device's own delays.
 - **The checks that name the free kinds.** On main `protocol` and `menus` say 29 reads as unknown,
   `pointer-control` that every kind from 29 to 254 does, and `compatibility` that 29 is not this
   build's. With the sound, 43 is `audio`, and 29 (PR #66's) and 44 read as unknown
-  (`pointer-control`: 29 to 42 and 44 to 254; `compatibility`: 29, 42 and 44). Mutants that
+  (`pointer-control`: 29 to 31, 33 to 42 and 44 to 254 since the merge with main at 5c323e6, 32
+  being the clipboard's; `compatibility`: 29, 42 and 44). Mutants that
   renumber a kind onto 29 (with #38: `menus`' "the fetch at 29", `pointer-control`'s "kind 26
   numbered 29" and `compatibility`'s "kind 28 as 29"; on main on 2026-09-27 only the second) would
   no longer compile, as a kind renumbered onto a taken one does not: they move to numbers no plan
@@ -1020,7 +1022,7 @@ thumbnail strip, as the Menus button (#36) takes its own.
 |---|---|
 | Landscape (`TopBar`, StreamScreen.swift:894-975): the iPad, the Duo's inner display and its outer one (710×500), a phone sideways | After Desktop, before Settings: Apps, the strip, Menus, Aa, Keyboard, Desktop, **Sound**, Settings |
 | The iPad's portrait window bar (`windowBar`, PortraitStreamScreen.swift:264-302): the Duo's inner display, an iPad upright, an iPad window narrower than 600 pt (the compact halves) | After Desktop, before Settings: Apps, the strip, Menus, Aa, Desktop, **Sound**, Settings |
-| A phone held upright, and the Duo's outer display upright (`phoneRow2`, PortraitStreamScreen.swift:398-413; `PhonePortraitLayout`) | Row 1 keeps the approved five (Apps, Aa, Keyboard, Desktop, Settings). **Sound** ends row 2, under Settings, as wide as row 1's buttons and as tall, centred in the strip's height, as Menus sits today; while the Mac's menus show too, Menus moves one place left, under Desktop. The strip ends 8 pt before the first of them |
+| A phone held upright, and the Duo's outer display upright (`phoneRow2`, PortraitStreamScreen.swift:398-413; `PhonePortraitLayout`) | Row 1 keeps the approved five (Apps, Aa, Keyboard, Desktop, Settings). **Sound** ends row 2, under Settings, as wide as row 1's buttons and as tall, centred in the strip's height, as Menus sits today; while the Mac's menus show too, Menus moves one place left, under Desktop. The strip ends 8 pt before the first of them. With Larger Picture in effect (main's #79: the switch on while a window streams, so no strip), Menus and Sound join row 1 in the landscape bar's order, Apps, Menus, Aa, Keyboard, Desktop, **Sound**, Settings, equal and 8 pt apart; Sound only where seven buttons are 44 pt or more, Menus counted whether or not it shows: a stream screen 384 pt wide or more (`PhonePortraitLayout.row1Beside`). Narrower (375 pt: the SE, the minis, a 6.7-inch iPhone zoomed), Sound is the Settings panel's switch alone |
 
 - **Which bars hold it.** A bar shows it where it still holds a whole thumbnail beside it
   (`MacMenuButton.fits`, counting Sound as one more button), after Menus, which keeps the place #36
@@ -1028,12 +1030,16 @@ thumbnail strip, as the Menus button (#36) takes its own.
   row of 666 pt or more (the roomy bar; 640 for the compact one, seven buttons), the regular halves
   at every width they are used at (600 pt and up), and the compact halves from a 532 pt window. An
   iPhone SE held sideways (639 pt of row) and iPad windows narrower than 532 pt upright (Split
-  View, Slide Over) show Menus where it fits, and not Sound. On a phone upright both always fit:
+  View, Slide Over) show Menus where it fits, and not Sound. On a phone upright without Larger
+  Picture both always fit:
   the strip keeps two whole thumbnails from 375 pt (the SE, the 15 Pro, the 18 Pro and Pro Max;
   three on the Duo's outer display) and one and most of the next at 320 pt (an SE with Display
   Zoom).
 - **Why not in row 1.** Noah approved the phone's row 1 as five buttons; a sixth would make each as
   narrow as row 3's key caps. The row's end is where #36 put the Menus button for the same reason.
+  Larger Picture (#79) has no row 2 while a window streams, so there Menus and Sound go to row 1
+  after all, six or seven to the row and each 44 pt or more, as the table's phone row says; a
+  question for Noah (Q10).
 - **The switch.** In the Settings panel, the group for this device (the last one: Take the Tour's
   today, This iPad or This iPhone with #38's Three-Finger Gestures), first in it: a `Toggle`
   **"Sound from ‹Mac›"**, on unless muted, the same state as the button, with the footnote **"Mutes
@@ -1192,7 +1198,7 @@ thumbnail strip, as the Menus button (#36) takes its own.
 | H0 | **Preflight** (no commit). Record the base. The sound's number still free and 24–28 still held as §3.1 says, and which checks and mutants name it: `git grep` over every ref, and every worktree's working tree and docs/, committed or not; the pbxproj block AA01–AA03 free the same way; which of PRs #37, #38 and #39 have landed; the codec probe, and the critique's reset and join probe, again on the build Mac | Recorded; ELD 480 and 512 give §Decision's F, P and end-to-end numbers within 1 ms, the same P after a reset, and a late join's first packet unusable, its fourth exact |
 | H1 | **Builds.** `swift build -c release`; iOS Debug and Release for the simulator and Debug for a generic device | Only the known warnings |
 | H2 | **The CLI byte for byte.** Base and new `SillHost --synthetic`, both with `SILL_TEST_LOOPBACK=1 SILL_TEST_SOFTWARE_ENCODER=1`: idle 35 s; with `sillclient.py PORT 8 desktop`; with `sillclient.py … --hello=0.6 --audio` (a hello that lists "aac-eld"); all again with `--direct-wireless`; digits masked, sorted | Identical; no `Audio` line and no `aud.` key; no kind 43 in the client's `kinds=` |
-| H3 | **Pure checks, each with its mutants caught.** `audio-packetizer` (Sources/SillHost/AudioPacketizer.swift), at least 30 cases: F from the first chunk (480, 1024, 441 and 960 frames), stamps against the anchors (±1 µs), the continuity tolerance at a quarter chunk ± 0.1 ms, a whole chunk missing, a chunk early, a format change, a segment ended with nothing flushed, `AudioSourceRule`'s table (a running stream kept, an ended one restarted after 10 s and not before); a gap emits nothing, and each block goes out with the chunk that completes it; at least 10 mutants (`>` for `≥` at the tolerance, the priming's sign, a gap that starts no segment, zeros filled into a gap, the tail flushed, an ended stream never restarted, a running one restarted). `audio-playout` (iOSClient/AudioPlayout.swift), at least 40 scenarios on a simulated clock (a steady home link; a 40 ms burst every 4 s; ±100 ppm for an hour; host clock steps of ±1 s; a 2 s stall, then a burst; duplicates; a seq gap; a join mid-segment; a still window; a link away at 80 ± 50 ms; a picture 1 s late; output latencies of 10 ms, 180 ms (AirPods) and 2 s (AirPlay) at home; IO buffers of 5 and 23 ms; a move's hand-over, both connections carrying the same packets and the new one 30 ms faster, its first packets handled late at the hand-over; a move home, away's bounds to home's; mute and unmute) and 5,000 random runs, with the invariants: nothing plays before it arrives; no two packets overlap; the sound never leads the picture as the model sees it; nothing is scheduled less than the IO buffer + 2 ms before its render; with any output latency up to 2 s and any IO buffer, a steady link loses no packet as late after its first 2 s; a packet decoded on a reset decoder in the middle of a segment is never played; a hand-over plays no packet twice and resets nothing, and a duplicate never counts toward the floor or the need; after a disturbance under 40 ms the error falls at 1.9 ms a second or better until under 5 ms; at most one frame added or dropped a packet; at least 18 mutants (max for min in the floor, no dedupe, no guard, the late test's sign, the jump at 400 ms, no step test, no fades, the need not rising at once, and the critique's: the output latency left out of the need, the late test without the IO buffer, a segment's first packet placed without its P, the packet after a seq gap played, a hand-over resetting the dedupe; and the refresh's: a duplicate counted before it is dropped). Wire cases: `compatibility` (AudioFormat and the new fields round trip; `{}` decodes; unknown keys ignored; the old `Hello`, `StreamSettings` and `ClientStats` decode the new JSON) and `protocol` (type 2 serialized and parsed; every malformed payload gives nil and never traps; 1,000 random byte strings). The kind checks (`protocol`, `menus`, `pointer-control`, and `compatibility` once #38 is in): 43 is `audio` (29 until 2026-10-14), and 29 to 42 and 44 read as unknown; the mutants that renumbered a kind onto 29 (and `pointer-control`'s onto 30) do so onto numbers from 250 to 254, each still caught (§3.1). `phone-portrait`: row 2 with Sound at its end, with and without Menus, at every width from 300 to 599 pt (Sound under Settings; Menus under Desktop beside it, under Settings without it; the strip ending 8 pt before the first; a whole thumbnail left at 320 pt, two from 375), with mutants (Sound under Desktop, the strip not shortened, Menus not moved aside); `tour`, which compiles the layout: its lit areas never take in Sound | All pass; every mutant caught |
+| H3 | **Pure checks, each with its mutants caught.** `audio-packetizer` (Sources/SillHost/AudioPacketizer.swift), at least 30 cases: F from the first chunk (480, 1024, 441 and 960 frames), stamps against the anchors (±1 µs), the continuity tolerance at a quarter chunk ± 0.1 ms, a whole chunk missing, a chunk early, a format change, a segment ended with nothing flushed, `AudioSourceRule`'s table (a running stream kept, an ended one restarted after 10 s and not before); a gap emits nothing, and each block goes out with the chunk that completes it; at least 10 mutants (`>` for `≥` at the tolerance, the priming's sign, a gap that starts no segment, zeros filled into a gap, the tail flushed, an ended stream never restarted, a running one restarted). `audio-playout` (iOSClient/AudioPlayout.swift), at least 40 scenarios on a simulated clock (a steady home link; a 40 ms burst every 4 s; ±100 ppm for an hour; host clock steps of ±1 s; a 2 s stall, then a burst; duplicates; a seq gap; a join mid-segment; a still window; a link away at 80 ± 50 ms; a picture 1 s late; output latencies of 10 ms, 180 ms (AirPods) and 2 s (AirPlay) at home; IO buffers of 5 and 23 ms; a move's hand-over, both connections carrying the same packets and the new one 30 ms faster, its first packets handled late at the hand-over; a move home, away's bounds to home's; mute and unmute) and 5,000 random runs, with the invariants: nothing plays before it arrives; no two packets overlap; the sound never leads the picture as the model sees it; nothing is scheduled less than the IO buffer + 2 ms before its render; with any output latency up to 2 s and any IO buffer, a steady link loses no packet as late after its first 2 s; a packet decoded on a reset decoder in the middle of a segment is never played; a hand-over plays no packet twice and resets nothing, and a duplicate never counts toward the floor or the need; after a disturbance under 40 ms the error falls at 1.9 ms a second or better until under 5 ms; at most one frame added or dropped a packet; at least 18 mutants (max for min in the floor, no dedupe, no guard, the late test's sign, the jump at 400 ms, no step test, no fades, the need not rising at once, and the critique's: the output latency left out of the need, the late test without the IO buffer, a segment's first packet placed without its P, the packet after a seq gap played, a hand-over resetting the dedupe; and the refresh's: a duplicate counted before it is dropped). Wire cases: `compatibility` (AudioFormat and the new fields round trip; `{}` decodes; unknown keys ignored; the old `Hello`, `StreamSettings` and `ClientStats` decode the new JSON) and `protocol` (type 2 serialized and parsed; every malformed payload gives nil and never traps; 1,000 random byte strings). The kind checks (`protocol`, `menus`, `pointer-control`, and `compatibility` once #38 is in): 43 is `audio` (29 until 2026-10-14), and the rest of 29 to 42 (32 is the clipboard's since the merge with main at 5c323e6) and 44 read as unknown; the mutants that renumbered a kind onto 29 (and `pointer-control`'s onto 30) do so onto numbers from 250 to 254, each still caught (§3.1). `phone-portrait`: row 2 with Sound at its end, with and without Menus, at every width from 300 to 599 pt (Sound under Settings; Menus under Desktop beside it, under Settings without it; the strip ending 8 pt before the first; a whole thumbnail left at 320 pt, two from 375), with mutants (Sound under Desktop, the strip not shortened, Menus not moved aside); `tour`, which compiles the layout: its lit areas never take in Sound | All pass; every mutant caught |
 | H4 | **`audio-codec`** (a new check): Sources/SillHost/AudioEncoder.swift and iOSClient/AudioDecoder.swift in memory; the test tone through the encoder at F 480 and 512, each packet decoded at once | F and P as §3.2; with the first P frames dropped, each click lands at its stamp's sample ±2 frames; 5 s of the busy signal at 120–140 kbps; nothing but AudioToolbox linked |
 | H5 | **The harness at home** (`Scripts/audio/`, step 4: the real StreamServer and sound files with the test tone and fake frames; no VideoToolbox, ScreenCaptureKit or CoreMedia). 60 s of Balanced-sized fake frames at 60 fps; `Scripts/audiocheck.swift` on the home door (a hello with "aac-eld"; it decodes and finds the clicks); the same run with Send Audio off | 100 ± 1 packets a second (93.75 with `SILL_TEST_AUDIO_CHUNK=1024`); no gap in seq; 60 clicks at whole seconds of their stamps ±1 ms; `net.dropped`, `net.sent` and the frames' age the same with and without sound, within run-to-run noise |
 | H6 | **The harness away:** Scripts/pacing's `bottleneck.py` (on main since #34) at 8 and 4 Mbps with 1.5 MB keyframes, and a 12 s dip to 0.5 Mbps; the remote door's slow link through `Scripts/sillrelay.py` at 2 Mbit/s and +150 ms; and the pacing harness's own gate cases (kf25m32, real24, restartkf, stillend) with sound, against the same without | `aud.drop` 0 at 8 and 4 Mbps while `net.dropped` > 0 in the keyframe case; every packet's age at most the frames' age + 20 ms; in the dip, sound and frames arrive late together, and 2 s after it ends the packets' age is back; the pacing cases' fps and drops within their run-to-run noise with sound on (the keyframe asked for while at most 16 KB waits is not held back) |
@@ -1307,7 +1313,9 @@ Commit messages end with the session's attribution lines.
   `me.saffer.sill.mac` or Noah's devices; test hosts on loopback and the software encoder, the
   hardware encoder only while no-device.sh finds no device.
 - **Row 1 of the phone's arrangement stays as Noah approved it** (five buttons), and the Menus
-  button never gives way to Sound: a bar with room for one of them shows Menus (§7.6).
+  button never gives way to Sound: a bar with room for one of them shows Menus (§7.6). Larger
+  Picture (#79), which has no row 2, is the exception: Menus and, from 384 pt, Sound join its row 1
+  ("Merged with main at 5c323e6"; for Noah, Q10).
 - **Apple frameworks only** (AudioToolbox, AVFAudio, ScreenCaptureKit). New iOS files need their
   four pbxproj entries by hand. Swift 5 language mode.
 
@@ -1361,11 +1369,14 @@ rewritten for the layouts main has since #30 and #36, and Q12 says where the kin
 10. **Where the Sound button goes.** Default (§7.6): **after Desktop in every bar that holds it
     and a whole thumbnail**, the Menus button kept first where only one fits; **on a phone upright,
     and on the Duo's outer display upright, at the end of the thumbnails' row**, under Settings,
-    with Menus moving under Desktop while both show, row 1's approved five untouched; and **a Sound
+    with Menus moving under Desktop while both show, row 1's approved five untouched (with Larger
+    Picture, which has no thumbnails' row, row 1 before Settings from 384 pt, and the panel's switch
+    alone narrower: the merge with main at 5c323e6); and **a Sound
     switch first in the panel's group for this device on every layout**, the only Sound control in
     a Slide Over. Alternatives: a sixth button in the phone's row 1 (each as narrow as a key cap);
     Sound kept before Menus where only one fits (an iPad has the Mac's menus in its own menu bar on
-    iPadOS 26, a phone does not); the switch only where no bar holds the button.
+    iPadOS 26, a phone does not); the switch only where no bar holds the button; with Larger
+    Picture, Sound never in row 1 (the panel's switch alone).
 11. **Headphones unplugged.** Default: **mute and say so**, iOS's pause for a live feed. The
     alternative: keep playing on the speaker.
 12. **The kind number.** Default: **29**. 24, 25 and 27 are the Mac's menus and 26 its pointer, on
@@ -1989,3 +2000,46 @@ pass (220 and crosscheck.py's 8), `menus` 309, `pointer-control` 157; their muta
 `SillHost --synthetic --audio` on loopback (the software encoder, no router) with
 `sillclient.py --audio --set=sendAudio=1`: 584 kind 43 messages, one format, epoch 1, no seq gap;
 `Scripts/encoder-check/no-device.sh` passing before and after.
+
+## Merged with main at 5c323e6 (2026-10-18)
+
+One merge commit, never a rebase: PRs #74 (the Settings window's height), #75 (window frames put
+back, issue #57), #77 (the reconnect after sleep), #78 (the clipboard), #79 (Larger Picture), #80
+(the hardware keyboard), #85 (Homebrew) and #98 (Tailscale without a service name). Where they meet
+the sound:
+- **§3.1, the kinds.** #78's clipboard is kind 32, beside the sound's 43; 29 to 31 and 33 to 42 stay
+  free (PR #66's). The kind checks now say 32 is the clipboard: `pointer-control`, 29 to 31, 33 to 42
+  and 44 to 254 unknown; `protocol` and `clipboard`, 29, 30, 31 and 33 unknown; `compatibility`, 29,
+  42 and 44 not this build's. The clipboard's own mutants renumber its kind onto 30, 31 and 33,
+  which move if #66 lands (Tests/checks/README.md).
+- **§4.1, the settings.** `sendAudio` sits beside #78's `shareClipboard` in HostConfig (its
+  `standard`, its change line), and the CLI's `--audio` beside `--no-clipboard`.
+- **§4.7, the source.** #75 keeps a regular-mode window streaming through three of the catalog's
+  looks while it is off the list (one that was full screen when last listed, or that Sill fitted),
+  `active` unchanged. The sound found a regular-mode window's app only through the catalog, so a
+  follow in those seconds (a device that plays sound joining or leaving, Send Audio turned on or
+  off) stopped it ("the streamed window's app is not known"), and nothing followed again once the
+  window was listed again. `select` now keeps the picked window's app (`streamedPID`), and
+  `audioKey` falls back to it for that window: the same `.app` key, so the pipeline keeps the
+  running stream (`AudioSourceRule`'s keep).
+- **§7.6.** Larger Picture (#79) has no thumbnails' row while a window streams, so the Sound button
+  joins row 1 before Settings, in the landscape bar's order: Apps, Menus, Aa, Keyboard, Desktop,
+  Sound, Settings (`PhonePortraitLayout.row1Beside(menus:sound:)`, `phoneRow1(layout, menus:sound:)`).
+  It joins only where seven buttons are each `minButtonWidth` (44 pt) or wider, Menus counted
+  whether or not it shows, so Sound never comes and goes with the menus: a stream screen 384 pt wide
+  or more. Narrower (375 pt: the SE, the 12 and 13 mini, a 6.7-inch iPhone with Display Zoom), Sound
+  is the Settings panel's switch alone. The standard arrangement is unchanged: Sound ends row 2.
+  Checked by `phone-portrait`'s cases and mutants A1–A4 and `tour`'s case for the Sound button in
+  Larger Picture's row 1. This departs from §13's hard rule and Q10's default, and is left to Noah
+  (Q10).
+
+Verified (2026-10-18): `swift build -c release`; the iOS app from a scratch copy with the iOS 27.1
+SDK's names stubbed (Xcode 27.0 here), Debug and Release for the generic simulator, only the known
+`StreamClient` capture warning (a build with Xcode 27.1, CI's, owed); CI's CLI step (`--internet`
+alone exits 2, `--print-reachability`); `Tests/checks/run-all.sh`, all 47 (`compatibility` 140,
+`pointer-control` 158, `phone-portrait` 501, `tour` 111,192, `clipboard` 259); the mutants of the 25
+checks that compile a file both sides changed (StreamProtocol's StreamMessage.swift and
+Compatibility.swift, HostConfig.swift, PhonePortraitLayout.swift), 936, every one caught
+(`compatibility` 34, `protocol` 34, `pointer-control` 33, `phone-portrait` 81, `tour` 84,
+`clipboard` 72, `menus` 43, `key-strokes` 81). Not run on the merge: the sound and pacing harnesses,
+H2 and the previews.

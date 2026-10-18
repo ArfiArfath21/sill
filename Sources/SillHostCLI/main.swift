@@ -34,6 +34,12 @@ config.virtualDisplay = virtualDisplay
 // CLAUDE.md. A device can still turn it on or off; that lasts until SillHost quits.
 config.directWireless = CommandLine.arguments.contains("--direct-wireless")
 
+// `SillHost --no-clipboard`: share nothing of the clipboard with devices for this run (kind 32,
+// docs/clipboard-plan.md). On by default, as in Sill.app: a device whose Share Clipboard is on is
+// sent the text copied on this Mac while it is connected, and its own text becomes this Mac's.
+// A --synthetic host shares a pasteboard of its own, never this Mac's clipboard.
+config.shareClipboard = !CommandLine.arguments.contains("--no-clipboard")
+
 // `SillHost --audio`: Send Audio for this run: every connected device that plays the Mac's sound (its
 // hello lists a codec) gets the streamed app's sound, or every app's for the Desktop, or with
 // --synthetic a test tone. Off by default, as in Sill.app: the Mac keeps playing its own sound. A

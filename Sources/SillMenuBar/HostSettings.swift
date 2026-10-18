@@ -44,6 +44,7 @@ final class HostSettings {
         static let askedScreenRecording = "askedScreenRecording", askedAccessibility = "askedAccessibility"
         static let logShowsStats = "logShowsStats"
         static let updateCheck = "updateCheck"
+        static let shareClipboard = "shareClipboard"
         static let sendAudio = "sendAudio"
     }
 
@@ -111,6 +112,8 @@ final class HostSettings {
             Key.internetAccess: standard.internetAccess,
             Key.remoteAddressName: "",
             Key.updateCheck: true,
+            // On, like the CLI: each device has its own switch, and a password manager's copies never go.
+            Key.shareClipboard: standard.shareClipboard,
             // Off, like the CLI: the Mac keeps playing its own sound (docs/audio-plan.md, Q1).
             Key.sendAudio: standard.sendAudio,
         ])
@@ -129,6 +132,7 @@ final class HostSettings {
                             // (the identity store), from which AppModel reads it at launch, before
                             // the host starts, and to which the Devices pane saves it.
                             requirePairing: HostConfig.standard.requirePairing,
+                            shareClipboard: defaults.bool(forKey: Key.shareClipboard),
                             sendAudio: defaults.bool(forKey: Key.sendAudio)).validated()
         remoteAddressName = defaults.string(forKey: Key.remoteAddressName) ?? ""
         updateCheck = defaults.bool(forKey: Key.updateCheck)
@@ -153,6 +157,7 @@ final class HostSettings {
         if config.remoteAccess != old.remoteAccess { defaults.set(config.remoteAccess, forKey: Key.remoteAccess) }
         if config.remotePort != old.remotePort { defaults.set(config.remotePort, forKey: Key.remotePort) }
         if config.internetAccess != old.internetAccess { defaults.set(config.internetAccess, forKey: Key.internetAccess) }
+        if config.shareClipboard != old.shareClipboard { defaults.set(config.shareClipboard, forKey: Key.shareClipboard) }
         if config.sendAudio != old.sendAudio { defaults.set(config.sendAudio, forKey: Key.sendAudio) }
     }
 
