@@ -22,9 +22,9 @@ final class PairingWindowState {
 /// taking the keyboard (`WindowPlacement.showInFront`), over a full-screen app too, so a request
 /// can never swallow a password being typed in another app.
 ///
-/// `sharingType = .none` is a best effort only (ScreenCaptureKit is reported to ignore it from
-/// macOS 15); what keeps the code off every device is the Desktop stream leaving Sill's own
-/// windows out, and the window catalog skipping them.
+/// Hidden from third-party screen sharing unless Settings › Devices allows it. `sharingType` is
+/// best effort only (ScreenCaptureKit is reported to ignore it from macOS 15); Sill's Desktop
+/// stream and window catalog always leave Sill's own windows out, regardless of this setting.
 @MainActor
 final class PairDeviceWindowController: NSWindowController, NSWindowDelegate {
     private let model: AppModel
@@ -37,8 +37,11 @@ final class PairDeviceWindowController: NSWindowController, NSWindowDelegate {
         window.title = "Pair iPhone or iPad"
         window.isReleasedWhenClosed = false
         window.collectionBehavior.insert([.moveToActiveSpace, .fullScreenAuxiliary])
-        window.sharingType = .none
+        window.sharingType = model.settings.displayQRCodeOnRemoteDesktops ? .readOnly : .none
         super.init(window: window)
+        model.settings.onQRCodeVisibilityChange = { [weak window] visible in
+            window?.sharingType = visible ? .readOnly : .none
+        }
         let host = NSHostingController(rootView: LivePairDeviceView(model: model, state: state, close: { [weak self] in self?.close() }))
         host.sizingOptions = [.preferredContentSize]
         window.contentViewController = host

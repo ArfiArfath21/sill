@@ -90,6 +90,9 @@ jobs:
       - name: Pure checks (Tests/checks/run-all.sh)
         run: Tests/checks/run-all.sh
 
+      - name: Pairing window settings and sharing (SwiftPM tests)
+        run: swift test
+
       # The iOS app needs the iOS 27.1 SDK (the iPhone Duo's hinge and fold, docs/iphone-duo-plan.md):
       # the newest Xcode 27.1 that is not a beta, else its newest beta (the image had only
       # Xcode_27.1_beta.app, 27A9269, in October 2026); without either, a warning and the newest Xcode

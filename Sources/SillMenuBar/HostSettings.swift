@@ -45,6 +45,7 @@ final class HostSettings {
         static let logShowsStats = "logShowsStats"
         static let updateCheck = "updateCheck"
         static let shareClipboard = "shareClipboard"
+        static let displayQRCodeOnRemoteDesktops = "displayQRCodeOnRemoteDesktops"
     }
 
     var config: HostConfig {
@@ -90,6 +91,16 @@ final class HostSettings {
     }
     @ObservationIgnored var onUpdateCheckChange: (@MainActor () -> Void)?
 
+    /// Lets third-party screen sharing show the pairing window. Sill's own streams still exclude it.
+    var displayQRCodeOnRemoteDesktops: Bool {
+        didSet {
+            guard displayQRCodeOnRemoteDesktops != oldValue else { return }
+            defaults.set(displayQRCodeOnRemoteDesktops, forKey: Key.displayQRCodeOnRemoteDesktops)
+            onQRCodeVisibilityChange?(displayQRCodeOnRemoteDesktops)
+        }
+    }
+    @ObservationIgnored var onQRCodeVisibilityChange: (@MainActor (Bool) -> Void)?
+
     @ObservationIgnored private let defaults: UserDefaults
 
     init(defaults: UserDefaults = .standard) {
@@ -111,6 +122,7 @@ final class HostSettings {
             Key.internetAccess: standard.internetAccess,
             Key.remoteAddressName: "",
             Key.updateCheck: true,
+            Key.displayQRCodeOnRemoteDesktops: false,
             // On, like the CLI: each device has its own switch, and a password manager's copies never go.
             Key.shareClipboard: standard.shareClipboard,
         ])
@@ -132,6 +144,7 @@ final class HostSettings {
                             shareClipboard: defaults.bool(forKey: Key.shareClipboard)).validated()
         remoteAddressName = defaults.string(forKey: Key.remoteAddressName) ?? ""
         updateCheck = defaults.bool(forKey: Key.updateCheck)
+        displayQRCodeOnRemoteDesktops = defaults.bool(forKey: Key.displayQRCodeOnRemoteDesktops)
         settingsTab = defaults.string(forKey: Key.settingsTab).flatMap(SettingsTab.init(rawValue:)) ?? .general
         permissionsOnboardingDismissed = defaults.bool(forKey: Key.permissionsOnboardingDismissed)
         askedScreenRecording = defaults.bool(forKey: Key.askedScreenRecording)

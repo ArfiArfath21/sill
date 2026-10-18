@@ -65,8 +65,8 @@ final class AppModel {
     @ObservationIgnored private var presentationExpiry: Task<Void, Never>?
     @ObservationIgnored private var presentationExpiryAt: Date?
 
-    init() {
-        let settings = HostSettings()
+    init(defaults: UserDefaults = .standard) {
+        let settings = HostSettings(defaults: defaults)
         self.settings = settings
         permissions = PermissionsModel(settings: settings)
         let updates = UpdateChecker(configuration: DebugHooks.updateConfiguration(testPattern: CommandLine.arguments.contains("--synthetic")),

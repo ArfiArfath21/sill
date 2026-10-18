@@ -13,6 +13,7 @@ struct LiveDevicesPane: View {
     var body: some View {
         DevicesPane(status: model.coordinator?.status.snapshot.remote ?? RemoteStatus(),
                     requirePairing: Binding(get: { settings.config.requirePairing }, set: { model.setRequirePairing($0) }),
+                    displayQRCodeOnRemoteDesktops: $settings.displayQRCodeOnRemoteDesktops,
                     requirePairingProblem: model.requirePairingProblem,
                     actions: DevicesPane.Actions(pair: { model.pairDevice() },
                                                  remove: { model.removeDevice($0) },
@@ -34,6 +35,7 @@ struct DevicesPane: View {
 
     let status: RemoteStatus
     @Binding var requirePairing: Bool
+    @Binding var displayQRCodeOnRemoteDesktops: Bool
     /// The last Require pairing change the identity store did not keep.
     var requirePairingProblem: AppModel.RequirePairingProblem?
     let actions: Actions
@@ -76,6 +78,11 @@ struct DevicesPane: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .fixedSize(horizontal: false, vertical: true)
                 }
+            }
+            Section {
+                Toggle("Display QR code on remote desktops", isOn: $displayQRCodeOnRemoteDesktops)
+            } footer: {
+                Footnote("Shows the pairing window in Apple Remote Desktop and other screen sharing apps. Anyone viewing the shared screen can see and use the pairing code. Sill’s own streams always hide this window.")
             }
             pairedDevices
         }

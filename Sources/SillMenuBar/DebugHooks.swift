@@ -378,6 +378,7 @@ enum DebugHooks {
         }
         for sample in devicesPaneSamples() {
             let pane = DevicesPane(status: sample.status, requirePairing: .constant(sample.requirePairing),
+                                   displayQRCodeOnRemoteDesktops: .constant(false),
                                    requirePairingProblem: nil, actions: DevicesPane.Actions(), now: previewNow)
                 .formStyle(.grouped)
                 .frame(width: 520)

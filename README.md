@@ -98,7 +98,10 @@ Sill has layouts of its own.
   a USB cable the device pairs by itself. From then on each end knows the
   other's key, and every connection, nearby or away, is pinned to those keys.
   In Sill's Settings on your Mac, Devices lists the devices you paired, and
-  you can remove any of them there.
+  you can remove any of them there. To pair while using Apple Remote Desktop
+  or another screen sharing app, turn on **Display QR code on remote desktops**
+  in Settings › Devices. It is off by default; turning it on lets anyone viewing
+  the shared screen see and use the pairing code.
 - **Away from home**, Remote Access (off by default) lets the devices you
   paired reach your Mac through your own VPN or a port you forward on your
   router; a device learns how the next time it connects at home with Remote

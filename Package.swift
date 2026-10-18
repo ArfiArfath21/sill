@@ -24,6 +24,7 @@ let package = Package(
         .executableTarget(name: "SillHostCLI", dependencies: ["SillHostCore", "StreamProtocol"]),
         // The menu bar app: status item, Settings and Log windows (AppKit lifecycle, SwiftUI panes).
         .executableTarget(name: "SillMenuBar", dependencies: ["SillHostCore", "StreamProtocol"]),
+        .testTarget(name: "SillMenuBarTests", dependencies: ["SillMenuBar"]),
         // Milestone 3 spike: virtual display + window move + capture. Its VirtualDisplay.swift
         // is a symlink to the host's copy. Not shipped.
         .executableTarget(name: "CaptureProbe"),
