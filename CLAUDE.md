@@ -6380,4 +6380,4 @@ device keeps working with Macs from the first public build on, or each says why
 - v1 out of scope: hole punching, multi-window, layout customization. Audio is in scope since
   2026-09-27 (Noah: "Audio: the plan is done and parked as a v2 feature by your earlier decision",
   first in what he wanted worked on; docs/audio-plan.md, docs/BRIEF.md), and in, as a beta, since
-  2026-10-20 (Noah on PR #94: "merge as beta support"): Send Audio, off by default, the Mac's alone.
+  2026-10-20 (Noah, about PR #94: "merge as beta support"): Send Audio, off by default, the Mac's alone.

@@ -51,7 +51,7 @@ a v2 feature by your earlier decision."
   records the decision in BRIEF.md and CLAUDE.md. Send Audio stays off by default (Q1), so a
   release that carries it changes nothing for anyone who leaves it off.
 
-**A beta (2026-10-20).** Noah, on PR #94: "Check the sound branch and see if it is polished, if
+**A beta (2026-10-20).** Noah, about PR #94: "Check the sound branch and see if it is polished, if
 so then merge as beta support." So Send Audio ships as a beta, off by default: the Mac's status
 menu says "Send Audio (Beta)", Settings › Streaming "Send audio (beta)" with a footnote that starts
 "Beta.", the CLI's `--audio` line "(beta)", and the device's Send Audio row a "Beta" tag ("Send

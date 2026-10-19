@@ -89,7 +89,7 @@ Out: hole punching, multi-window, layout customization, AV1. Audio moved in on
 2026-09-27 (Noah: "Audio: the plan is done and parked as a v2 feature by your
 earlier decision", first in what he wanted worked on): the sound of what
 streams, off by default (Send Audio), per docs/audio-plan.md. In, as a beta,
-since 2026-10-20 (Noah on PR #94: "merge as beta support"): Send Audio is the
+since 2026-10-20 (Noah, about PR #94: "merge as beta support"): Send Audio is the
 Mac's alone and says beta until the plan's device tests pass.
 
 Milestones (solo, ~10 hrs/week; halve at 20):
