@@ -328,10 +328,12 @@ final class StreamClient: ObservableObject {
     /// Where the sprite's tip goes, a fraction of the video frame, or nil to hide it: the display
     /// view's `setPointer`, set by `StreamView.wirePointer`. Up to 120 times a second. Main thread.
     var onPointerChange: ((CGPoint?) -> Void)?
-    /// Something that may have moved the Mac's caret went to the Mac: a click or a key going down
+    /// Something that may move the Mac's caret is about to go to the Mac: a click or a key going down
     /// (TextInputRules.movesCaret), whichever view sent it, a pick, a launch, a window's button, a menu
-    /// item or a gesture. The stream screen's input view then forgets what it remembers of what was typed
-    /// (InputOverlayProxy.caretMayHaveMoved, #138). Set by StreamScreen. Main thread.
+    /// item or a gesture. Called before it is queued, so what the stream screen's input view sends of a
+    /// composition still in progress goes out first, where the caret still is; the view then forgets
+    /// what it remembers of what was typed (InputOverlayProxy.caretMayHaveMoved, #138). Set by
+    /// StreamScreen. Main thread.
     var onCaretMayMove: (() -> Void)?
     /// Q1's flip only (`PointerPresence.trackpadLinger`): the one timer that re-renders when the
     /// trackpad's pointer is due to go. Idle while the linger is nil, as it is by default.
@@ -3190,7 +3192,7 @@ final class StreamClient: ObservableObject {
     private func request(_ source: StreamSource) {
         choicesSent += 1
         onCaretMayMove?()   // the Mac raises what it picks: its caret is in another window
-        send(.selectSource, Wire.encode(source))
+        sendAfterInput(.selectSource, Wire.encode(source))
         #if DEBUG
         // Layout harness (mock, no connection): show the pick locally so taps can be checked.
         if connection == nil { DispatchQueue.main.async { self.active = source } }
@@ -3201,7 +3203,7 @@ final class StreamClient: ObservableObject {
     func command(_ action: WindowCommand.Action, window id: UInt32) {
         noteAction()
         onCaretMayMove?()
-        send(.windowCommand, Wire.encode(WindowCommand(id: id, action: action)))
+        sendAfterInput(.windowCommand, Wire.encode(WindowCommand(id: id, action: action)))
     }
 
     // MARK: Bar order
@@ -3246,7 +3248,7 @@ final class StreamClient: ObservableObject {
         noteAction()
         choicesSent += 1   // the host picks the launched app's window: a choice, like a pick
         onCaretMayMove?()
-        send(.launchApp, Wire.encode(LaunchApp(bundleID: bundleID)))
+        sendAfterInput(.launchApp, Wire.encode(LaunchApp(bundleID: bundleID)))
     }
 
     /// Send one input event to the Mac. Safe to call from the main thread; the work hops to the
@@ -3359,6 +3361,14 @@ final class StreamClient: ObservableObject {
         let message = StreamMessage(kind: kind, timestamp: Date().timeIntervalSince1970,
                                     isKeyframe: false, payload: payload)
         link.send(message.serialized())
+    }
+
+    /// A pick, a launch, a window's button or a menu item, behind the input already on its way
+    /// (`sendInput` hops to `queue`, which is serial): what an input method was still composing, sent
+    /// just before as `onCaretMayMove` let go of it, and anything typed a moment earlier reach the Mac
+    /// before it moves the caret, where the caret was. Sent straight away, it could overtake them.
+    private func sendAfterInput(_ kind: StreamMessageKind, _ payload: Data) {
+        queue.async { [weak self] in self?.send(kind, payload) }
     }
 
     // MARK: - The pointer (docs/pointer-visibility-plan.md §7.3)
@@ -4212,7 +4222,7 @@ extension StreamClient {
         case .send(let request)?:
             menuToken += 1
             onCaretMayMove?()
-            send(.pressMenuItem, payload: Wire.encode(request))
+            sendAfterInput(.pressMenuItem, Wire.encode(request))
             #if DEBUG
             print("menus: chose \(row.title) (\(request.id ?? ""))")
             if connection == nil { mockAnswer(request) }

@@ -5368,8 +5368,10 @@ good.
   (`scroll(_:at:translation:velocity:from:)`); a `UITextInput` since #138: an
   input method's composition over the picture, sent once chosen, dictation and
   its corrections, ⌃Space to iPadOS with keyboards in two languages, Scribble
-  declined, what was typed forgotten when the Mac's caret may move
-  (`forgetTyped`, from `StreamClient.onCaretMayMove`); `InputOverlayProxy`, who holds
+  declined, what is composed sent first and what was typed forgotten when the
+  Mac's caret may move (`forgetTyped`, from `StreamClient.onCaretMayMove`, before
+  it goes out: a pick, a launch, a window's button and a menu item follow the
+  queued input, `sendAfterInput`); `InputOverlayProxy`, who holds
   the keyboard, carrying out `HardwareKeyboardPolicy`; `HardwareKeyboardMonitor`,
   GameController's keyboard), `TextComposition` (what the input view holds for
   iPadOS's text system: the composition, what was typed since the Mac's caret

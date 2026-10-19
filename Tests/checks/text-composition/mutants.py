@@ -32,8 +32,11 @@ MUTANTS = [
     ("T13 a range past the end is not cut there", "let end = min(max(range.location + range.length, start), utf16.count)",
      "let end = max(range.location + range.length, start)"),
     ("T14 a correction leaves out what follows its range", "        return commit(before + text + after)\n", "        return commit(before + text)\n"),
-    ("T15 a forget also drops the composition", "    mutating func reset() {\n        sent = \"\"\n", "    mutating func reset() {\n        sent = \"\"\n        marked = nil\n"),
-    ("T16 a forget forgets nothing", "    mutating func reset() {\n        sent = \"\"\n", "    mutating func reset() {\n"),
+    ("T15 a forget drops what is composed, unsent", "        let out = unmark()\n        sent = \"\"\n",
+     "        marked = nil\n        let out: [Output] = []\n        sent = \"\"\n"),
+    ("T16 a forget forgets nothing", "        let out = unmark()\n        sent = \"\"\n", "        let out = unmark()\n"),
+    ("T47 a forget keeps what is composed on the device (the PR's: dropped by the input method at the next key)",
+     "        let out = unmark()\n", "        let out: [Output] = []\n"),
     # The tail
     ("T17 what was sent trimmed to 200 characters in every edit (the PR's cut)", "        sent = new\n", "        sent = String(new.suffix(200))\n"),
     ("T18 a trim while an input method composes", "var wantsTrim: Bool { marked == nil && sent.count > Self.limit }", "var wantsTrim: Bool { sent.count > Self.limit }"),

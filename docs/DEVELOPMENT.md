@@ -487,12 +487,16 @@ composes on the device: what it is composing shows at the top middle of the
 picture, its candidates show where iPadOS puts them (on the on-screen keyboard,
 or with a hardware keyboard beside the composition), and only the text chosen
 goes to the Mac, typed as any text is. While it composes, every key is the input
-method's (the arrows pick, Return and Space choose, Esc cancels), so nothing of
-it reaches the Mac until it is chosen. What is still composed when the input
-view stops taking the keyboard (Settings, the Apps list or the tour opens, the
-device turns) goes to the Mac as it stands, as a text field on the device keeps
-it. Dictation types what is said, and the corrections it makes a moment later
-go to the Mac as backspaces back to the first change, then the rest typed again.
+method's (the arrows move through its candidates, Return chooses, and Esc does
+what that input method does with it), so nothing of it reaches the Mac until it
+is chosen. What is still composed when the input view stops taking the keyboard
+(Settings, the Apps list or the tour opens, the device turns) goes to the Mac as
+it stands, as a text field on the device keeps it, and so does what is still
+composed when a click, a key or a pick is about to move the Mac's caret (a tap on
+the picture, say): it goes first, where the caret was, as a tap elsewhere in a
+text field keeps a composition. Dictation types what is said, and the
+corrections it makes a moment later go to the Mac as backspaces back to the first
+change, then the rest typed again.
 
 There is no setting for it in Sill: the input view follows the keyboards and
 dictation languages set up in the device's Settings › General › Keyboard

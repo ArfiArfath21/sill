@@ -140,12 +140,17 @@ do {   // emoji and combining marks count as one character on the Mac
     check("a combining mark that joins the last character retypes it whole", accent == [.backspaces(1), .text("é")] && mac == "abé")
 }
 
-do {   // reset forgets what was sent, not the composition
+do {   // a forget (the Mac's caret is about to move: a click, a key, a pick) sends what is composed
+       // first, as it stands, where the caret still is, then forgets everything
     var c = C()
-    _ = c.insert("hello")
-    c.setMarked("ㄏ", selected: NSRange(location: 1, length: 0))
-    c.reset()
-    check("reset forgets what was sent", c.sent.isEmpty && c.marked == "ㄏ" && c.markedRange == NSRange(location: 0, length: 1))
+    var mac = ""
+    apply(c.insert("hello"), to: &mac)
+    c.setMarked("ㄏㄠ", selected: NSRange(location: 2, length: 0))
+    let out = c.forget()
+    apply(out, to: &mac)
+    check("a forget sends what is composed, as it stands, before the caret moves", out == [.text("ㄏㄠ")] && mac == "helloㄏㄠ")
+    check("…then forgets it all", c.sent.isEmpty && !c.isComposing && c.length == 0 && c.markedRange == nil)
+    check("a forget with nothing composed sends nothing", c.forget() == [] && c.sent.isEmpty)
 }
 
 do {   // a correction taken before a forget: nothing goes to the Mac
@@ -153,7 +158,7 @@ do {   // a correction taken before a forget: nothing goes to the Mac
     var mac = "earlier text "
     apply(c.insert("I sea it"), to: &mac)
     let stale = NSRange(location: 2, length: 3)        // "sea", taken before the Mac's caret moved
-    c.reset()                                          // a click on the Mac
+    apply(c.forget(), to: &mac)                        // a click on the Mac
     apply(c.insert("x"), to: &mac)                     // typed where the caret is now
     let out = c.replace(stale, with: "see")
     check("a range that starts past the document after a forget sends nothing", out == [] && mac == "earlier text I sea itx")
@@ -178,7 +183,7 @@ do {   // dictation's last correction of a phrase (its punctuation and capitals)
     apply(c.insert("hello"), to: &mac)
     let taken = c.generation
     let phrase = NSRange(location: 0, length: 5)       // "hello", as the text system holds it
-    c.reset()                                          // a click on the Mac
+    apply(c.forget(), to: &mac)                        // a click on the Mac
     check("a forget starts a new document", c.generation == taken + 1)
     apply(c.insert("x"), to: &mac)                     // typed where the caret is now
     check("typing keeps the document", c.generation == taken + 1)
@@ -190,10 +195,12 @@ do {   // dictation's last correction of a phrase (its punctuation and capitals)
     check("…and one taken since goes", now == [.backspaces(1), .text("y")] && mac == "earlier helloy")
     c.setMarked("ㄋ", selected: NSRange(location: 1, length: 0))
     let marked = c.generation
-    c.reset()
-    check("a forget while composing also starts a new document", c.generation == marked + 1 && c.marked == "ㄋ")
+    let composed = c.forget()
+    apply(composed, to: &mac)
+    check("a forget while composing sends the composition, then starts a new document",
+          composed == [.text("ㄋ")] && mac == "earlier helloyㄋ" && c.generation == marked + 1 && !c.isComposing)
     check("…and a correction of the composition taken before it sends nothing",
-          c.replace(NSRange(location: 1, length: 1), with: "你", taken: marked) == [] && c.marked == "ㄋ")
+          c.replace(NSRange(location: 1, length: 1), with: "你", taken: marked) == [] && c.length == 0 && mac == "earlier helloyㄋ")
 }
 
 do {   // the tail: kept whole to its limit, trimmed past it, never while composing
@@ -325,8 +332,12 @@ func randomRuns(_ runs: Int, alphabet: [String], forgets: Bool) -> (fails: Int, 
                 if taken == nil { taken = (range, c.generation) }
                 apply(c.replace(range, with: word(), taken: c.generation), to: &mac)
             case 5:
-                c.reset()
+                apply(c.forget(), to: &mac)
                 everReset = true
+                if c.isComposing { why = "a forget kept the composition on the device" }
+                else if let composed = before.marked, !mac.hasSuffix(before.sent + composed) {
+                    why = "a forget lost what was composed"
+                }
             case 6:
                 // A correction whose range the text system took before a forget: past the document's end.
                 guard let range = stale, range.location > c.length else { break }
