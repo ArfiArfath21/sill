@@ -72,6 +72,15 @@ final class AudioOutput {
     private var clicks = ClickFinder()
     #endif
 
+    /// Whether a kind 43 format came this session: until one does (Send Audio off, a Mac without
+    /// sound), a video frame is not handed to `queue` at all, so a session without sound costs no hop
+    /// and no sorted insert per frame. The guard's frames start with the sound (rule 3 reads the
+    /// frames of the last 2 s, which fill within its first seconds, while the cover dominates the
+    /// delay). Set by `format` on the network queue, cleared at a session's start and end; a move's
+    /// hand-over keeps it, as it keeps the sound. Under its own lock.
+    private let formatSeenLock = NSLock()
+    private var formatSeen = false
+
     // The last closed second, for the client's stats (its network queue) and the HUD.
     private let statsLock = NSLock()
     private var lastSecond: AudioPlayout.Second?
@@ -118,6 +127,7 @@ final class AudioOutput {
     /// A new session connection (a connect, a reconnect): nothing of the last one's sound is kept. A
     /// move's hand-over is not one. Any thread.
     func sessionStarted(away: Bool) {
+        formatSeenLock.withLock { formatSeen = false }
         queue.async { [self] in
             stopEngine(reason: nil, fade: true)
             _ = model.reset(.session)
@@ -136,6 +146,7 @@ final class AudioOutput {
 
     /// The session ended (a tear-down): the engine stops. Any thread.
     func sessionEnded() {
+        formatSeenLock.withLock { formatSeen = false }
         queue.async { [self] in
             sessionLive = false
             stopEngine(reason: nil, fade: true)
@@ -188,13 +199,16 @@ final class AudioOutput {
     /// The pings' median round trip of the last second (rule 13's threshold). Any thread.
     func rtt(median ms: Int?) { queue.async { [self] in model.rtt(median: ms.map { Double($0) / 1000 }) } }
 
-    /// A video frame, stamped as the network queue took it (rule 3).
+    /// A video frame, stamped as the network queue took it (rule 3); dropped here until the session's
+    /// first format (`formatSeen`).
     func frame(stamp: Double, arrival: Double) {
+        guard formatSeenLock.withLock({ formatSeen }) else { return }
         queue.async { [self] in model.frame(stamp: stamp, arrival: arrival) }
     }
 
     /// A kind 43 format.
     func format(_ f: AudioFormat) {
+        formatSeenLock.withLock { formatSeen = true }
         queue.async { [self] in receive(f) }
     }
 
