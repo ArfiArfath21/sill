@@ -105,9 +105,10 @@ enum MenuBuilder {
             MenuEntry(kind: .item, title: "Standard", subtitle: "A quarter of the pixels; much lighter to encode",
                       checked: config.captureScale < 1.5, action: .setCaptureScale(1)),
         ]))
-        // The last of what streams: the sound of it (docs/audio-plan.md §6). Absolute, like Virtual
-        // Display: it sets the value it showed.
-        menu.append(MenuEntry(kind: .item, title: "Send Audio", subtitle: "The Mac keeps playing it too",
+        // The last of what streams: the sound of it (docs/audio-plan.md §6), a beta, which its title
+        // says (in the title, so menu.txt and VoiceOver have it too). Absolute, like Virtual Display:
+        // it sets the value it showed.
+        menu.append(MenuEntry(kind: .item, title: "Send Audio (Beta)", subtitle: "The Mac keeps playing it too",
                               checked: config.sendAudio, action: .setSendAudio(!config.sendAudio)))
         menu.append(.separator)
 

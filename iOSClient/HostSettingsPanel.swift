@@ -298,12 +298,18 @@ struct HostSettingsPanel: View {
                 // row for a Mac without sound; why no sound comes, when the Mac says, under it. The Mac's
                 // alone (Q8, the beta's default): the Mac refuses a device's change, so the switch only
                 // shows it, as Direct Wireless's does from afar, and its footnote says where it is set.
+                // A beta: a tag after its title ("Send Audio, beta" to VoiceOver), and the footnote's
+                // first word. The Sound button and This iPad's switch are this device's mute: no tag.
                 if let send = shown.sendAudio {
                     Rows {
                         Toggle(isOn: .constant(send)) {
-                            Text("Send Audio").foregroundStyle(Palette.text)
+                            HStack(spacing: 8) {
+                                Text("Send Audio").foregroundStyle(Palette.text)
+                                BetaTag()
+                            }
                         }
                         .disabled(true)
+                        .accessibilityLabel("Send Audio, beta")
                         .accessibilityHint("Set in Sill on \(mac).")
                         .rowFrame()
                     }
@@ -311,8 +317,8 @@ struct HostSettingsPanel: View {
                     if send, let note = state.audioNote {
                         Footnote(text: note, warning: true)
                     }
-                    Footnote(text: send ? "Every connected device hears what streams; \(mac) keeps playing it too. Sound mutes it on this \(device) alone. Turn Send Audio off in Sill on \(mac)."
-                                        : "Turn on Send Audio in Sill on \(mac) to hear what streams on every connected device; \(mac) keeps playing it too.")
+                    Footnote(text: send ? "Beta. Every connected device hears what streams; \(mac) keeps playing it too. Sound mutes it on this \(device) alone. Turn Send Audio off in Sill on \(mac)."
+                                        : "Beta. Turn on Send Audio in Sill on \(mac) to hear what streams on every connected device; \(mac) keeps playing it too.")
                 }
                 // Direct Wireless Connection: how devices reach the Mac, not how it streams; after the
                 // closing footer, whose "the stream restarts" is not true of it, and last, the least
@@ -692,6 +698,21 @@ private struct Rows<Content: View>: View {
     var body: some View {
         VStack(spacing: 0) { content }
             .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Palette.control))
+    }
+}
+
+/// "Beta" after a row's title, for a feature still being tried (Send Audio): small, muted, in a thin
+/// capsule, and grows with the text. Hidden from VoiceOver: the row's label says "beta".
+private struct BetaTag: View {
+    var body: some View {
+        Text("Beta")
+            .font(.caption2.weight(.semibold))
+            .foregroundStyle(Palette.muted)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .overlay(Capsule().strokeBorder(Palette.muted.opacity(0.6), lineWidth: 1))
+            .fixedSize()
+            .accessibilityHidden(true)
     }
 }
 

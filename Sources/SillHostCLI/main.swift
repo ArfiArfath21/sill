@@ -146,8 +146,8 @@ func startHost() {
             print("\(c.windowCount) windows on screen. Advertising _sill._tcp on the local network.")
             if c.active == .none { print("Nothing is streaming yet: pick a window from the iOS app. Ctrl-C to stop.") }
             if audioFlag {
-                print(synthetic ? "Audio on for this run: devices that play sound get a test tone with the test pattern."
-                                : "Audio on for this run: devices that play sound get the streamed app's sound, or the whole Mac's for the Desktop.")
+                print(synthetic ? "Audio on for this run (beta): devices that play sound get a test tone with the test pattern."
+                                : "Audio on for this run (beta): devices that play sound get the streamed app's sound, or the whole Mac's for the Desktop.")
             }
             Stats.shared.startPrinting()
         } catch {

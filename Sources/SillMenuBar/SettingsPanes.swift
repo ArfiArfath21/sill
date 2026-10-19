@@ -308,13 +308,15 @@ private struct StreamingPane: View {
             } footer: {
                 Footnote("Lower latency when the Mac is busy, at a softer picture.")
             }
+            // The Mac's sound (docs/audio-plan.md §6), a beta: its switch and its footnote say so, and
+            // only this Mac turns it on (Q8).
             Section {
-                Toggle("Send audio", isOn: $settings.config.sendAudio)
+                Toggle("Send audio (beta)", isOn: $settings.config.sendAudio)
                 if settings.config.sendAudio, let problem = model.coordinator?.status.snapshot.audio?.problem {
                     Warning("Sill \(problem). The picture is unaffected.")
                 }
             } footer: {
-                Footnote("Devices play the sound of what you stream: all of the streamed window’s app, or every app for the Desktop. The Mac keeps playing it too, and each device can mute it with its Sound button. Nothing is recorded.")
+                Footnote("Beta. Devices play the sound of what you stream: all of the streamed window’s app, or every app for the Desktop. The Mac keeps playing it too, and each device can mute it with its Sound button. Only this Mac turns it on. Nothing is recorded.")
             }
             if let snapshot = model.coordinator?.status.snapshot, snapshot.softwareEncoder {
                 Section {
