@@ -40,8 +40,12 @@ package final class StreamCoordinator {
     private var prioritizeSpeed: Bool { config.prioritizeSpeed }
 
     let server: StreamServer
-    /// Wake and hold the physical display while a device is watching; released when the last
-    /// session leaves, so an idle Mac keeps its normal Energy Saver behavior.
+    /// A sleeping display gives the stream black frames (issue #134): a device's session connecting,
+    /// its picks and its input are user activity on the Mac, declared as a key press would be
+    /// (`deviceActive`). DisplayWake decides when; DisplayActivity makes the call, off the main actor.
+    /// Nothing is held: the display sleeps again by the Mac's own setting once no device uses it. A
+    /// test host (`--synthetic`, as `injector.dryRun`) only counts `disp.wakeDry`.
+    private var displayWake: DisplayWake
     private let displayActivity = DisplayActivity()
     let catalog = WindowCatalog()
     let capture = WindowCapture()
@@ -317,6 +321,7 @@ package final class StreamCoordinator {
         // executable: that narrowing is for the door and pairing hooks (TestHooks), and a gesture's
         // chord must never be posted from the test pattern.
         gesturesDry = synthetic                            // a test host never posts a gesture (§7.4)
+        displayWake = DisplayWake(testHost: synthetic)     // nor declares user activity (issue #134)
         testHotKeys = synthetic ? Self.testHotKeyTable() : nil
         menus = MenuMirror(server: server)
         let launch = UUID().uuidString
@@ -372,6 +377,8 @@ package final class StreamCoordinator {
                 }
                 // Home or away before its catalog: its settings state says which quality it sets.
                 self.routesChanged(joined: id, endpoint: "\(connection.endpoint)")
+                // A sleeping display gives black frames: the session's start wakes it, as a key would.
+                self.deviceActive(.connect, connection)
                 // Catalog first: the client's UI needs it even if the keyframe is slow to come.
                 self.catalog.thumbnailsWanted = true
                 self.sendCatalog(to: connection)
@@ -422,7 +429,6 @@ package final class StreamCoordinator {
                 guard let self else { return }
                 let wasEmpty = self.catalog.clientCount == 0
                 self.catalog.clientCount = count          // the catalog idles itself at 0
-                self.displayActivity.setStreaming(count > 0)
                 // Nobody is watching: stop capturing and encoding. The next client picks afresh.
                 if count == 0 { self.viewport = nil; self.clientFPS = [:] }   // the next device starts from scratch
                 if count == 0 { self.gestureChords.forget() }                 // and did not open a view it could close
@@ -882,6 +888,7 @@ package final class StreamCoordinator {
         switch message.kind {
         case .selectSource:
             guard let source = Wire.decode(StreamSource.self, from: message.payload) else { return }
+            if source != .none { deviceActive(.pick, connection) }   // the display shows the pick, not black
             // A window picked comes forward on the Mac, which closes a view a gesture opened; the
             // Desktop picked (as a device does before a gesture made over a window) leaves it.
             if case .window = source { gestureChords.forget() }
@@ -892,6 +899,7 @@ package final class StreamCoordinator {
             // The bar's long-press menu: the window's own traffic lights, pressed through
             // Accessibility. The staged window's element is already matched; others are looked up.
             guard let cmd = Wire.decode(WindowCommand.self, from: message.payload) else { return }
+            deviceActive(.input, connection)    // a press of the window's button, as a click on it
             gestureChords.forget()              // a window's own button: a view a gesture opened is left behind
             let done: Bool
             if virtualDisplay, let p = stage.placement, p.windowID == cmd.id {
@@ -907,6 +915,7 @@ package final class StreamCoordinator {
         case .launchApp:
             guard let req = Wire.decode(LaunchApp.self, from: message.payload),
                   let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: req.bundleID) else { return }
+            deviceActive(.pick, connection)     // its first window is picked for the device (`windowsChanged`)
             gestureChords.forget()              // the app comes forward, which closes a view a gesture opened
             pendingLaunch = req.bundleID
             let config = NSWorkspace.OpenConfiguration()
@@ -918,6 +927,9 @@ package final class StreamCoordinator {
             }
         case .input:
             guard let event = Wire.decode(InputEvent.self, from: message.payload) else { return }
+            // Input keeps the display on as local input does (at most one declaration in 5 s), and
+            // wakes it if it went to sleep meanwhile.
+            deviceActive(.input, connection)
             let device = ObjectIdentifier(connection)
             guard let rect = currentSourceRect() else {
                 // Nothing streams (between sources, or the stream stopped: the window closed under a
@@ -940,6 +952,7 @@ package final class StreamCoordinator {
             // turns into its own shortcut. At most `gesturesPerSecond` a second per connection: a
             // stroke makes one, so more is a runaway or hostile client.
             guard let gesture = Wire.decode(TrackpadGesture.self, from: message.payload) else { return }
+            deviceActive(.input, connection)    // trackpad input, sent as a gesture instead of kind 8
             let id = ObjectIdentifier(connection)
             let now = CFAbsoluteTimeGetCurrent()
             var recent = (gestureArrivals[id] ?? []).filter { now - $0 < 1 }
@@ -1035,12 +1048,25 @@ package final class StreamCoordinator {
             clipboard.received(message.payload, from: connection, who: deviceName(connection))
         case .pressMenuItem:
             guard let r = Wire.decode(PressMenuItem.self, from: message.payload) else { return }
+            deviceActive(.input, connection)    // a menu item chosen, as a click on it
             // One of the Mac's menu items chosen from a device acts as a click on it would, and may
             // bring a window forward: a view a gesture opened is left behind, as after a click.
             gestureChords.forget()
             menus.press(r, from: connection, who: deviceName(connection))
         default:
             break
+        }
+    }
+
+    /// A device's session connected, or it picked what to stream or sent input: someone is using the
+    /// Mac, as a key press on it would say (issue #134). DisplayWake decides whether this one declares
+    /// it; DisplayActivity makes the call on its own queue and says "Woke the display for …" only when
+    /// the display was asleep. A test host counts `disp.wakeDry` and touches nothing.
+    private func deviceActive(_ event: DisplayWake.Event, _ connection: NWConnection) {
+        switch displayWake.decide(event, at: CFAbsoluteTimeGetCurrent()) {
+        case .nothing: break
+        case .count: Stats.shared.bump(DisplayWake.dryKey)
+        case .declare: displayActivity.declare(for: deviceName(connection), event)
         }
     }
 
