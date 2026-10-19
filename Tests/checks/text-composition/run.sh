@@ -6,7 +6,9 @@
 # nothing; and TextInputRules: which input moves the Mac's caret, which input modes are keyboards, and
 # whose ⌃Space it is.
 #   Tests/checks/text-composition/run.sh             compile and run the check
+#   Tests/checks/text-composition/run.sh --mutants   one-line mutants of TextComposition.swift; each must fail it
 here="$(cd "$(dirname "$0")" && pwd)"
 source "$here/../common.sh"
+if [ "${1:-}" = "--mutants" ]; then run_mutants python3 "$here/mutants.py"; exit; fi
 swiftc -O iOSClient/TextComposition.swift Sources/StreamProtocol/Input.swift "$here/main.swift" -o "$out/check"
 "$out/check"
