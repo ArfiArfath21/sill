@@ -25,12 +25,24 @@ if let window {
     let started = CFAbsoluteTimeGetCurrent()
     let outcome = MainActor.assumeIsolated { WindowSizer.perform(.close, element: window) }   // main.swift's top level runs on the main thread
     let took = CFAbsoluteTimeGetCurrent() - started
-    print(String(format: "     close took %.2f s: %@", took, outcome.words))
+    print(String(format: "     close took %.2f s: %@", took, outcome.words(for: .close)))
     check(took < 1.5, "the close comes back within 1.5 s while the app holds its main thread")
     check(outcome == .noAnswer, "and says the app did not answer in time, not that it refused")
     Thread.sleep(forTimeInterval: 0.3)
     check(log().contains("windowShouldClose 'Slow Close' (sleeping 4 s)"), "the press reached the window's close")
     Thread.sleep(forTimeInterval: 4.5)     // the fixture's sleep, so it exits cleanly
 }
+// The words the host's "Window N <action>: …" line takes: only a close asks about unsaved changes.
+let noAnswer = WindowSizer.CommandOutcome.noAnswer
+check(noAnswer.words(for: .close).contains("asking about unsaved changes"), "a close with no answer may be asking about unsaved changes")
+check(!noAnswer.words(for: .minimize).contains("unsaved") && noAnswer.words(for: .minimize).contains("minimize"),
+      "a minimize with no answer says so, and nothing of unsaved changes (\(noAnswer.words(for: .minimize)))")
+check(!noAnswer.words(for: .fullScreen).contains("unsaved") && noAnswer.words(for: .fullScreen).contains("full screen"),
+      "full screen with no answer says so, and nothing of unsaved changes (\(noAnswer.words(for: .fullScreen)))")
+check(WindowSizer.CommandOutcome(.success) == .done && WindowSizer.CommandOutcome(.cannotComplete) == .noAnswer
+      && WindowSizer.CommandOutcome(.actionUnsupported) == .refused && WindowSizer.CommandOutcome(.invalidUIElement) == .refused,
+      "AX's answers: success done, cannotComplete no answer in time, anything else refused")
+check([WindowCommand.Action.close, .minimize, .fullScreen].allSatisfy { WindowSizer.CommandOutcome.done.words(for: $0) == "done"
+      && WindowSizer.CommandOutcome.refused.words(for: $0) == "refused" }, "done and refused read the same for every action")
 print(failures == 0 ? "close: all passed" : "close: \(failures) failed")
 exit(failures == 0 ? 0 : 1)

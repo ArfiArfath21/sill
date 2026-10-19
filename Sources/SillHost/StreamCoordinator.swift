@@ -907,7 +907,7 @@ package final class StreamCoordinator {
             } else {
                 outcome = .refused
             }
-            print("Window \(cmd.id) \(cmd.action.rawValue): \(outcome.words)")
+            print("Window \(cmd.id) \(cmd.action.rawValue): \(outcome.words(for: cmd.action))")
             Stats.shared.bump("win.\(cmd.action.rawValue)")
             await catalog.refreshWindows()      // show the result now, not at the next poll
         case .launchApp:

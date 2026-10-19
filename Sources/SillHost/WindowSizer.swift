@@ -149,17 +149,21 @@ final class WindowSizer {
         case done
         /// No such window or button, or the app said no.
         case refused
-        /// The app did not answer within the element's timeout (Close's button: 1 s): it is busy, or
-        /// its close asks about unsaved changes. The command may still take effect.
+        /// The app did not answer within the element's timeout (Close's button: 1 s): it is busy, or,
+        /// for a close, asking about unsaved changes in an alert of its own. The command may still take
+        /// effect.
         case noAnswer
 
         init(_ e: AXError) { self = e == .success ? .done : e == .cannotComplete ? .noAnswer : .refused }
 
-        var words: String {
-            switch self {
-            case .done: return "done"
-            case .refused: return "refused"
-            case .noAnswer: return "no answer in time (the app is busy, or asking about unsaved changes); it may still act"
+        /// The words after "Window 123 close: ". Only a close asks about unsaved changes.
+        func words(for action: WindowCommand.Action) -> String {
+            switch (self, action) {
+            case (.done, _): return "done"
+            case (.refused, _): return "refused"
+            case (.noAnswer, .close): return "no answer in time (the app is busy, or asking about unsaved changes); it may still act"
+            case (.noAnswer, .minimize): return "no answer in time (the app is busy); it may still minimize the window"
+            case (.noAnswer, .fullScreen): return "no answer in time (the app is busy); it may still take the window in or out of full screen"
             }
         }
     }
