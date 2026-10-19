@@ -14,7 +14,8 @@ import StreamProtocol
 /// hardware keyboard is attached, else with the Keyboard button), and a trackpad's or a mouse's
 /// scrolling over the picture comes here too (docs/hardware-keyboard-plan.md). It is a text input, not
 /// only a key input, so an input method's composition and dictation reach the Mac (#138,
-/// `TextComposition`).
+/// `TextComposition`), in whichever keyboards and dictation languages the person set up in iOS
+/// Settings; Scribble never writes into it, as the Pencil is the Mac's mouse here.
 final class InputOverlayView: UIView, UITextInput, UIGestureRecognizerDelegate {
     /// Pixel size of the streamed frame. Zero until the host's parameter sets arrive; input is
     /// ignored until then, since there is nothing on screen to aim at.
@@ -165,6 +166,11 @@ final class InputOverlayView: UIView, UITextInput, UIGestureRecognizerDelegate {
         // composition label says it instead, for a moment.
         NotificationCenter.default.addObserver(self, selector: #selector(inputModeChanged),
                                                name: UITextInputMode.currentInputModeDidChangeNotification, object: nil)
+
+        // Scribble writes into any editable text input, which this view is since #138, so without this
+        // the Pencil's strokes over the picture, which are the Mac's clicks and drags, could become
+        // handwriting typed on the Mac. It never starts here (`scribbleInteraction(_:shouldBeginAt:)`).
+        addInteraction(UIScribbleInteraction(delegate: self))
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -1005,6 +1011,12 @@ extension InputOverlayView {
         compositionLabel.isHidden = false
         bringSubviewToFront(compositionLabel)
     }
+}
+
+/// Scribble never writes here: the Apple Pencil is the Mac's mouse over the picture (`touchesBegan`),
+/// and its strokes are clicks and drags, never handwriting.
+extension InputOverlayView: UIScribbleInteractionDelegate {
+    func scribbleInteraction(_ interaction: UIScribbleInteraction, shouldBeginAt location: CGPoint) -> Bool { false }
 }
 
 /// A label with room around its text.
