@@ -40,11 +40,11 @@ config.directWireless = CommandLine.arguments.contains("--direct-wireless")
 // A --synthetic host shares a pasteboard of its own, never this Mac's clipboard.
 config.shareClipboard = !CommandLine.arguments.contains("--no-clipboard")
 
-// `SillHost --audio`: Send Audio for this run: every connected device that plays the Mac's sound (its
-// hello lists a codec) gets the streamed app's sound, or every app's for the Desktop, or with
-// --synthetic a test tone. Off by default, as in Sill.app: the Mac keeps playing its own sound. A
-// device can still turn it on or off; that lasts until SillHost quits. Without it the output is what
-// it always was.
+// `SillHost --audio`: Send Audio for this run, a beta (docs/audio-plan.md): every connected device that
+// plays the Mac's sound (its hello lists a codec) gets the streamed app's sound, or every app's for the
+// Desktop, or with --synthetic a test tone. Off by default, as in Sill.app: the Mac keeps playing its
+// own sound. A device cannot turn it on or off (the Mac's alone, as in Sill.app: DeviceSettings), so
+// this flag is the only switch for the run. Without it the output is what it always was.
 let audioFlag = CommandLine.arguments.contains("--audio")
 config.sendAudio = audioFlag
 

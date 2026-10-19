@@ -72,8 +72,10 @@ public struct StreamSettings: Codable, Hashable, Sendable {
     public var directWireless: Bool?
     /// Send Audio: every connected device whose hello lists a codec it plays gets the sound of what
     /// streams (kind 43, Audio.swift): the streamed window's app, or every app for the Desktop. The Mac
-    /// keeps playing it too. Off by default. Optional because it came seventh: nil is a host without
-    /// sound (the device shows no row and no Sound button, and never sends it).
+    /// keeps playing it too. Off by default, a beta, and the Mac's alone: a device sees it (its row
+    /// shows it, read-only, and its Sound button shows while it is on), and a host refuses a device's
+    /// change of it (`HostSettingsChange.sendAudio`). Optional because it came seventh: nil is a host
+    /// without sound (the device shows no row and no Sound button).
     public var sendAudio: Bool?
 
     /// `directWireless` and `sendAudio` have no default: every host must say, so the compiler finds
@@ -231,6 +233,10 @@ public struct HostSettingsChange: Codable, Hashable, Sendable {
     public var prioritizeSpeed: Bool?
     public var virtualDisplay: Bool?
     public var directWireless: Bool?
+    /// Send Audio from a device: every host refuses it, on or off, from either door, and names it in its
+    /// log (the beta's default for docs/audio-plan.md's Q8: the Mac's menu and Settings, and the CLI's
+    /// `--audio`, set it; the device's row only shows it). Kept on the wire, never reused: a later
+    /// decision may let a device set it again (PR #66's Mac viewer asked to).
     public var sendAudio: Bool?
 
     public init(token: Int? = nil, maxFPS: Int? = nil, bitrate: Int? = nil, captureScale: Double? = nil,

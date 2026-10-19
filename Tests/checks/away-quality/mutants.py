@@ -24,6 +24,14 @@ MUTANTS = [
     ("AQ17 standard shares no clipboard", H + "HostConfig.swift", "requirePairing: true, shareClipboard: true, sendAudio: false)", "requirePairing: true, shareClipboard: false, sendAudio: false)"),
     ("AQ18 the clipboard's change unnamed", H + "HostConfig.swift", '        if shareClipboard != new.shareClipboard { parts.append("share clipboard \\(onOff(shareClipboard)) → \\(onOff(new.shareClipboard))") }\n', ""),
     ("AQ19 the clipboard's switch never stored", H + "HostConfig.swift", "        self.shareClipboard = shareClipboard\n", "        self.shareClipboard = true\n"),
+    # Send Audio, the Mac's alone (docs/audio-plan.md, Q8).
+    ("AQ20 a device's Send Audio accepted", H + "DeviceSettings.swift", "var ok = HostSettingsChange(prioritizeSpeed: c.prioritizeSpeed)",
+     "var ok = HostSettingsChange(prioritizeSpeed: c.prioritizeSpeed, sendAudio: c.sendAudio)"),
+    ("AQ21 a device's Send Audio refused unnamed", H + "DeviceSettings.swift", "        if c.sendAudio != nil { refused.append(sendAudioRefusal) }\n", ""),
+    ("AQ22 only a device's Send Audio on refused", H + "DeviceSettings.swift", "if c.sendAudio != nil {", "if c.sendAudio == true {"),
+    ("AQ23 a device never sees Send Audio on", H + "DeviceSettings.swift", "directWireless: directWireless, sendAudio: sendAudio)",
+     "directWireless: directWireless, sendAudio: false)"),
+    ("AQ24 Send Audio's change unnamed", H + "HostConfig.swift", 'if sendAudio != new.sendAudio { parts.append(', 'if false { parts.append('),
 ]
 caught = 0
 for name, rel, old, new in MUTANTS:

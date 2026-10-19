@@ -16,7 +16,8 @@ import StreamProtocol
 ///
 /// Every control shows `client.settings.displayed` (the Mac's value with this device's unanswered
 /// pick over it) and sends through `client.changeSettings`, one field per control, from its action
-/// only. Errors show inline, never in alerts. After the Mac's settings come the device's own groups:
+/// only; Send Audio's switch only shows the Mac's (the Mac's alone: docs/audio-plan.md, Q8). Errors
+/// show inline, never in alerts. After the Mac's settings come the device's own groups:
 /// This iPad (or iPhone), whose switches are preferences here and send nothing to the Mac (the Mac's
 /// sound, while it sends it, `StreamClient.soundMuted`; Larger Picture, `StreamClient.largerPictureKey`,
 /// on an iPhone without a hinge whose picture it makes larger, `largerPictureOffered`; Share Clipboard,
@@ -294,20 +295,24 @@ struct HostSettingsPanel: View {
                 Footnote(text: "Applies to every device streaming from \(mac). The stream restarts for a moment.")
                 // Send Audio (docs/audio-plan.md §7.7): after the closing footer, whose "the stream restarts"
                 // is not true of it (the sound has a stream of its own), like Direct Wireless after it. No
-                // row for a Mac without sound; why no sound comes, when the Mac says, under it.
+                // row for a Mac without sound; why no sound comes, when the Mac says, under it. The Mac's
+                // alone (Q8, the beta's default): the Mac refuses a device's change, so the switch only
+                // shows it, as Direct Wireless's does from afar, and its footnote says where it is set.
                 if let send = shown.sendAudio {
                     Rows {
-                        Toggle(isOn: binding(send) { HostSettingsChange(sendAudio: $0) }) {
-                            RowTitle(title: "Send Audio", since: client.settings.pendingSince(.sendAudio))
+                        Toggle(isOn: .constant(send)) {
+                            Text("Send Audio").foregroundStyle(Palette.text)
                         }
+                        .disabled(true)
+                        .accessibilityHint("Set in Sill on \(mac).")
                         .rowFrame()
                     }
                     .id(Self.sendAudioID)
                     if send, let note = state.audioNote {
                         Footnote(text: note, warning: true)
                     }
-                    Footnote(text: send ? "Every device hears what streams; \(mac) keeps playing it too. Sound mutes it on this \(device) alone."
-                                        : "\(mac) plays the sound of what streams on every connected device, and keeps playing it too.")
+                    Footnote(text: send ? "Every connected device hears what streams; \(mac) keeps playing it too. Sound mutes it on this \(device) alone. Turn Send Audio off in Sill on \(mac)."
+                                        : "Turn on Send Audio in Sill on \(mac) to hear what streams on every connected device; \(mac) keeps playing it too.")
                 }
                 // Direct Wireless Connection: how devices reach the Mac, not how it streams; after the
                 // closing footer, whose "the stream restarts" is not true of it, and last, the least
