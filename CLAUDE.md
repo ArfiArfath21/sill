@@ -46,6 +46,26 @@ device, the CLI untouched (`--pairing` prints its code on stdout).
   `-SillSetAfter` turned it on, 0 off, 1 on, the same open window throughout; 1 from the first look
   with it saved on (the launch line logged) and with `-showPairingWindowToScreenSharing 1` (nothing
   saved).
+- The verifier's findings (2026-10-20, after fa57c2f), each fixed in a commit of its own: the
+  window's `NSWindow.SharingType` for each answer (`.none` hidden, `.readOnly` shown), which no check
+  compiled, moved from PairDeviceWindowController into `PairingWindowSharing.swift` under
+  `#if canImport(AppKit)`, and the check (AppKit imported for that enum alone, no window) asserts
+  both: 18 checks, 11 of 11 mutants (new: the two cases swapped, hidden told `.readOnly`, shown told
+  `.none`); the footnote's and README's example is the Mac's ("…or another remote desktop app, as
+  you would a Mac without a display"; it read as an app without a display); docs/remote-access-plan.md
+  §6.2, the window's spec, names the switch; docs/DEVELOPMENT.md says what the switch changes, what
+  Screen Sharing, Apple Remote Desktop and VNC viewers see, and that a screen recording or a call's
+  shared screen may show the code either way (ScreenCaptureKit is reported to ignore `.none` from
+  macOS 15). Main merged in at d1fa97e (no conflict) and at 4d990e9 (ci.yml's mutants matrix alone:
+  both sides kept, sorted). Verified again on the merge: `swift build -c release` from a clean
+  `git archive` (only the CaptureProbe warning); `pairing-sharing` 18 checks and 11 of 11 mutants;
+  `Tests/checks/run-all.sh`, all 47; the previews against main's (4d990e9), both run from one path:
+  the Devices pane's eight differ, two new, the other 132 byte for byte (`menu.txt` among them);
+  live on a test host as above (a scratch copy, its pairing window alone transparent and
+  click-through, opened by a test client's ask), `kCGWindowSharingState` sampled every 0.1 s: 0 with
+  the switch off, then 1, 0 and 1 within half a second of each `-SillSetAfter` change, one window
+  throughout, off screen after the Cancel; relaunched with it saved on, 1 from the window's first
+  look and the launch line once; with `-showPairingWindowToScreenSharing 1`, 1 and nothing saved.
 - **Untested, for Noah:** with Sill.app from this branch, through Screen Sharing from another Mac
   (or Screens, or Apple Remote Desktop) to a Mac: Pair iPhone or iPad… shows nothing remotely with
   the switch off, the window and its code with it on, and flipping it with the window open shows or

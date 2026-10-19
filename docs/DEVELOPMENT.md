@@ -834,7 +834,8 @@ on a phone held upright, who moves the Mac's pointer, the Mac's menus on both
 ends, which three-finger strokes are gestures and what the Mac does with one,
 which modifiers a device's keys leave set on the Mac,
 the first-run tour, pairing at home (the doors, the cable, the device's rows),
-which keychain Sill.app keeps its identity in, the away quality and the link's
+whether screen sharing shows the pairing window, which keychain Sill.app keeps
+its identity in, the away quality and the link's
 judgement, the iPhone Duo's layouts, what of the clipboard goes between the Mac
 and a device, and which type encodings the virtual display's private API may
 report) on their own with a check each, and
