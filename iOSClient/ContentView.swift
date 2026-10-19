@@ -1089,6 +1089,8 @@ struct ConnectScreen: View {
                 .accessibilityAddTraits(carded ? .isHeader : [])
                 .accessibilityFocused($titleFocused)
                 .frame(maxWidth: .infinity, alignment: .leading)
+                // The switch between rows and tiles: a 44 pt target over the title's line, which it
+                // overhangs above and below (an overlay, so the column is laid out as before it).
                 .overlay(alignment: .trailing) {
                     if !carded, client.pendingLink == nil, style == .tiles || client.macs.contains(where: { $0.macID != nil }) {
                         Button {
@@ -1097,11 +1099,10 @@ struct ConnectScreen: View {
                             Image(systemName: style == .tiles ? "list.bullet" : "square.grid.2x2")
                                 .font(.system(size: 15, weight: .medium))
                                 .foregroundStyle(Palette.accent)
-                                .frame(width: 36, height: 36)
+                                .frame(width: 44, height: 44)
                                 .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
-                        .padding(.trailing, 4)
                         .accessibilityLabel(style == .tiles ? "Show as list" : "Show as tiles")
                     }
                 }
@@ -1321,20 +1322,24 @@ struct ConnectScreen: View {
         let preview = mac.macID.flatMap { client.macPreviews[$0] }
         return Button(action: { client.connect(to: mac) }) {
             VStack(alignment: .leading, spacing: 0) {
-                ZStack {
-                    Rectangle().fill(Palette.iconFallback.opacity(0.35))
-                    if let preview {
-                        Image(uiImage: preview)
-                            .resizable()
-                            .scaledToFill()
-                    } else {
-                        Image(systemName: "desktopcomputer")
-                            .font(.system(size: 24))
-                            .foregroundStyle(.white.opacity(0.85))
+                // The band sets the size; the picture fills it as an overlay, which never sizes the
+                // tile, and is clipped to it. In the band's place, a picture wider than its cell (a
+                // 16:9 or 2.39:1 screen) made the tile wider than its column.
+                Rectangle()
+                    .fill(Palette.iconFallback.opacity(0.35))
+                    .frame(height: 92)
+                    .overlay {
+                        if let preview {
+                            Image(uiImage: preview)
+                                .resizable()
+                                .scaledToFill()
+                        } else {
+                            Image(systemName: "desktopcomputer")
+                                .font(.system(size: 24))
+                                .foregroundStyle(.white.opacity(0.85))
+                        }
                     }
-                }
-                .frame(height: 92)
-                .clipped()
+                    .clipped()
                 VStack(alignment: .leading, spacing: 2) {
                     Text(mac.name)
                         .font(.system(size: 14, weight: .medium))

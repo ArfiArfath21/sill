@@ -682,8 +682,19 @@ enum MockCatalog {
             if client.macGroups.isEmpty {
                 client.macGroups = ["HOMEPAIRING8": "Home", "HOMEPAIRING6": "Home", "A3C5HR4RBV67YR21": "Work"]
             }
-            client.macPreviews = ["HOMEPAIRING8": thumbnail(seed: 0), "HOMEPAIRING6": thumbnail(seed: 1),
-                                  "A3C5HR4RBV67YR21": thumbnail(seed: 2)]
+            // `-SillVideoSize WxH`: the pictures at that shape (a 16:9 Desktop, a 2.39:1 ultrawide one), each
+            // 320 pt wide as a session's end keeps it, so a photo shows a tile keeping to its cell.
+            var size = CGSize(width: 208, height: 132)
+            if let raw = UserDefaults.standard.string(forKey: "SillVideoSize") {
+                let parts = raw.lowercased().split(separator: "x").compactMap { Double($0) }
+                if parts.count == 2, parts[0] > 0, parts[1] > 0 {
+                    size = CGSize(width: 320, height: (320 * parts[1] / parts[0]).rounded())
+                } else {
+                    print("-SillVideoSize \(raw): not WxH")
+                }
+            }
+            client.macPreviews = ["HOMEPAIRING8": thumbnail(seed: 0, size: size), "HOMEPAIRING6": thumbnail(seed: 1, size: size),
+                                  "A3C5HR4RBV67YR21": thumbnail(seed: 2, size: size)]
         }
         return client
     }
@@ -741,11 +752,10 @@ enum MockCatalog {
         }
     }
 
-    /// 208×132 window portrait: a dark body under a 9 pt title strip, with a few grey bars so it
-    /// reads as a tiny window rather than a blank rectangle.
-    private static func thumbnail(seed: Int) -> UIImage {
-        let size = CGSize(width: 208, height: 132)
-        return UIGraphicsImageRenderer(size: size).image { _ in
+    /// 208×132 window portrait (or `size`): a dark body under a 9 pt title strip, with a few grey bars
+    /// so it reads as a tiny window rather than a blank rectangle.
+    private static func thumbnail(seed: Int, size: CGSize = CGSize(width: 208, height: 132)) -> UIImage {
+        UIGraphicsImageRenderer(size: size).image { _ in
             colour(0x26282D).setFill()
             UIBezierPath(rect: CGRect(origin: .zero, size: size)).fill()
 
