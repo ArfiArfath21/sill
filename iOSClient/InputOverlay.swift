@@ -179,6 +179,15 @@ final class InputOverlayView: UIView, UITextInput, UIGestureRecognizerDelegate {
 
     required init?(coder: NSCoder) { fatalError() }
 
+    /// Not an element for VoiceOver, as it was not before it became a text input (#138): to an assistive
+    /// technology a text input reads as an unlabeled text field ("is editing") over the whole picture,
+    /// the stream screen's first element (the simulator's accessibility tree, 2026-10-20). What an input
+    /// method composes shows in a label of its own, an element while it shows.
+    override var isAccessibilityElement: Bool {
+        get { false }
+        set {}
+    }
+
     /// A composition on show keeps to the top middle of the picture when this view changes size.
     override func layoutSubviews() {
         super.layoutSubviews()

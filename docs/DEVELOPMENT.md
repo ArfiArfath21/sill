@@ -526,7 +526,9 @@ characters typed with nothing in between, all but the last 1,000 are forgotten.
 Scribble never writes over the picture (the Apple Pencil is the Mac's mouse
 there), and Writing Tools, math results and grammar suggestions are off in the
 input view, as autocorrection and predictions are: each would rewrite text the
-Mac already has.
+Mac already has. To VoiceOver the input view is still no element, as before it
+was a text input (it would read as an unlabeled text field over the picture,
+first on the screen); what an input method composes is a label it can read.
 
 `iOSClient/TextComposition.swift` is the rule, checked in
 `Tests/checks/text-composition`. Debug builds print `hwkey: usage 44 down via
