@@ -49,10 +49,17 @@ test is Noah's.
   the device's own Desktop requests and re-centre no longer wake the display; which kinds count moved
   from the coordinator's switch into the rule, checked; the woke line only once the display reads on,
   never twice for one wake; the Untested list below.
-- Verified: `swift build -c release`, only the CaptureProbe warning (the real call never ran here); the
-  check and its mutants; `run-all.sh`; a loopback synthetic host on the software encoder with two
-  `sillclient.py` devices: `disp.wakeDry` at each connect and a tap, none for a Desktop pick or a move
-  right after the host's own restart (the PR's description has the run); previews identical to main's.
+- Verified (2026-10-20, merged with main at 9a8e30c): `swift build -c release`, no new warning (the
+  real call never ran here); the check and its 60 mutants; `run-all.sh`, all 46; a loopback synthetic
+  host on the software encoder with two stand-in devices (a scratch client that, as
+  `pointerFrameChanged` does, moves its own pointer to the middle as a restarted stream's parameter
+  sets arrive; the software encoder's test pattern never changes size, so a restart stood in for a
+  new size): `disp.wakeDry` at both connects (1.3 s apart), a tap, a move 8 s after a restart and a
+  gesture; none for the Desktop asked for by itself (twice, each restarting the stream), the
+  stand-in's own move as the restarted stream's parameter sets arrived (6 s after the last
+  declaration), the other device's tap 1.3 s after the first's, a key 2 s after a move, or a pick of
+  nothing; no `disp.wake`, no line, `pmset -g assertions` nothing of the host's; Sill.app's previews
+  (140 files) identical to main's, rendered from one path.
 - **Untested, for Noah,** with Sill.app from this branch (release-signed with the embedded profile):
   `pmset displaysleepnow`, then connect the iPad at home and through Tailscale: the picture, not black
   windows, and Sill.log's "Woke the display for …, which connected."; `pmset -g assertions` lists
