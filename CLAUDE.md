@@ -5373,7 +5373,8 @@ good.
   the keyboard, carrying out `HardwareKeyboardPolicy`; `HardwareKeyboardMonitor`,
   GameController's keyboard), `TextComposition` (what the input view holds for
   iPadOS's text system: the composition, what was typed since the Mac's caret
-  last moved, corrections as backspaces and text; `TextInputRules`, which input
+  last moved, corrections as backspaces and text, none from a range taken before
+  a forget or a trim (`generation`); `TextInputRules`, which input
   moves the Mac's caret and whose ⌃Space it is; pure,
   `Tests/checks/text-composition`; pbxproj AC0138/FC0138), `HardwareKeyboardPolicy` (when the stream's input
   view holds the keyboard for a hardware keyboard and when it is the person's

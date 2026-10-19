@@ -70,6 +70,13 @@ MUTANTS = [
     ("T42 the keyboards asked for at every key", "        guard usage == space, modifiers & (shift | control | option | command) == control else { return false }\n        return Set(languages().filter(isKeyboard)).count >= 2",
      "        let asked = Set(languages().filter(isKeyboard))\n        guard usage == space, modifiers & (shift | control | option | command) == control else { return false }\n        return asked.count >= 2"),
     ("T41 caps lock makes ⌃Space the Mac's", "modifiers & (shift | control | option | command) == control", "modifiers == control"),
+    # The document a correction's range was taken in
+    ("T43 a forget keeps the document (a correction taken before it lands in what was typed since)",
+     "        sent = \"\"\n        generation += 1\n", "        sent = \"\"\n"),
+    ("T44 a trim keeps the document", "        sent = String(sent.suffix(Self.keep))\n        generation += 1\n",
+     "        sent = String(sent.suffix(Self.keep))\n"),
+    ("T45 the document a correction was taken in ignored", "        if let taken, taken != generation { return [] }\n", ""),
+    ("T46 every edit starts a new document", "        sent = new\n        return out\n", "        sent = new\n        generation += 1\n        return out\n"),
 ]
 caught = 0
 for name, old, new in MUTANTS:

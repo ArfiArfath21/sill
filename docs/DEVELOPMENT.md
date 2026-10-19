@@ -512,7 +512,10 @@ anything that may move the caret: a click or a key from any part of Sill (the
 picture, the portrait trackpad, the key row, a hardware keyboard, Esc), another
 window or the Desktop picked by anyone, an app opened, a window's buttons, a
 menu item, a three-finger gesture. A correction of what was forgotten sends
-nothing, rather than typing its words a second time where the caret is now.
+nothing, rather than typing its words a second time where the caret is now
+(dictation's last touch to a phrase, its punctuation or capitals, arriving just
+after a click, say), whether the text system hands back the range it took
+before the forget or builds it again from offsets it kept.
 Typing on the Mac itself, and another device's input, Sill does not see: a
 correction made right after either can land in the wrong place. Past 4,000
 characters typed with nothing in between, all but the last 1,000 are forgotten.

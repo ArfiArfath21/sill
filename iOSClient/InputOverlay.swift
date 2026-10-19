@@ -955,55 +955,60 @@ final class InputOverlayView: UIView, UITextInput, UIGestureRecognizerDelegate {
 /// picture and sent once chosen, and dictation's text and corrections. The caret is always at the end;
 /// the Mac's own caret is wherever it is there.
 extension InputOverlayView {
+    /// An offset into the document, and the document it was taken in (`TextComposition.generation`):
+    /// one taken before a forget or a trim is stale, whatever its offset.
     final class Position: UITextPosition {
         let offset: Int
-        init(_ offset: Int) { self.offset = offset }
+        let generation: Int
+        init(_ offset: Int, _ generation: Int) { self.offset = offset; self.generation = generation }
     }
 
     final class Range: UITextRange {
         let range: NSRange
-        init(_ range: NSRange) { self.range = range }
-        override var start: UITextPosition { Position(range.location) }
-        override var end: UITextPosition { Position(range.location + range.length) }
+        let generation: Int
+        init(_ range: NSRange, _ generation: Int) { self.range = range; self.generation = generation }
+        override var start: UITextPosition { Position(range.location, generation) }
+        override var end: UITextPosition { Position(range.location + range.length, generation) }
         override var isEmpty: Bool { range.length == 0 }
     }
 
-    /// The offsets `range` spans, lower first, as the text system holds them: past the document's end
-    /// when it took them before what was typed was forgotten (`forgetTyped`), which
-    /// `TextComposition.replace` judges.
-    private func offsets(_ range: UITextRange) -> NSRange? {
+    /// The offsets `range` spans, lower first, as the text system holds them, and the oldest document
+    /// either end was taken in: an older one than now when it took them before what was typed was
+    /// forgotten (`forgetTyped`) or trimmed, which `TextComposition.replace` judges.
+    private func offsets(_ range: UITextRange) -> (range: NSRange, generation: Int)? {
         guard let start = range.start as? Position, let end = range.end as? Position else { return nil }
         let lower = max(min(start.offset, end.offset), 0), upper = max(start.offset, end.offset, 0)
-        return NSRange(location: lower, length: upper - lower)
+        return (NSRange(location: lower, length: upper - lower), min(start.generation, end.generation))
     }
 
     func text(in range: UITextRange) -> String? {
-        guard let range = offsets(range) else { return nil }
+        guard let range = offsets(range)?.range else { return nil }
         let length = composition.length
         let lower = min(range.location, length), upper = min(range.location + range.length, length)
         return (composition.document as NSString).substring(with: NSRange(location: lower, length: upper - lower))
     }
 
     func replace(_ range: UITextRange, withText text: String) {
-        guard let range = offsets(range) else { return }
-        Self.textinput("replace (\(range.location),\(range.length)) with \(text.debugDescription)")
+        guard let (range, taken) = offsets(range) else { return }
+        Self.textinput("replace (\(range.location),\(range.length)) with \(text.debugDescription)"
+                       + (taken == composition.generation ? "" : ", a range taken before a forget: nothing sent"))
         setOwnPointer(nil, .none)
-        typed(composition.replace(range, with: text))
+        typed(composition.replace(range, with: text, taken: taken))
     }
 
     var selectedTextRange: UITextRange? {
-        get { Range(composition.selectedRange) }
+        get { Range(composition.selectedRange, composition.generation) }
         set {
             // The caret stays at the end: the Mac's caret cannot be moved from here.
             #if DEBUG
-            if let asked = newValue.flatMap(offsets), asked != composition.selectedRange {
+            if let asked = newValue.flatMap(offsets)?.range, asked != composition.selectedRange {
                 Self.textinput("selectedTextRange (\(asked.location),\(asked.length)) asked for, not taken: the caret stays at the end")
             }
             #endif
         }
     }
 
-    var markedTextRange: UITextRange? { composition.markedRange.map(Range.init) }
+    var markedTextRange: UITextRange? { composition.markedRange.map { Range($0, composition.generation) } }
 
     func setMarkedText(_ markedText: String?, selectedRange: NSRange) {
         Self.textinput("setMarkedText \(markedText?.debugDescription ?? "nil") (\(selectedRange.location),\(selectedRange.length))")
@@ -1017,18 +1022,19 @@ extension InputOverlayView {
         typed(composition.unmark())
     }
 
-    var beginningOfDocument: UITextPosition { Position(0) }
-    var endOfDocument: UITextPosition { Position(composition.length) }
+    var beginningOfDocument: UITextPosition { Position(0, composition.generation) }
+    var endOfDocument: UITextPosition { Position(composition.length, composition.generation) }
 
     func textRange(from fromPosition: UITextPosition, to toPosition: UITextPosition) -> UITextRange? {
         guard let from = fromPosition as? Position, let to = toPosition as? Position else { return nil }
-        return Range(NSRange(location: min(from.offset, to.offset), length: abs(to.offset - from.offset)))
+        return Range(NSRange(location: min(from.offset, to.offset), length: abs(to.offset - from.offset)),
+                     min(from.generation, to.generation))
     }
 
     func position(from position: UITextPosition, offset: Int) -> UITextPosition? {
         guard let position = position as? Position else { return nil }
         let new = position.offset + offset
-        return (0...composition.length).contains(new) ? Position(new) : nil
+        return (0...composition.length).contains(new) ? Position(new, position.generation) : nil
     }
 
     func position(from position: UITextPosition, in direction: UITextLayoutDirection, offset: Int) -> UITextPosition? {

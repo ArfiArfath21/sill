@@ -33,6 +33,10 @@ struct TextComposition: Equatable {
     private(set) var marked: String?
     /// The selection inside the marked text, relative to its start (UTF-16).
     private(set) var markedSelection = NSRange(location: 0, length: 0)
+    /// Which document the text system's positions were taken in: each forget (`reset`) and each trim
+    /// starts a new one, as every offset moves then. A correction whose range was taken in an older one
+    /// is stale wherever its offsets fall now (`replace`).
+    private(set) var generation = 0
 
     /// Past this many characters, the tail is due a trim (`wantsTrim`): only a long stretch of typing or
     /// dictation with no click, key or pick in it gets there.
@@ -89,11 +93,14 @@ struct TextComposition: Equatable {
 
     /// `range` of the document replaced with `text` (dictation's corrections, an input method's own
     /// edits): any composition ends, and the Mac is brought to the new document by deleting back to
-    /// where the old and new first differ and typing the rest. A range that starts past the document's
-    /// end was taken before this side forgot what it held (`reset`: the Mac's caret moved since), so the
-    /// text it means is no longer just before the caret there: nothing is sent, rather than its
-    /// replacement typed a second time at the caret.
-    mutating func replace(_ range: NSRange, with text: String) -> [Output] {
+    /// where the old and new first differ and typing the rest. A range taken before this side forgot or
+    /// trimmed what it held (`taken`, its positions' `generation`, older than the document's; or one the
+    /// text system built again from offsets it kept, which then starts past the document's end) no
+    /// longer points at the text it means: the Mac's caret moved since, or every offset did. Nothing is
+    /// sent, rather than its replacement typed a second time at the caret (dictation's last correction
+    /// of a phrase, its punctuation or capitals, coming after a click).
+    mutating func replace(_ range: NSRange, with text: String, taken: Int? = nil) -> [Output] {
+        if let taken, taken != generation { return [] }
         let utf16 = Array(document.utf16)
         guard range.location <= utf16.count else { return [] }
         let start = max(range.location, 0)
@@ -104,19 +111,21 @@ struct TextComposition: Equatable {
     }
 
     /// The Mac's caret moved some other way (a click, an arrow, a shortcut, a pick): what was sent is
-    /// forgotten; a composition carries on.
+    /// forgotten; a composition carries on. Every position the text system holds is stale.
     mutating func reset() {
         sent = ""
+        generation += 1
     }
 
     /// The tail is past `limit` and nothing is being composed: the input view trims it at its next turn.
     var wantsTrim: Bool { marked == nil && sent.count > Self.limit }
 
     /// The tail's last `keep` characters are kept, when it wants a trim. Every offset moves: the input
-    /// view tells the text system, as for a `reset`.
+    /// view tells the text system, as for a `reset`, and every position it holds is stale.
     mutating func trim() {
         guard wantsTrim else { return }
         sent = String(sent.suffix(Self.keep))
+        generation += 1
     }
 
     /// The document becomes `new`, all of it sent: backspaces over what differs, then the rest.

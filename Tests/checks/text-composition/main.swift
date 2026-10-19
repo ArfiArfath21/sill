@@ -2,9 +2,9 @@
 // the device until it is committed, and every edit the text system makes reaches the Mac as backspaces
 // and text that leave the Mac's text equal to the document (#138). What was typed is kept whole while
 // the text system may revise it (a long dictation's corrections land where they were made), trimmed only
-// past its limit, and a correction whose range was taken before a forget sends nothing. Then
-// TextInputRules: which input moves the Mac's caret, which input modes are keyboards, and whose ⌃Space
-// it is. Scenario by scenario, then 20,000 seeded random edit sequences against a model of the Mac's
+// past its limit, and a correction whose range was taken before a forget or a trim sends nothing,
+// wherever its offsets fall now. Then TextInputRules: which input moves the Mac's caret, which input
+// modes are keyboards, and whose ⌃Space it is. Scenario by scenario, then 20,000 seeded random edit sequences against a model of the Mac's
 // text field.
 //   swiftc -O iOSClient/TextComposition.swift Sources/StreamProtocol/Input.swift \
 //       Tests/checks/text-composition/main.swift -o check && ./check
@@ -171,21 +171,50 @@ do {   // a correction taken before a forget: nothing goes to the Mac
           overhanging == [.backspaces(1), .text("Z")] && c.sent == "xZ" && mac == "earlier text I sea itxZ")
 }
 
+do {   // dictation's last correction of a phrase (its punctuation and capitals) comes after a click: its
+       // range was taken before the forget and reaches into what was typed since
+    var c = C()
+    var mac = "earlier "
+    apply(c.insert("hello"), to: &mac)
+    let taken = c.generation
+    let phrase = NSRange(location: 0, length: 5)       // "hello", as the text system holds it
+    c.reset()                                          // a click on the Mac
+    check("a forget starts a new document", c.generation == taken + 1)
+    apply(c.insert("x"), to: &mac)                     // typed where the caret is now
+    check("typing keeps the document", c.generation == taken + 1)
+    let out = c.replace(phrase, with: "Hello.", taken: taken)
+    check("a correction taken before a forget sends nothing, even where what was typed since reaches",
+          out == [] && mac == "earlier hellox" && c.sent == "x")
+    let now = c.replace(NSRange(location: 0, length: 1), with: "y", taken: c.generation)
+    apply(now, to: &mac)
+    check("…and one taken since goes", now == [.backspaces(1), .text("y")] && mac == "earlier helloy")
+    c.setMarked("ㄋ", selected: NSRange(location: 1, length: 0))
+    let marked = c.generation
+    c.reset()
+    check("a forget while composing also starts a new document", c.generation == marked + 1 && c.marked == "ㄋ")
+    check("…and a correction of the composition taken before it sends nothing",
+          c.replace(NSRange(location: 1, length: 1), with: "你", taken: marked) == [] && c.marked == "ㄋ")
+}
+
 do {   // the tail: kept whole to its limit, trimmed past it, never while composing
     var c = C()
     _ = c.insert(String(repeating: "字", count: C.limit))
     check("a tail of exactly the limit wants no trim", !c.wantsTrim && c.sent.count == C.limit)
     c.trim()
-    check("…and a trim then keeps it all", c.sent.count == C.limit)
+    check("…and a trim then keeps it all, and the document", c.sent.count == C.limit && c.generation == 0)
     _ = c.insert("x")
     check("one character past the limit wants a trim", c.wantsTrim)
     c.setMarked("ㄅ", selected: NSRange(location: 1, length: 0))
     check("no trim while an input method composes", !c.wantsTrim)
     c.trim()
-    check("…and a trim then does nothing", c.sent.count == C.limit + 1 && c.marked == "ㄅ")
+    check("…and a trim then does nothing", c.sent.count == C.limit + 1 && c.marked == "ㄅ" && c.generation == 0)
     c.setMarked(nil, selected: NSRange(location: 0, length: 0))
+    let lastCharacter = NSRange(location: c.length - 1, length: 1)
     c.trim()
     check("a trim keeps the last characters", c.sent.count == C.keep && c.sent.hasSuffix("字x") && !c.wantsTrim)
+    check("…and starts a new document", c.generation == 1)
+    check("…so a correction taken before it sends nothing",
+          c.replace(lastCharacter, with: "y", taken: 0) == [] && c.sent.hasSuffix("字x"))
     check("the limits as documented", C.limit == 4_000 && C.keep == 1_000)
 }
 
@@ -261,21 +290,24 @@ var generator = Seeded(state: 0x5111_0138)
 
 /// `runs` sequences of 12 edits each from `alphabet`, with forgets, stale corrections and trims among
 /// them when `forgets`, against a model of the Mac's text field: it always ends with what is
-/// remembered, and is exactly that while nothing was forgotten. The first failure is printed; the
-/// number of failed runs, and of stale corrections tried, are returned.
-func randomRuns(_ runs: Int, alphabet: [String], forgets: Bool) -> (fails: Int, stale: Int) {
+/// remembered, and is exactly that while nothing was forgotten; a new document (`generation`) comes
+/// with a forget or a trim, and only then. The first failure is printed; the number of failed runs, and
+/// of stale corrections tried (past the end, and taken in a document since forgotten), are returned.
+func randomRuns(_ runs: Int, alphabet: [String], forgets: Bool) -> (fails: Int, stale: Int, taken: Int) {
     func word() -> String { (0..<Int.random(in: 1...3, using: &generator)).map { _ in alphabet.randomElement(using: &generator)! }.joined() }
-    var failed = 0, staleTried = 0
+    var failed = 0, staleTried = 0, takenTried = 0
     var firstFailure: String?
     for run in 0..<runs {
         var c = C()
         var mac = ""
         var everReset = false
         var stale: NSRange?
+        var taken: (range: NSRange, generation: Int)?
         for step in 0..<12 {
             let before = c
             var why: String?
-            switch Int.random(in: 0..<(forgets ? 9 : 5), using: &generator) {
+            let op = Int.random(in: 0..<(forgets ? 10 : 5), using: &generator)
+            switch op {
             case 0: apply(c.insert(word()), to: &mac)
             case 1:
                 let w = word()
@@ -290,7 +322,8 @@ func randomRuns(_ runs: Int, alphabet: [String], forgets: Bool) -> (fails: Int, 
                 let b = Int.random(in: a...chars.count, using: &generator)
                 let range = utf16Range(c.document, characters: a..<b)
                 if c.length > 0, stale == nil { stale = NSRange(location: c.length + 1, length: Int.random(in: 0...3, using: &generator)) }
-                apply(c.replace(range, with: word()), to: &mac)
+                if taken == nil { taken = (range, c.generation) }
+                apply(c.replace(range, with: word(), taken: c.generation), to: &mac)
             case 5:
                 c.reset()
                 everReset = true
@@ -303,7 +336,18 @@ func randomRuns(_ runs: Int, alphabet: [String], forgets: Bool) -> (fails: Int, 
             case 7:
                 c.trim()
                 everReset = everReset || c.sent != before.sent
+            case 8:
+                // A correction whose range the text system took in a document since forgotten, wherever
+                // its offsets fall now (inside what was typed since, too).
+                guard let (range, generation) = taken, generation != c.generation else { break }
+                takenTried += 1
+                let out = c.replace(range, with: word(), taken: generation)
+                if out != [] || c != before { why = "a correction taken before a forget changed something" }
             default: break
+            }
+            let newDocument = op == 5 || (op == 7 && before.wantsTrim)
+            if why == nil, c.generation != before.generation + (newDocument ? 1 : 0) {
+                why = "the document's generation moved without a forget or a trim, or stayed through one"
             }
             if why == nil, c.length != c.document.utf16.count { why = "the length is not the document's" }
             if why == nil, !mac.hasSuffix(c.sent) { why = "the Mac's text does not end with what is remembered" }
@@ -317,7 +361,7 @@ func randomRuns(_ runs: Int, alphabet: [String], forgets: Bool) -> (fails: Int, 
         }
     }
     if let firstFailure { print("     \(firstFailure)") }
-    return (failed, staleTried)
+    return (failed, staleTried, takenTried)
 }
 
 // Forgets among the edits. No lone combining mark here: one typed right after a forget joins a
@@ -325,7 +369,8 @@ func randomRuns(_ runs: Int, alphabet: [String], forgets: Bool) -> (fails: Int, 
 let forgetful = randomRuns(20_000, alphabet: ["a", "b", "你", "好", "ㄋ", "ˇ", "👍🏽", "é", "e", " ", "\n"], forgets: true)
 check("20,000 seeded random sequences: the Mac's text always ends with what is remembered, and is it while nothing was forgotten",
       forgetful.fails == 0)
-check("…stale corrections among them (\(forgetful.stale)), none of which sent anything", forgetful.stale > 1_000)
+check("…stale corrections among them (\(forgetful.stale) past the end, \(forgetful.taken) taken before a forget), none of which sent anything",
+      forgetful.stale > 1_000 && forgetful.taken > 1_000)
 // No forget: a combining mark that joins the character before it is retyped with it.
 let joining = randomRuns(5_000, alphabet: ["a", "e", "\u{301}", "👍", "\u{1F3FD}", "ㄋ", "ˇ", " "], forgets: false)
 check("5,000 seeded random sequences with combining marks and skin tones: the Mac's text is what was sent", joining.fails == 0)
