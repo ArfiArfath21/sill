@@ -1,6 +1,6 @@
-// ConnectionList (iOSClient): the connect screen's list vs. tiles style, per-Mac groups and sections,
-// preview JPEG filenames and pruning, and tile column count. Compiled with
-// iOSClient/ConnectionList.swift alone (run.sh).
+// ConnectionList (iOSClient): the connect screen's list vs. tiles style, when a session's end keeps a
+// picture for a tile, per-Mac groups and sections, preview JPEG filenames and pruning, and tile column
+// count. Compiled with iOSClient/ConnectionList.swift alone (run.sh).
 import Foundation
 import CoreGraphics
 
@@ -15,6 +15,18 @@ typealias C = ConnectionList
 check(C.storedStyle(nil) == .list && C.storedStyle("") == .list && C.storedStyle("grid") == .list, "default style is list")
 check(C.storedStyle("list") == .list && C.storedStyle("tiles") == .tiles, "stored style round-trips")
 check(C.Style.list.toggled == .tiles && C.Style.tiles.toggled == .list, "toggling flips between list and tiles")
+
+// A picture at a session's end: only with tiles, from a window in front, for a saved Mac. Every
+// combination, so dropping any one condition (or joining them with "or") fails.
+for style in C.Style.allCases {
+    for sceneActive in [false, true] {
+        for saved in [false, true] {
+            let want = style == .tiles && sceneActive && saved
+            check(C.takesPreview(style: style, sceneActive: sceneActive, saved: saved) == want,
+                  "picture kept: \(style), window in front \(sceneActive), saved \(saved) → \(want)")
+        }
+    }
+}
 
 // Group cleaning and JSON persistence.
 check(C.cleanGroup(nil) == nil && C.cleanGroup("   \n\t ") == nil, "blank group is nil")

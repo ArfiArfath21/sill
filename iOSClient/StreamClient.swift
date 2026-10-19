@@ -3124,11 +3124,25 @@ final class StreamClient: ObservableObject {
         sessionHost = nil
         refusedListing = nil
         resetHomeMove()
-        // Off screen (in the background) the snapshot is blank and would replace a good picture.
-        if connected, videoSize != .zero, UIApplication.shared.applicationState == .active,
-           let macID = session?.macID, savedMac(macID) != nil,
-           let preview = displayView.snapshot(maxWidth: 320, includePointer: false) {
-            savePreview(preview, for: macID)
+        // A saved Mac's tile shows its screen as the last session ended, kept only while tiles are on and
+        // only from this session's own window in front (ConnectionList.takesPreview): the window's
+        // scene, not the app, since one of two Sill windows can be behind while the app is active, and
+        // a window behind draws nothing. The snapshot is nil while the picture is black or interrupted.
+        if connected, videoSize != .zero, let macID = session?.macID {
+            let inFront = displayView.window?.windowScene?.activationState == .foregroundActive
+            if ConnectionList.takesPreview(style: connectionStyle, sceneActive: inFront, saved: savedMac(macID) != nil) {
+                if let preview = displayView.snapshot(maxWidth: 320, includePointer: false) {
+                    savePreview(preview, for: macID)
+                } else {
+                    #if DEBUG
+                    print("tiles: no picture of \(macID) kept: the layer had none to give (black or interrupted)")
+                    #endif
+                }
+            } else {
+                #if DEBUG
+                print("tiles: no picture of \(macID) kept: \(connectionStyle), window in front \(inFront), saved \(savedMac(macID) != nil)")
+                #endif
+            }
         }
         queue.async { self.lastParameterSets = nil; self.pendingMove = nil; self.stopMeasuring() }
         firstListDeadline?.cancel()

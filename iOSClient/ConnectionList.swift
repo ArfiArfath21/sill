@@ -16,9 +16,18 @@ enum ConnectionList {
     static let maxGroupLength = 32
     static let twoColumnMinWidth: CGFloat = 340
 
-    /// The stored style; `.list` for nil or any unknown value, so existing installs keep rows.
+    /// The stored style; `.list` for nil or any unknown value, so existing installs keep rows (tiles are
+    /// a choice, never the default: Noah on issue #116).
     static func storedStyle(_ raw: String?) -> Style {
         raw == Style.tiles.rawValue ? .tiles : .list
+    }
+
+    /// Whether a session's end keeps a picture of the Mac's screen for its tile. Only while tiles are
+    /// on: the list shows no pictures and keeps none (turning tiles off deletes them). Only from a
+    /// window in front: one in the background, or the other of two Sill windows, draws nothing, and a
+    /// black picture would replace a good one. Only for a saved Mac: only its tile shows a picture.
+    static func takesPreview(style: Style, sceneActive: Bool, saved: Bool) -> Bool {
+        style == .tiles && sceneActive && saved
     }
 
     /// Cleans a group name: collapses whitespace/newlines, caps at `maxGroupLength`, nil when blank.

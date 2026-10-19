@@ -194,7 +194,7 @@ extension StreamClient {
         status = "Forgot \(name). It still lists this \(Self.deviceWord) until you remove it in Sill’s Settings on the Mac."
     }
 
-    // MARK: Connection groups and preview pictures
+    // MARK: Connection groups and preview pictures (ConnectionList)
 
     func setGroup(_ group: String?, for macID: String) {
         let next = ConnectionList.settingGroup(group, for: macID, in: macGroups)
@@ -205,12 +205,23 @@ extension StreamClient {
         }
     }
 
+    /// The connect screen's arrangement as stored (`Sill.connectionStyle`, which ConnectScreen's switch
+    /// and a saved Mac's menu set): pictures are kept only with tiles (ConnectionList.takesPreview).
+    var connectionStyle: ConnectionList.Style {
+        ConnectionList.storedStyle(UserDefaults.standard.string(forKey: ConnectionList.styleKey))
+    }
+
+    /// Caches: never in a backup, and iOS may empty it, which costs a tile its picture until the next
+    /// session ends.
     private static var previewsDirectory: URL? {
         FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first?
             .appendingPathComponent("SillPreviews", isDirectory: true)
     }
 
+    /// At launch: each saved Mac's picture while tiles are on. With the list there are none to show, and
+    /// none may stay: any left behind go.
     func loadSavedPreviews() {
+        guard connectionStyle == .tiles else { removeAllPreviews(); return }
         guard let dir = Self.previewsDirectory else { return }
         var loaded: [String: UIImage] = [:]
         for mac in savedMacs {
@@ -223,13 +234,22 @@ extension StreamClient {
         pruneSavedPreviews()
     }
 
+    /// A session's end with tiles on (`tearDown`). The file has complete protection: unreadable while
+    /// the device is locked. Sill reads it only at launch and writes it only from a window in front, so
+    /// both happen while the device is unlocked.
     func savePreview(_ image: UIImage, for macID: String) {
         guard let name = ConnectionList.previewFileName(for: macID) else { return }
         macPreviews[macID] = image
         guard !savedMacsSeeded, let dir = Self.previewsDirectory,
               let data = image.jpegData(compressionQuality: 0.72) else { return }
-        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        try? data.write(to: dir.appendingPathComponent(name), options: .atomic)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true,
+                                                 attributes: [.protectionKey: FileProtectionType.complete])
+        let file = dir.appendingPathComponent(name)
+        try? data.write(to: file, options: [.atomic, .completeFileProtection])
+        #if DEBUG
+        let protection = (try? FileManager.default.attributesOfItem(atPath: file.path))?[.protectionKey] as? FileProtectionType
+        print("tiles: kept the picture of \(macID), \(data.count / 1024) KB, protection \(protection?.rawValue ?? "not reported")")
+        #endif
     }
 
     func removePreview(for macID: String) {
@@ -238,9 +258,20 @@ extension StreamClient {
         try? FileManager.default.removeItem(at: dir.appendingPathComponent(name))
     }
 
+    /// Tiles turned off (ConnectScreen, for its switch and a saved Mac's menu), or the list at launch:
+    /// every picture goes, shown and stored.
+    func removeAllPreviews() {
+        if !macPreviews.isEmpty { macPreviews = [:] }
+        guard let dir = Self.previewsDirectory, FileManager.default.fileExists(atPath: dir.path) else { return }
+        try? FileManager.default.removeItem(at: dir)
+        #if DEBUG
+        print("tiles: the list: every picture deleted")
+        #endif
+    }
+
     func pruneSavedPreviews() {
         let kept = Set(savedMacs.map(\.macID))
-        macPreviews = macPreviews.filter { kept.contains($0.key) }
+        if macPreviews.keys.contains(where: { !kept.contains($0) }) { macPreviews = macPreviews.filter { kept.contains($0.key) } }
         guard !savedMacsSeeded, let dir = Self.previewsDirectory,
               let files = try? FileManager.default.contentsOfDirectory(atPath: dir.path) else { return }
         for stale in ConnectionList.stalePreviewFiles(in: files, keepingMacIDs: kept) {

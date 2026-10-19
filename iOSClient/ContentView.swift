@@ -1035,6 +1035,11 @@ struct ConnectScreen: View {
             Button("Add") { if let id = newGroupFor { client.setGroup(newGroupName, for: id) } }
             Button("Cancel", role: .cancel) {}
         }
+        // Tiles turned off, by the switch beside the title or a saved Mac's menu: the pictures go, shown
+        // and stored, and none is kept again until tiles are back (ConnectionList.takesPreview).
+        .onChange(of: styleRaw) { _, raw in
+            if ConnectionList.storedStyle(raw) == .list { client.removeAllPreviews() }
+        }
         .onChange(of: client.pairing) { old, new in
             // Paired but no session came (10 s): the card closes, and the Mac is a saved row.
             if case .paired = old, new == .idle, !client.connected { fold() }
@@ -1056,7 +1061,11 @@ struct ConnectScreen: View {
         // "Stopped trying…", "… is saved", Forget, and the line a session ended with (why the Mac
         // closed it), which is already set when this screen comes back. A changed Text alone is
         // never spoken, and the rows keep the focus.
-        .onAppear { announce(client.status) }
+        .onAppear {
+            announce(client.status)
+            // Tiles turned off in another Sill window while this one streamed: its pictures go too.
+            if style == .list, !client.macPreviews.isEmpty { client.removeAllPreviews() }
+        }
         .onChange(of: client.status) { _, line in announce(line) }
     }
 
@@ -1260,7 +1269,7 @@ struct ConnectScreen: View {
                 Label(style == .tiles ? "Show as List" : "Show as Tiles",
                       systemImage: style == .tiles ? "list.bullet" : "square.grid.2x2")
             }
-            if client.macPreviews[id] != nil {
+            if style == .tiles, client.macPreviews[id] != nil {
                 Button(role: .destructive) { client.removePreview(for: id) } label: {
                     Label("Remove Preview Picture", systemImage: "photo.badge.minus")
                 }

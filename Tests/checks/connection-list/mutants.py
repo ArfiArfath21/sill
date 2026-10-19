@@ -6,6 +6,12 @@ F = os.path.join(WT, "iOSClient/ConnectionList.swift")
 MUTANTS = [
     ("default style is tiles", "raw == Style.tiles.rawValue ? .tiles : .list", ".tiles"),
     ("toggled stays the same", "self == .list ? .tiles : .list", "self"),
+    # When a session's end keeps a picture (Noah on #116: tiles are a choice; the list keeps none).
+    ("a picture with the list too", "style == .tiles && sceneActive && saved", "sceneActive && saved"),
+    ("a picture from a window behind", "style == .tiles && sceneActive && saved", "style == .tiles && saved"),
+    ("a picture of a Mac not saved", "style == .tiles && sceneActive && saved", "style == .tiles && sceneActive"),
+    ("a picture when any condition holds", "style == .tiles && sceneActive && saved", "style == .tiles || sceneActive || saved"),
+    ("a picture only with the list", "style == .tiles && sceneActive && saved", "style == .list && sceneActive && saved"),
     ("no group length cap", "return String(joined.prefix(maxGroupLength))", "return joined"),
     ("blank group kept", "guard !words.isEmpty else { return nil }", ""),
     ("decode ignores empty macID check", "where !macID.isEmpty && macID.count <= 128", "where macID.count <= 128"),
