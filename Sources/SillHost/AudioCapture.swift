@@ -29,8 +29,12 @@ final class AudioCapture: NSObject, AudioSource, SCStreamOutput, SCStreamDelegat
     private let filter: SCContentFilter
     /// The pipeline's `sill.audio`: the buffers, and the thrown-away picture.
     private let queue: DispatchQueue
-    /// Main actor (start, stop); read by the delegate to tell a replaced stream's stop from this one's.
-    private var stream: SCStream?
+    /// The running stream: set and taken on the main actor (start, stop), and taken by the delegate on
+    /// ScreenCaptureKit's queue when the system stops it, so always under `streamLock` (`take`): a stop
+    /// and the delegate never both think they own it, and a replaced stream's stop is told from this
+    /// one's.
+    private let streamLock = NSLock()
+    private var current: SCStream?
     // On `queue`.
     private var firstLogged = false
     private var tally = AudioBufferTally()
@@ -61,21 +65,20 @@ final class AudioCapture: NSObject, AudioSource, SCStreamOutput, SCStreamDelegat
         let stream = SCStream(filter: filter, configuration: config, delegate: self)
         try stream.addStreamOutput(self, type: .audio, sampleHandlerQueue: queue)
         try stream.addStreamOutput(self, type: .screen, sampleHandlerQueue: queue)
-        self.stream = stream
+        streamLock.withLock { current = stream }
         do {
             try await Self.bounded("start", after: Self.startStopTimeout, { done in stream.startCapture(completionHandler: done) }) {
                 // Started after all, once the start was given up on: stopped again, never left running.
                 stream.stopCapture { _ in }
             }
         } catch {
-            if self.stream === stream { self.stream = nil }
+            _ = take(stream)
             throw error
         }
     }
 
     func stop() async {
-        guard let stream else { return }
-        self.stream = nil
+        guard let stream = take() else { return }
         try? await Self.bounded("stop", after: Self.startStopTimeout, { done in stream.stopCapture(completionHandler: done) }) {}
         // stopCapture returning does not mean the handler queue has drained.
         await withCheckedContinuation { (c: CheckedContinuation<Void, Never>) in queue.async { c.resume() } }
@@ -177,9 +180,18 @@ final class AudioCapture: NSObject, AudioSource, SCStreamOutput, SCStreamDelegat
     }
 
     func stream(_ stream: SCStream, didStopWithError error: Error) {
-        guard stream === self.stream else { return }   // a stream already replaced or stopped
-        self.stream = nil
+        guard take(stream) != nil else { return }   // a stream already replaced or stopped
         onStopped?(Self.describe(error))
+    }
+
+    /// The running stream, taken (nil from then on) if it is `expected` (any, with nil); nil when it
+    /// is not, or none runs. Whoever takes it is the one who stops it or reports its end.
+    private func take(_ expected: SCStream? = nil) -> SCStream? {
+        streamLock.withLock {
+            guard let s = current, expected == nil || s === expected else { return nil }
+            current = nil
+            return s
+        }
     }
 
     /// The error's words, with ScreenCaptureKit's code for the ones the plan names (−3818 the sound
