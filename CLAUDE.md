@@ -60,6 +60,11 @@ test is Noah's.
   declaration), the other device's tap 1.3 s after the first's, a key 2 s after a move, or a pick of
   nothing; no `disp.wake`, no line, `pmset -g assertions` nothing of the host's; Sill.app's previews
   (140 files) identical to main's, rendered from one path.
+- Known: a connection the device opens by itself counts as a connect (its reconnect after a dropped
+  connection, a move to the cable, to Wi-Fi or home), and so does its re-centre when it reaches the Mac
+  more than 2 s after the new stream's first parameter sets left (a slow remote link): either can wake
+  a sleeping display once with nobody at the device (docs/DEVELOPMENT.md, A sleeping display). Telling
+  them apart would need the device to say so, a wire change.
 - **Untested, for Noah,** with Sill.app from this branch (release-signed with the embedded profile):
   `pmset displaysleepnow`, then connect the iPad at home and through Tailscale: the picture, not black
   windows, and Sill.log's "Woke the display for …, which connected."; `pmset -g assertions` lists

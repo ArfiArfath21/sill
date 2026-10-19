@@ -437,8 +437,13 @@ sending nothing by themselves.
 Every session the host admits counts: a paired device, any device at home with
 Require pairing off, and with the CLI's plain home door (no `--pairing`) any
 device on this Mac's networks or over Direct Wireless; a request to pair does
-not. It wakes a display, never a Mac that is asleep, and cannot light a closed
-laptop's display.
+not. A connection the device opens by itself counts as a connect too (its
+reconnect after a dropped connection, a move to the cable, to Wi-Fi or home
+from away), and so does its own pointer move to a new frame's middle when it
+reaches the Mac more than 2 s after the new stream's first parameter sets left
+(a slow link): either can wake a sleeping display once with nobody at the
+device. It wakes a display, never a Mac that is asleep, and cannot light a
+closed laptop's display.
 
 The log says "Woke the display for iPad (iPad14,1), which connected." (or
 "…, which opened an app.", "…, which sent input.", "…, which pressed a window’s
