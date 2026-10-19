@@ -108,13 +108,11 @@ MUTANTS = {
     "S3 what streams ignored (the Desktop and nothing with Larger Picture, as before 2026-10-15)": ("switchOn && streaming == .window", "switchOn"),
     "S4 the switch ignored while a window streams": ("switchOn && streaming == .window", "streaming == .window"),
     "S5 the rule turned around (the Desktop larger, a window not)": ("switchOn && streaming == .window", "switchOn && streaming != .window"),
-    # The Mac's sound in Larger Picture's row 1 (docs/audio-plan.md §7.6).
-    "A1 Sound in row 1 at any width": ("let soundFits = Self.split(row1, count: Button.allCases.count + 2, gap: Self.gap)[0].width >= Self.minButtonWidth",
-                                       "let soundFits = true"),
-    "A2 Sound's room judged without Menus when it does not show": ("count: Button.allCases.count + 2, gap: Self.gap)[0].width >= Self.minButtonWidth",
-                                                                   "count: Button.allCases.count + (menus ? 2 : 1), gap: Self.gap)[0].width >= Self.minButtonWidth"),
-    "A3 Sound after Settings": ("row.remove(at: row.count - 2)", "row.remove(at: row.count - 1)"),
-    "A4 the stored Menus beside Sound at Desktop's place": ("menusBesideSound = seven[1]", "menusBesideSound = seven[4]"),
+    # No Sound button in Larger Picture's row 1 (docs/audio-plan.md, Q10): the panel's switch alone.
+    "A1 Sound in Larger Picture's row 1, at Settings' place": ("            sound = gone\n", "            sound = six[5]\n"),
+    "A2 Menus beside Sound moved in Larger Picture": ("            menusBesideSound = menus\n", "            menusBesideSound = six[2]\n"),
+    "A3 a strip beside both in Larger Picture": ("            stripBesideBoth = gone\n",
+                                                 "            stripBesideBoth = CGRect(origin: gone.origin, size: CGSize(width: gone.width, height: Self.stripHeight))\n"),
 }
 caught = 0
 for name, (old, new) in MUTANTS.items():

@@ -15,8 +15,9 @@ import CoreGraphics
 /// streaming keep the standard arrangement) and the software keyboard's height known (`keyboard`),
 /// the thumbnails' row goes and the picture gets every point that keeps the key row
 /// `keyboardClearance` above the keyboard (on an 18 Pro Max 424×422 against 424×265); the trackpad
-/// is the keyboard's footprint, so nothing moves when it comes up, the Menus and Sound buttons join
-/// row 1 (`row1Beside`), and the Apps drawer opens above row 1, where no keyboard reaches (`drawer`).
+/// is the keyboard's footprint, so nothing moves when it comes up, the Menus button joins row 1 (the
+/// Mac's sound is the Settings panel's switch alone there: docs/audio-plan.md, Q10), and the Apps
+/// drawer opens above row 1, where no keyboard reaches (`drawer`).
 /// The picture's frame then takes the picture's own shape inside that room (`pane(video:)`, so a
 /// 16:10 window keeps its shape and a taller one gains), and the viewport is the whole room, which
 /// the Mac fits a window to once Aa sets its text size (or on the virtual display). It applies
@@ -97,8 +98,7 @@ struct PhonePortraitLayout: Equatable {
     /// with a Home button; its keyboard is not known, so Larger Picture leaves it alone: `keyboard`.)
     static let faceIDShape: CGFloat = 1.9
     /// Larger Picture's row 1 holds six buttons (Menus with the five), each at least this wide: a
-    /// touch target's least, so the arrangement needs a stream screen 332 pt wide or more. Seven with
-    /// the Mac's Sound button too (`row1Beside`), which joins only from 384 pt.
+    /// touch target's least, so the arrangement needs a stream screen 332 pt wide or more.
     static let minButtonWidth: CGFloat = 44
 
     /// Row 1, in the landscape bar's order.
@@ -135,8 +135,10 @@ struct PhonePortraitLayout: Equatable {
     /// under Settings, where Menus goes without it, and the strip ends `gap` before it
     /// (`stripBesideMenus`: one button at the row's end, whichever). With the Mac's menus too, Menus
     /// moves one place left, under Desktop, and the strip ends `gap` before that. Row 1 keeps its five.
-    /// With Larger Picture both are in row 1, here beside each other, seven to the row; `row1Beside`
-    /// has row 1 for each of them showing or not, and whether Sound fits.
+    /// With Larger Picture there is no row 2, and row 1 takes no Sound button (Noah's approved row,
+    /// docs/audio-plan.md, Q10): the Mac's sound is the Settings panel's switch alone, `sound` and
+    /// `stripBesideBoth` are the strip's empty place under row 1, and `menusBesideSound` is Menus' own
+    /// place in row 1 (`menus`).
     let sound: CGRect
     let menusBesideSound: CGRect
     let stripBesideBoth: CGRect
@@ -225,8 +227,8 @@ struct PhonePortraitLayout: Equatable {
                                      height: strip.height)
         } else {
             // Larger Picture: no strip, so the key row comes straight under row 1's band; the Menus
-            // button joins row 1 after Apps, six sharing the row, and the Sound button before Settings
-            // (`row1Beside`; here the two beside each other, seven sharing the row).
+            // button joins row 1 after Apps, six sharing the row. No Sound button: the Settings
+            // panel's switch alone (Q10).
             let six = Self.split(row1, count: Button.allCases.count + 1, gap: Self.gap)
             let gone = CGRect(origin: CGPoint(x: Self.side - Self.stripInset, y: row1.maxY + Self.band),
                               size: CGSize(width: max(0, width - 2 * (Self.side - Self.stripInset)), height: 0))
@@ -234,9 +236,8 @@ struct PhonePortraitLayout: Equatable {
             stripBesideMenus = gone
             menus = six[1]
             buttonsBesideMenus = [six[0]] + six.dropFirst(2)
-            let seven = Self.split(row1, count: Button.allCases.count + 2, gap: Self.gap)
-            sound = seven[5]
-            menusBesideSound = seven[1]
+            sound = gone
+            menusBesideSound = menus
             stripBesideBoth = gone
         }
 
@@ -370,37 +371,6 @@ struct PhonePortraitLayout: Equatable {
     static func offersLargerPicture(screen: CGSize) -> Bool {
         let upright = CGSize(width: min(screen.width, screen.height), height: max(screen.width, screen.height))
         return keyboard(for: upright, largerPicture: true, foldable: false) != nil
-    }
-
-    /// Row 1 beside the Mac's Menus and Sound buttons (`row1Beside`).
-    struct Row1Beside: Equatable {
-        /// Row 1's five, in `Button` order.
-        let buttons: [CGRect]
-        /// The Menus and Sound buttons in row 1; nil where they are not in it.
-        let menus: CGRect?
-        let sound: CGRect?
-        /// The Aa ruler on this row's Aa.
-        let ruler: CGRect
-        let rulerStep: CGFloat
-    }
-
-    /// Row 1 while the Mac sent its menus (`menus`) and sends its sound (`sound`). In the standard
-    /// arrangement `buttons` whatever they are: Menus and Sound end row 2 (`menus`, `sound`). With
-    /// Larger Picture, in the landscape bar's order (docs/audio-plan.md §7.6): Apps, Menus, Aa,
-    /// Keyboard, Desktop, Sound, Settings, those that show equal and `gap` apart across the row. Sound
-    /// joins only where seven buttons are `minButtonWidth` or more, Menus counted whether or not it
-    /// shows, as the bars count it, so Sound never comes and goes with the menus: a stream screen
-    /// 384 pt wide or more. Narrower (375 pt: the SE, the minis, a 6.7-inch iPhone zoomed) Sound is
-    /// the Settings panel's switch alone, as in a bar that holds Menus and not Sound.
-    func row1Beside(menus: Bool, sound: Bool) -> Row1Beside {
-        guard largerPicture else { return Row1Beside(buttons: buttons, menus: nil, sound: nil, ruler: ruler, rulerStep: rulerStep) }
-        let soundFits = Self.split(row1, count: Button.allCases.count + 2, gap: Self.gap)[0].width >= Self.minButtonWidth
-        let soundShows = sound && soundFits
-        var row = Self.split(row1, count: Button.allCases.count + (menus ? 1 : 0) + (soundShows ? 1 : 0), gap: Self.gap)
-        let menusButton: CGRect? = menus ? row.remove(at: 1) : nil
-        let soundButton: CGRect? = soundShows ? row.remove(at: row.count - 2) : nil
-        let (aaRuler, step) = Self.ruler(on: row[Button.textSize.rawValue], in: row1)
-        return Row1Beside(buttons: row, menus: menusButton, sound: soundButton, ruler: aaRuler, rulerStep: step)
     }
 
     /// The ruler centred on `aa`, over `row`: as wide as the room between Aa's centre and the row's

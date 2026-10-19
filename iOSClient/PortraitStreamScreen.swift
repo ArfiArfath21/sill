@@ -320,10 +320,10 @@ struct PortraitStreamScreen: View {
     /// StreamScreen hands this no keyboard then) there is no thumbnails' row: the picture gets every
     /// point that keeps the key row 10 pt above the software keyboard, its pane at the picture's own
     /// shape at the top of that room (`pane(video:)`), the trackpad is the keyboard's footprint, and
-    /// the Menus button joins row 1 after Apps (the Sound button before Settings, where seven fit).
-    /// Windows come from Apps (an open app again shows its next window) and from the Mac's Window
-    /// menu; the drawer opens above row 1, over the room (`layout.drawer`), so a keyboard up, the
-    /// Mac's or its own search field's, covers none of it.
+    /// the Menus button joins row 1 after Apps (the Mac's sound is the Settings panel's switch alone
+    /// there: docs/audio-plan.md, Q10). Windows come from Apps (an open app again shows its next
+    /// window) and from the Mac's Window menu; the drawer opens above row 1, over the room
+    /// (`layout.drawer`), so a keyboard up, the Mac's or its own search field's, covers none of it.
     /// The viewport is the layout's picture in both arrangements (with Larger Picture the whole
     /// room), so the Mac fits a window to all of it; a switch between the Desktop and a window
     /// changes the arrangement and so sends one new viewport, as a rotation does.
@@ -354,7 +354,7 @@ struct PortraitStreamScreen: View {
             // beside them.
             PhoneRows(size: layout.size, rects: rects) {
                 picturePane(measured: false).accessibilityHidden(drawerOpen)
-                phoneRow1(layout, menus: larger && client.menus.hasMenus, sound: larger && client.soundAvailable)
+                phoneRow1(layout, menus: larger && client.menus.hasMenus)
                 if !larger {
                     phoneRow2(layout)
                         .opacity(drawerOpen || settingsOpen ? 0 : 1)
@@ -391,20 +391,21 @@ struct PortraitStreamScreen: View {
 
     /// Row 1: the landscape bar's five, in its order, widened to share the row with the key row's
     /// whitespace between them (Noah). Aa's ruler unfolds over the row; the other four fade and take
-    /// no touch until it folds. `menus` and `sound`: Larger Picture's row 1 while the Mac sent menus
-    /// and sends its sound, the Menus button after Apps and the Sound button before Settings, where
-    /// the landscape bar has them (`PhonePortraitLayout.row1Beside`: Sound only where seven fit).
-    private func phoneRow1(_ layout: PhonePortraitLayout, menus: Bool, sound: Bool) -> some View {
-        let row = layout.row1Beside(menus: menus, sound: sound)
-        let width = row.buttons[PhonePortraitLayout.Button.apps.rawValue].width
+    /// no touch until it folds. `menus`: Larger Picture's row 1 while the Mac sent menus, the Menus
+    /// button after Apps, six to the row (`buttonsBesideMenus`), where the landscape bar has it. Never
+    /// the Sound button: row 1 stays as Noah approved it (docs/audio-plan.md, Q10, the beta's default),
+    /// so with Larger Picture, which has no thumbnails' row, the Mac's sound is the Settings panel's
+    /// switch alone.
+    private func phoneRow1(_ layout: PhonePortraitLayout, menus: Bool) -> some View {
+        let width = (menus ? layout.buttonsBesideMenus : layout.buttons)[PhonePortraitLayout.Button.apps.rawValue].width
         return HStack(spacing: PhonePortraitLayout.gap) {
             appsButton(width: width)
                 .opacity(scaleOpen ? 0 : 1)
                 .allowsHitTesting(!scaleOpen)
                 .tourTarget(.apps)
 
-            if let menusAt = row.menus {
-                MacMenuButton(client: client, width: menusAt.width, height: menusAt.height,
+            if menus {
+                MacMenuButton(client: client, width: layout.menus.width, height: layout.menus.height,
                               radius: metrics.buttonRadius, iconSize: metrics.buttonIcon, spacing: metrics.buttonSpacing,
                               iconBox: PortraitMetrics.phoneIconBox, onOpen: menusOpened, onClose: menusClosed)
                     .opacity(scaleOpen ? 0 : 1)
@@ -414,7 +415,7 @@ struct PortraitStreamScreen: View {
 
             TextScaleControl(scale: $textScale, open: $scaleOpen,
                              width: width, height: layout.row1.height,
-                             radius: metrics.buttonRadius, pointsPerStep: row.rulerStep,
+                             radius: metrics.buttonRadius, pointsPerStep: menus ? layout.rulerStepBesideMenus : layout.rulerStep,
                              iconBox: PortraitMetrics.phoneIconBox, iconSpacing: metrics.buttonSpacing)
                 .tourTarget(.textSize)
 
@@ -432,22 +433,12 @@ struct PortraitStreamScreen: View {
                 .opacity(scaleOpen ? 0 : 1)
                 .allowsHitTesting(!scaleOpen)
 
-            if let soundAt = row.sound {
-                SoundButton(client: client, width: soundAt.width, height: soundAt.height,
-                            radius: metrics.buttonRadius, iconSize: metrics.buttonIcon, spacing: metrics.buttonSpacing,
-                            iconBox: PortraitMetrics.phoneIconBox)
-                    .opacity(scaleOpen ? 0 : 1)
-                    .allowsHitTesting(!scaleOpen)
-                    .transition(.opacity)
-            }
-
             settingsButton(width: width)
                 .opacity(scaleOpen ? 0 : 1)
                 .allowsHitTesting(!scaleOpen)
         }
         .animation(.easeOut(duration: 0.16), value: scaleOpen)
         .animation(.easeOut(duration: 0.18), value: menus)
-        .animation(.easeOut(duration: 0.18), value: sound)
     }
 
     /// Row 2: the thumbnails, and at the row's end, under Settings, the Menus button while the Mac

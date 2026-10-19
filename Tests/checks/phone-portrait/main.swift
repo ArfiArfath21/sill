@@ -325,9 +325,9 @@ for w in 300...599 {
                          && near(l.menus.minX - l.stripBesideMenus.maxX, 8) && l.stripBesideMenus.width - 16 >= 80, size,
                          "menus \(str(l.menus)), strip \(str(l.stripBesideMenus))")
 
-        let row1Kept = [(false, false), (true, false), (false, true), (true, true)].allSatisfy { m, s in
-            l.row1Beside(menus: m, sound: s) == L.Row1Beside(buttons: b, menus: nil, sound: nil, ruler: l.ruler, rulerStep: l.rulerStep)
-        }
+        // Row 1 keeps its five whichever shows: the standard arrangement's row 1 is `buttons`, and
+        // `buttonsBesideMenus` the same five.
+        let row1Kept = l.buttonsBesideMenus == b
         soundRule.expect(near(l.sound.minX, b[4].minX) && near(l.sound.width, b[4].width) && l.sound.height == 50
                          && near(l.sound.midY, l.strip.midY) && l.sound == l.menus
                          && near(l.menusBesideSound.minX, b[3].minX) && near(l.menusBesideSound.width, b[3].width)
@@ -687,38 +687,16 @@ do {
           near(L(size: se.container, keyboard: 233).menus.width, 307.0 / 6) && near(L(size: mini.container, keyboard: 310).menus.width, 307.0 / 6))
 }
 
-// Row 1 beside the Mac's sound too (docs/audio-plan.md §7.6): Sound before Settings, as the landscape
-// bar has it after Desktop; seven equal buttons with Menus, six without. Only where seven are 44 pt or
-// more (Menus counted whether or not it shows), from 384 pt: not at 375 (the SE, the minis), where
-// Sound is the Settings panel's switch alone.
+// No Sound button in Larger Picture's row 1 (docs/audio-plan.md, Q10, the beta's default: row 1 stays as
+// Noah approved it): the Mac's sound is the Settings panel's switch alone there, on every phone. `sound`
+// and `stripBesideBoth` are the strip's empty place under row 1, as `strip` and `stripBesideMenus` are,
+// and Menus beside Sound is Menus' own place in row 1.
 do {
-    let l = L(size: proMax.container, keyboard: 320)
-    let both = l.row1Beside(menus: true, sound: true), alone = l.row1Beside(menus: false, sound: true)
-    check("Pro Max: seven buttons of 52: Apps at 14, Menus at 74, Aa at 134, Keyboard at 194, Desktop at 254",
-          both.buttons.count == 5 && near(both.buttons[0], CGRect(x: 14, y: 454, width: 52, height: 50))
-            && near(both.menus!, CGRect(x: 74, y: 454, width: 52, height: 50)) && near(both.buttons[1].minX, 134)
-            && near(both.buttons[2].minX, 194) && near(both.buttons[3].minX, 254))
-    check("Pro Max: then Sound at 314, Settings at 374 to 426; the stored Sound and Menus beside it the same",
-          near(both.sound!, CGRect(x: 314, y: 454, width: 52, height: 50)) && near(both.buttons[4].minX, 374)
-            && near(both.buttons[4].maxX, 426) && both.sound == l.sound && both.menus == l.menusBesideSound)
-    check("Pro Max: the ruler on that Aa, 204 wide, 36 a detent",
-          near(both.rulerStep, 36) && near(both.ruler, CGRect(x: 58, y: 454, width: 204, height: 50)))
-    check("Pro Max, Sound without Menus: six of 62, Sound at 294 before Settings at 364; the ruler on the second, 35.5 a detent",
-          alone.menus == nil && near(alone.sound!, CGRect(x: 294, y: 454, width: 62, height: 50)) && near(alone.buttons[1].minX, 84)
-            && near(alone.buttons[4].minX, 364) && near(alone.rulerStep, 35.5) && near(alone.ruler, CGRect(x: 14, y: 454, width: 202, height: 50)))
-    check("Pro Max, without Sound: row 1 as without the Mac's sound (five, or six beside Menus)",
-          l.row1Beside(menus: true, sound: false)
-            == L.Row1Beside(buttons: l.buttonsBesideMenus, menus: l.menus, sound: nil, ruler: l.rulerBesideMenus, rulerStep: l.rulerStepBesideMenus)
-            && l.row1Beside(menus: false, sound: false) == L.Row1Beside(buttons: l.buttons, menus: nil, sound: nil, ruler: l.ruler, rulerStep: l.rulerStep))
-    check("Sound joins from 384 pt (seven of 44), not at 383 (43.9)",
-          L(size: CGSize(width: 384, height: 900), keyboard: 320).row1Beside(menus: false, sound: true).sound != nil
-            && L(size: CGSize(width: 383, height: 900), keyboard: 320).row1Beside(menus: false, sound: true).sound == nil)
-    for (p, fits) in [(proMax, true), (pro, true), (fifteenPro, true), (seventeenE, true), (mini, false), (se, false)] {
+    for p in [proMax, pro, fifteenPro, seventeenE, mini, se] {
         let l = L(size: p.container, keyboard: p.keyboard!)
-        check("\(p.name), \(Int(p.container.width)) pt: " + (fits ? "Sound in row 1, with the menus or without" : "no Sound in row 1, the row as without it"),
-              fits ? l.row1Beside(menus: true, sound: true).sound != nil && l.row1Beside(menus: false, sound: true).sound != nil
-                   : l.row1Beside(menus: true, sound: true) == l.row1Beside(menus: true, sound: false)
-                       && l.row1Beside(menus: false, sound: true) == l.row1Beside(menus: false, sound: false))
+        check("\(p.name), \(Int(p.container.width)) pt, Larger Picture: no Sound button (\(str(l.sound))), Menus beside it at its own place in row 1",
+              l.sound.height == 0 && l.sound == l.strip && l.stripBesideBoth == l.strip && l.menusBesideSound == l.menus
+                && l.menus.minY == l.row1.minY && !l.buttons.contains { $0.intersects(l.sound) })
     }
 }
 
@@ -764,7 +742,7 @@ let lRow1 = Rule("Larger Picture: five equal buttons as today, and beside the Ma
 let lCaps = Rule("Larger Picture: six equal caps, 44 tall, 8 apart, from 14 to W − 14")
 let lRulers = Rule("Larger Picture: both rulers over row 1, centred on their Aa, inside the row, 36 a detent where they fit")
 let lPanels = Rule("Larger Picture: the panel from 8 under row 1 to 16 off the bottom, the drawer from 8 to 8 above row 1 (128 above the keyboard), both across row 1; the anchor the panel's corner; the dim all but row 1")
-let lSound = Rule("Larger Picture beside the Mac's sound: Apps, Menus, Aa, Keyboard, Desktop, Sound, Settings, those that show equal, 8 apart, from 14 to W − 14; Sound only where seven are 44 pt or more (Menus counted whether or not it shows), else the row as without it; the ruler on that row's Aa; the stored Sound and Menus beside it the seven's")
+let lSound = Rule("Larger Picture and the Mac's sound (Q10): no Sound button in row 1 or anywhere (the panel's switch alone): `sound` and `stripBesideBoth` the strip's empty place under row 1, Menus beside Sound its own place in row 1, row 1 as without the sound")
 let lFrames = Rule("Larger Picture: each frame inside the room, from its top, whole points, at the picture's shape (to a point), centred across when taller than the room; the span the pad's width × the frame's shape")
 let largerRules = [lInside, lOrdered, lGaps, lRoom, lRow1, lCaps, lRulers, lPanels, lSound, lFrames]
 let frameVideos = [CGSize.zero, CGSize(width: 3024, height: 1964), CGSize(width: 2560, height: 1080), CGSize(width: 1000, height: 1000),
@@ -806,25 +784,8 @@ for keyboard: CGFloat in [233, 301, 310, 320] {
                            && l.drawer == CGRect(x: 14, y: 8, width: W - 28, height: l.row1.minY - 16) && l.drawer.maxY == H - keyboard - 128
                            && near(l.settingsAnchor.x, l.settings.maxX / W, 0.0001) && near(l.settingsAnchor.y, l.settings.minY / H, 0.0001)
                            && l.dim == [CGRect(x: 0, y: 0, width: W, height: l.row1.minY), CGRect(x: 0, y: l.row1.maxY, width: W, height: H - l.row1.maxY)], size)
-            let seven = (W - 76) / 7, soundFits = seven >= 44
-            var soundOK = near(l.sound.width, seven) && near(l.sound.maxX, W - 14 - seven - 8) && near(l.menusBesideSound.minX, 14 + seven + 8)
-                && l.sound.minY == l.row1.minY && l.menusBesideSound.minY == l.row1.minY && l.stripBesideBoth.height == 0
-            for (m, snd) in [(false, false), (true, false), (false, true), (true, true)] {
-                let r = l.row1Beside(menus: m, sound: snd)
-                let shows = snd && soundFits, count = 5 + (m ? 1 : 0) + (shows ? 1 : 0)
-                let each = (W - 28 - CGFloat(count - 1) * 8) / CGFloat(count)
-                var row = r.buttons
-                if let sound = r.sound { row.insert(sound, at: 4) }
-                if let menus = r.menus { row.insert(menus, at: 1) }
-                let fitting = min(36, ((r.buttons[1].midX - 14) * 2 - 60) / 4)
-                let shape = (r.menus != nil) == m && (r.sound != nil) == shows && r.buttons.count == 5 && row.count == count
-                let spaced = row.allSatisfy { near($0.width, each) && $0.minY == l.row1.minY && $0.height == 50 }
-                    && row[0].minX == 14 && near(row.last!.maxX, W - 14) && zip(row, row.dropFirst()).allSatisfy { near($1.minX - $0.maxX, 8) }
-                let ruled = near(r.ruler.midX, r.buttons[1].midX) && r.ruler.minY == l.row1.minY && near(r.ruler.width, 4 * r.rulerStep + 60)
-                    && r.ruler.minX >= 14 - 0.001 && r.ruler.maxX <= W - 14 + 0.001 && near(r.rulerStep, fitting)
-                let stored = !(m && shows) || (r.sound == l.sound && r.menus == l.menusBesideSound)
-                soundOK = soundOK && shape && spaced && ruled && stored
-            }
+            let soundOK = l.sound.height == 0 && l.sound == l.strip && l.stripBesideBoth == l.strip && l.menusBesideSound == l.menus
+                && !(l.buttons + l.buttonsBesideMenus + [l.menus]).contains { $0.intersects(l.sound) }
             lSound.expect(soundOK, size)
             var framesOK = true, bad = ""
             for v in frameVideos {

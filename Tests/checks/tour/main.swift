@@ -462,35 +462,8 @@ do {
     }
     check(worst == nil, "sideways and in the halves, with Sound before Settings: no step lights it\(worst.map { " — \($0)" } ?? "")")
 }
-// With Larger Picture the Sound button is in row 1, before Settings (PhonePortraitLayout.row1Beside),
-// beside Menus after Apps or without it: no step lights it there either, at every width it joins (384 pt
-// and up), above each keyboard.
-do {
-    var worst: String?, shown = 0
-    for w in stride(from: 332 as CGFloat, through: 599, by: 1) {
-        for (h, keyboard) in [(w * 2.1, 320), (w * 2.1, 301), (w * 1.75, 233)] as [(CGFloat, CGFloat)] {
-            let l = PhonePortraitLayout(size: CGSize(width: w, height: h), keyboard: keyboard)
-            for menus in [false, true] {
-                let r = l.row1Beside(menus: menus, sound: true)
-                guard let sound = r.sound else { continue }
-                shown += 1
-                let pane = l.pane(video: .zero)
-                let s = Screen(size: l.size, layout: F, stream: pane, targets: [
-                    .stream: pane,
-                    .apps: r.buttons[PhonePortraitLayout.Button.apps.rawValue],
-                    .textSize: r.buttons[PhonePortraitLayout.Button.textSize.rawValue],
-                    .keyboard: r.buttons[PhonePortraitLayout.Button.keyboard.rawValue],
-                    .settings: r.buttons[PhonePortraitLayout.Button.settings.rawValue],
-                    .keys: l.keys, .trackpad: l.trackpad], room: l.picture, thumbnails: false)
-                for topic in all {
-                    guard let t = s.union(topic), let lit = TourPolicy.cutout([t], screen: s.size) else { continue }
-                    if lit.intersects(sound), worst == nil { worst = "\(w)×\(h) \(topic): lit \(lit), Sound \(sound)" }
-                }
-            }
-        }
-    }
-    check(worst == nil && shown > 0, "a phone upright with Larger Picture, Sound in row 1 (\(shown) layouts): no step lights it\(worst.map { " — \($0)" } ?? "")")
-}
+// With Larger Picture there is no Sound button (docs/audio-plan.md, Q10: the Settings panel's switch alone),
+// so the tour's targets there are as without the Mac's sound.
 
 // MARK: - Where the card goes: an oracle from the plan's words
 
