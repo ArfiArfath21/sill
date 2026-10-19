@@ -13,8 +13,6 @@ final class HEVCDisplayView: UIView {
 
     private var formatDescription: CMVideoFormatDescription?
     private var waitingForKeyframe = true
-    /// Flushed after an interruption, and no keyframe since: the ask is owed until one comes.
-    private var interrupted = false
     private var lastParameterSets: Data?
 
     /// The streamed frame's pixel size, reported on main whenever new parameter sets arrive.
@@ -25,9 +23,21 @@ final class HEVCDisplayView: UIView {
     /// (`StreamClient.pointerFrameChanged`). Two hooks instead of a chain, so re-hosting after a
     /// rotation cannot stack closures.
     var onVideoSizeForPointer: ((CGSize) -> Void)?
-    /// The layer was interrupted and waits for a keyframe (`recoverIfInterrupted`). On the queue
-    /// `enqueue` runs on.
+    /// The queue `apply` and `enqueue` run on (the client's network queue): the layer's own
+    /// notifications, which come on whatever thread AVFoundation posts them, are looked at there.
+    var renderQueue: DispatchQueue?
+    /// The picture was interrupted: the layer was flushed and waits for a keyframe (`checkLayer`),
+    /// which a still window on the Mac never sends by itself. The client asks for one
+    /// (KeyframeRecovery). On `renderQueue`.
     var onNeedsKeyframe: (() -> Void)?
+    /// A keyframe ended a wait and went onto a layer that reads healthy: the picture is back (after an
+    /// interruption, or a new source's first). On `renderQueue`.
+    var onPictureBack: (() -> Void)?
+    /// The layer's notifications (`observeLayer`).
+    private var layerObservers: [NSObjectProtocol] = []
+    /// When a keyframe last ended a wait (`CACurrentMediaTime`): a decode failure posted before then
+    /// is about a frame from before the picture came back. On `renderQueue`.
+    private var resumedAt: CFTimeInterval = 0
 
     // MARK: The pointer sprite
     //
@@ -75,8 +85,32 @@ final class HEVCDisplayView: UIView {
         backgroundColor = .black
         displayLayer.videoGravity = .resizeAspect
         layer.addSublayer(cursorLayer)
+        observeLayer()
     }
     required init?(coder: NSCoder) { fatalError() }
+    deinit { layerObservers.forEach(NotificationCenter.default.removeObserver) }
+
+    /// The layer says it could not decode a frame, or that it needs a flush before it decodes again
+    /// (iOS says so when Sill goes to the background, or another app takes the decoder): looked at on
+    /// `renderQueue` at once, since a still window sends no frame that would show it (`checkLayer`).
+    private func observeLayer() {
+        let center = NotificationCenter.default
+        layerObservers.append(center.addObserver(forName: .AVSampleBufferDisplayLayerFailedToDecode, object: displayLayer,
+                                                 queue: nil) { [weak self] note in
+            let error = note.userInfo?[AVSampleBufferDisplayLayerFailedToDecodeNotificationErrorKey] as? Error
+            let postedAt = CACurrentMediaTime()
+            self?.renderQueue?.async { [weak self] in
+                // A frame enqueued before the picture came back failed: the flush that preceded the
+                // keyframe already dealt with it, and acting now would throw the new picture away.
+                guard let self, postedAt >= self.resumedAt else { return }
+                self.checkLayer("(its notification)", failedToDecode: error)
+            }
+        })
+        layerObservers.append(center.addObserver(forName: .AVSampleBufferDisplayLayerRequiresFlushToResumeDecodingDidChange,
+                                                 object: displayLayer, queue: nil) { [weak self] _ in
+            self?.renderQueue?.async { [weak self] in self?.checkLayer("(its notification)") }
+        })
+    }
 
     override func didMoveToWindow() {
         super.didMoveToWindow()
@@ -274,7 +308,9 @@ final class HEVCDisplayView: UIView {
         formatDescription = nil
         lastParameterSets = nil
         waitingForKeyframe = true
-        interrupted = false
+        #if DEBUG
+        interruptedAt = nil
+        #endif
         displayLayer.flushAndRemoveImage()
         // The pointer's copy of the size is main-thread state; the client zeroes its own alongside.
         DispatchQueue.main.async { [weak self] in
@@ -285,10 +321,10 @@ final class HEVCDisplayView: UIView {
 
     func enqueue(_ data: Data, isKeyframe: Bool) {
         guard let desc = formatDescription else { return }
+        let resuming = waitingForKeyframe
         if waitingForKeyframe {
             guard isKeyframe else { return }
             waitingForKeyframe = false
-            interrupted = false
         }
 
         let count = data.count
@@ -316,28 +352,95 @@ final class HEVCDisplayView: UIView {
             first[kCMSampleAttachmentKey_DisplayImmediately as String] = true
         }
 
-        if recoverIfInterrupted() { return }
+        if checkLayer("at a frame") { return }
+        if resuming { resumedAt = CACurrentMediaTime() }
         displayLayer.enqueue(sample)
+        if resuming {
+            #if DEBUG
+            if let at = interruptedAt {
+                print("display: the picture is back, \(Int(((CACurrentMediaTime() - at) * 1000).rounded())) ms after it was interrupted")
+                interruptedAt = nil
+            }
+            armLayerFailure()
+            #endif
+            onPictureBack?()
+        }
     }
 
-    /// The layer failed, or needs a flush before it decodes again (the app was in the background):
-    /// flush it, wait for a keyframe and ask for one (`onNeedsKeyframe`), since a still window sends
-    /// none. Also called when the app becomes active, when no frame may come to notice it, and then
-    /// asks again for a layer flushed in the background (where the ask is not sent) that has had no
-    /// keyframe since. On the queue `enqueue` runs on. True when it flushed the layer.
+    /// Whether the picture was interrupted: the layer failed (its `status`, with its `error`), could
+    /// not decode a frame (`failedToDecode`, from its notification), or needs a flush before it
+    /// decodes again (Sill was in the background, or another app took the decoder). If so the layer
+    /// is flushed (it keeps the last image it showed), waits for a keyframe, and `onNeedsKeyframe` is
+    /// told, since a still window on the Mac sends none. The Mac sends its parameter sets before
+    /// every keyframe and every sample carries the format, so nothing else needs sending again. From
+    /// each frame let through, the layer's notifications, and the picture's window becoming active
+    /// (StreamClient). On `renderQueue`. True when it flushed.
     @discardableResult
-    func recoverIfInterrupted() -> Bool {
-        guard displayLayer.status == .failed || displayLayer.requiresFlushToResumeDecoding else {
-            if interrupted { onNeedsKeyframe?() }
-            return false
-        }
-        print("display layer interrupted (\(displayLayer.status == .failed ? "failed: \(String(describing: displayLayer.error))" : "needs a flush")); asking for a keyframe")
+    func checkLayer(_ why: String, failedToDecode: Error? = nil) -> Bool {
+        guard formatDescription != nil else { return false }    // no picture yet: nothing to lose
+        let failed = displayLayer.status == .failed || displayLayer.error != nil
+        let needsFlush = displayLayer.requiresFlushToResumeDecoding
+        guard failed || needsFlush || failedToDecode != nil else { return false }
+        #if DEBUG
+        let what = failedToDecode.map { "could not decode a frame (\(($0 as NSError).code))" }
+            ?? (failed ? "failed (\(displayLayer.error.map { "\(($0 as NSError).domain) \(($0 as NSError).code)" } ?? "no error"))"
+                       : "needs a flush to decode again")
+        print("display: the picture was interrupted \(why): the layer \(what)\(needsFlush && failed ? " and needs a flush" : ""); flushed, waiting for a keyframe")
+        if interruptedAt == nil { interruptedAt = CACurrentMediaTime() }
+        #endif
         displayLayer.flush()
         waitingForKeyframe = true
-        interrupted = true
         onNeedsKeyframe?()
         return true
     }
+
+    #if DEBUG
+    /// When the picture was first interrupted, for the console's "back, N ms after" line.
+    private var interruptedAt: CFTimeInterval?
+    /// `-SillLayerFail <s>[,<s>…]` (ContentView's harness contract): at each of these seconds after the
+    /// launch's first picture, a frame that cannot decode goes onto the layer, so the recovery runs for
+    /// real: the layer's notification, the flush, the client's one ask (kind 44) and the Mac's keyframe.
+    private static let layerFailTimes: [Double] = (UserDefaults.standard.string(forKey: "SillLayerFail") ?? "")
+        .split(whereSeparator: { $0 == "," || $0 == " " }).compactMap { Double($0) }.filter { $0 > 0 }
+    private var layerFailArmed = true
+
+    /// On the first picture of the launch (`enqueue`, on `renderQueue`).
+    private func armLayerFailure() {
+        guard layerFailArmed, !Self.layerFailTimes.isEmpty, let queue = renderQueue else { return }
+        layerFailArmed = false
+        print("display: -SillLayerFail: a frame that cannot decode goes onto the layer at \(Self.layerFailTimes) s")
+        for time in Self.layerFailTimes {
+            queue.asyncAfter(deadline: .now() + time) { [weak self] in self?.breakLayer() }
+        }
+    }
+
+    /// A sample of noise behind an HEVC NAL length far longer than the sample, marked a keyframe to be
+    /// shown at once, in the stream's own format: the decoder refuses it.
+    private func breakLayer() {
+        guard let desc = formatDescription else { print("display: -SillLayerFail: no picture to break"); return }
+        var bytes: [UInt8] = [0x7F, 0xFF, 0xFF, 0xFF, 0x26, 0x01]
+        bytes += (0..<506).map { _ in UInt8.random(in: 0...255) }
+        var block: CMBlockBuffer?
+        var sample: CMSampleBuffer?
+        var size = bytes.count
+        var timing = CMSampleTimingInfo(duration: .invalid, presentationTimeStamp: .invalid, decodeTimeStamp: .invalid)
+        guard CMBlockBufferCreateWithMemoryBlock(allocator: nil, memoryBlock: nil, blockLength: bytes.count, blockAllocator: nil,
+                                                 customBlockSource: nil, offsetToData: 0, dataLength: bytes.count, flags: 0,
+                                                 blockBufferOut: &block) == noErr, let block,
+              CMBlockBufferReplaceDataBytes(with: bytes, blockBuffer: block, offsetIntoDestination: 0, dataLength: bytes.count) == noErr,
+              CMSampleBufferCreateReady(allocator: nil, dataBuffer: block, formatDescription: desc, sampleCount: 1,
+                                        sampleTimingEntryCount: 1, sampleTimingArray: &timing, sampleSizeEntryCount: 1,
+                                        sampleSizeArray: &size, sampleBufferOut: &sample) == noErr, let sample else {
+            print("display: -SillLayerFail: could not make the frame"); return
+        }
+        if let attachments = CMSampleBufferGetSampleAttachmentsArray(sample, createIfNecessary: true) as NSArray?,
+           let first = attachments.firstObject as? NSMutableDictionary {
+            first[kCMSampleAttachmentKey_DisplayImmediately as String] = true
+        }
+        print("display: -SillLayerFail: a frame that cannot decode goes onto the layer now")
+        displayLayer.enqueue(sample)
+    }
+    #endif
 }
 
 struct StreamView: UIViewRepresentable {

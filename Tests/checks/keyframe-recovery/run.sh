@@ -1,11 +1,14 @@
 #!/bin/bash
-# KeyframeRecovery (iOSClient), when the device re-picks its source for a fresh keyframe after its
-# display layer was interrupted: only while something streams, at most once per 2 s.
+# KeyframeRecovery (iOSClient/KeyframeRecovery.swift) on its own: when the device asks the Mac for a
+# keyframe after its picture was interrupted (issue #101): one ask per interruption, only while Sill
+# is active and something streams, at least 2 s apart, longer for a picture that keeps failing (4, 8,
+# 16, then 32 s), a trip to the background or 10 s of calm starting it afresh; then 20,000 random
+# sessions against a model of the event history.
 #   Tests/checks/keyframe-recovery/run.sh             compile and run the check
 #   Tests/checks/keyframe-recovery/run.sh --mutants   one-line mutants of KeyframeRecovery.swift; each must fail it
 here="$(cd "$(dirname "$0")" && pwd)"
 source "$here/../common.sh"
-if [ "${1:-}" = "--mutants" ]; then run_mutants python3 "$here/mutants.py" "$root"; exit; fi
+if [ "${1:-}" = "--mutants" ]; then run_mutants python3 "$here/mutants.py"; exit; fi
 rm -f "$out/check"
 swiftc -O iOSClient/KeyframeRecovery.swift "$here/main.swift" -o "$out/check"
 "$out/check"
