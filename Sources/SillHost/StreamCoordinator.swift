@@ -190,6 +190,15 @@ package final class StreamCoordinator {
     private lazy var gestureDrops = RefusalSummary(queue: .main, categories: ["gestures"]) { counts in
         "Gestures ignored: \(counts["gestures"] ?? 0) in a minute, from devices sending more than \(StreamCoordinator.gesturesPerSecond) a second."
     }
+    /// A device's keyframe requests (kind 44, issue #101: its picture was interrupted): when each
+    /// connection's last one was taken, at most one a second, the rest dropped with one line a minute.
+    /// A device asks once per interruption, 2 s apart at least (KeyframeRecovery), and each costs a
+    /// keyframe to every device.
+    private var keyframeRequestAt: [ObjectIdentifier: CFAbsoluteTime] = [:]
+    static let keyframeRequestSpacing: CFTimeInterval = 1
+    private lazy var keyframeRequestDrops = RefusalSummary(queue: .main, categories: ["keyframes"]) { counts in
+        "Keyframe requests ignored: \(counts["keyframes"] ?? 0) in a minute, from devices asking more than once a second."
+    }
     /// Gestures waiting for a switch in flight to finish, in arrival order, and the task posting them.
     private var pendingGestures: [(gesture: TrackpadGesture, device: String)] = []
     private var gestureDrain: Task<Void, Never>?
@@ -393,6 +402,7 @@ package final class StreamCoordinator {
                 self.settingsIgnoredLineAt[ObjectIdentifier(connection)] = nil
                 let id = ObjectIdentifier(connection)
                 self.gestureArrivals[id] = nil
+                self.keyframeRequestAt[id] = nil
                 self.routes[id] = nil
                 self.lastPairingWanted[id] = nil
                 self.connections[id] = nil
@@ -947,6 +957,22 @@ package final class StreamCoordinator {
             recent.append(now)
             gestureArrivals[id] = recent
             queueGesture(gesture, from: deviceName(connection))
+        case .keyframeRequest:
+            // A device's picture was interrupted (its display layer failed, or iOS stopped it while
+            // Sill was away) and waits for a keyframe, which a still window never sends. The encoder
+            // makes one from the next repaint, or encodes a still window's last frame again
+            // (HEVCEncoder.requestKeyframe); every device gets it, as when a device joins. Never a
+            // restart or a pick: nothing else streams again and no window comes forward.
+            let id = ObjectIdentifier(connection)
+            let now = CFAbsoluteTimeGetCurrent()
+            if let last = keyframeRequestAt[id], now >= last, now - last < Self.keyframeRequestSpacing {
+                keyframeRequestDrops.count("keyframes")
+                return
+            }
+            keyframeRequestAt[id] = now
+            guard active != .none, let encoder else { return }     // nothing streams: the next stream starts with one
+            print("Keyframe for \(deviceName(connection)): its picture was interrupted.")
+            encoder.requestKeyframe()
         case .viewport:
             guard let v = Wire.decode(Viewport.self, from: message.payload) else { return }
             viewport = v
