@@ -3,7 +3,8 @@
 # Compiles Scripts/menu-check/<harness>.swift with Sources/StreamProtocol and the host's menu files
 # as one module (-package-name sill): MenuReader, MenuFormat and MenuPolicy, and for the mirror
 # MenuMirror, each without its `import StreamProtocol` and `import Network` (the mirror's
-# NWConnection is the harness's FakeConnection); for close, WindowSizer alone. BUDGET replaces
+# NWConnection is the harness's FakeConnection); for close, WindowSizer with WindowRestore (its fits
+# and their way back, issue #57, which WindowSizer's resize calls). BUDGET replaces
 # MenuReader.readBudget.
 set -e
 HARNESS=$1; OUT=$2; BUDGET=${3:-}
@@ -13,7 +14,7 @@ trap 'rm -rf "$T"' EXIT
 cp "$ROOT"/Sources/StreamProtocol/*.swift "$T"/
 files=(MenuReader MenuFormat MenuPolicy)
 [ "$HARNESS" = mirror ] && files+=(MenuMirror)
-[ "$HARNESS" = close ] && files=(WindowSizer)
+[ "$HARNESS" = close ] && files=(WindowSizer WindowRestore)
 for f in "${files[@]}"; do
   sed -e '/^import StreamProtocol$/d' -e '/^import Network$/d' -e 's/NWConnection/FakeConnection/g' \
       "$ROOT/Sources/SillHost/$f.swift" > "$T/$f.swift"
