@@ -127,9 +127,9 @@ Sill has layouts of its own.
   from the website and not from the Mac App Store.
 
 Good to know: Sill shows one window, or the whole desktop, at a time, and it
-plays sound from your Mac only as a beta, off by default. The clipboard carries
-text only, up to 256 KB at a time, and only between apps that both have it.
-Your Mac needs to be awake, with Sill open. Sill may not be able to wake it.
+plays your Mac's sound on your device as a beta, off by default. The clipboard
+carries text only, up to 256 KB at a time, and only between apps that both have
+it. Your Mac needs to be awake, with Sill open. Sill may not be able to wake it.
 After a restart Sill opens only once someone logs in, with Launch at Login on.
 Only the iPhones and iPads you paired can connect, unless you turn off Require
 pairing in Settings › Devices; then any device on your network can, still
