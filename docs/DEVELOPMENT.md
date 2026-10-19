@@ -524,7 +524,12 @@ Mac already has.
 `iOSClient/TextComposition.swift` is the rule, checked in
 `Tests/checks/text-composition`. Debug builds print `hwkey: usage 44 down via
 pressesBegan (control): iPadOS's keyboard switch` for a Control-Space that
-stays on the device.
+stays on the device, and a `textinput:` line for each call iPadOS's text system
+makes and for what went to the Mac (`textinput: setMarkedText "ㄋㄧ" (2,0)`,
+`textinput: unmarkText`, `textinput: sent "你好"`, and each time the input view
+takes the keyboard `textinput: first responder; the keyboards set up: en-US,
+zh-Hant, emoji; this one zh-Hant`): what to read in Xcode's console when an
+input method or dictation types something twice, or not at all.
 
 On a device so far: the pull request's author, on an iPad Air (4th generation)
 with a Magic Keyboard against Sill for Mac 0.5.1, typed Zhuyin on the Magic

@@ -389,7 +389,7 @@ final class InputOverlayView: UIView, UITextInput, UIGestureRecognizerDelegate {
 
     override func didMoveToWindow() {
         super.didMoveToWindow()
-        if window == nil { momentum.stop(); releaseForwardedKeys(); commitComposition() }
+        if window == nil { momentum.stop(); releaseForwardedKeys(); commitComposition("left its window") }
         // A session's start, a rotation's other layout, a reconnect's new screen: the proxy takes the
         // keyboard for a hardware keyboard (on the next turn, once this view is settled in the window).
         if window != nil { keyboardProxy?.joined(self) } else { keyboardProxy?.left(self) }
@@ -600,6 +600,7 @@ final class InputOverlayView: UIView, UITextInput, UIGestureRecognizerDelegate {
     // Either way the latch is spent afterwards: it is a one-shot, like a sticky key.
 
     func insertText(_ text: String) {
+        Self.textinput("insertText \(text.debugDescription)" + (composition.isComposing ? " over the composition" : ""))
         setOwnPointer(nil, .none)
         if !composition.isComposing, !latchedModifiers.isDisjoint(with: .shortcutMakers), text.count == 1,
            let character = text.first, let usage = HIDKey.usage(for: character) {
@@ -622,6 +623,7 @@ final class InputOverlayView: UIView, UITextInput, UIGestureRecognizerDelegate {
     }
 
     func deleteBackward() {
+        Self.textinput("deleteBackward" + (composition.isComposing ? " in the composition" : ""))
         setOwnPointer(nil, .none)
         if !composition.isComposing, !latchedModifiers.isDisjoint(with: .shortcutMakers) {
             sendLatched(HIDKey.deleteBackward)
@@ -644,8 +646,12 @@ final class InputOverlayView: UIView, UITextInput, UIGestureRecognizerDelegate {
     private func typed(_ outputs: [TextComposition.Output]) {
         for output in outputs {
             switch output {
-            case .text(let text): send(.text(text))
-            case .backspaces(let count): for _ in 0..<count { send(.text("\u{8}")) }
+            case .text(let text):
+                Self.textinput("sent \(text.debugDescription)")
+                send(.text(text))
+            case .backspaces(let count):
+                Self.textinput("sent \(count) backspace" + (count == 1 ? "" : "s"))
+                for _ in 0..<count { send(.text("\u{8}")) }
             }
         }
         showComposition()
@@ -655,6 +661,7 @@ final class InputOverlayView: UIView, UITextInput, UIGestureRecognizerDelegate {
                 guard let self else { return }
                 self.trimQueued = false
                 guard self.composition.wantsTrim else { return }
+                Self.textinput("what was typed trimmed to its last \(TextComposition.keep) characters")
                 self.changeUnasked { $0.trim() }
             }
         }
@@ -665,6 +672,7 @@ final class InputOverlayView: UIView, UITextInput, UIGestureRecognizerDelegate {
     /// revised there, so the text system is told it is gone. A composition carries on.
     func forgetTyped() {
         guard !composition.sent.isEmpty else { return }
+        Self.textinput("forgot the \(composition.sent.count) characters typed: the Mac's caret may have moved")
         changeUnasked { $0.reset() }
     }
 
@@ -682,8 +690,9 @@ final class InputOverlayView: UIView, UITextInput, UIGestureRecognizerDelegate {
     /// (it resigns, or leaves its window) goes to the Mac as it stands, as a text field on iPadOS keeps
     /// it: it would otherwise stay over the picture, never sent, and every hardware key after it would
     /// go to an input method that no longer composes it (`pressesBegan`).
-    private func commitComposition() {
-        guard composition.isComposing else { return }
+    private func commitComposition(_ why: String) {
+        guard let marked = composition.marked else { return }
+        Self.textinput("\(why): the composition \(marked.debugDescription) goes to the Mac as it stands")
         typed(composition.unmark())
     }
 
@@ -718,6 +727,11 @@ final class InputOverlayView: UIView, UITextInput, UIGestureRecognizerDelegate {
         applyInputViews(automatic: automatic)
         let became = super.becomeFirstResponder()
         if became {
+            #if DEBUG
+            Self.textinput("first responder; the keyboards set up: "
+                           + UITextInputMode.activeInputModes.compactMap(\.primaryLanguage).joined(separator: ", ")
+                           + "; this one " + (textInputMode?.primaryLanguage ?? "unknown"))
+            #endif
             keyboardProxy?.became(self, automatic: askedAutomatic)
         } else {
             applyInputViews(automatic: before)
@@ -729,7 +743,7 @@ final class InputOverlayView: UIView, UITextInput, UIGestureRecognizerDelegate {
         let resigned = super.resignFirstResponder()
         if resigned {
             releaseForwardedKeys()
-            commitComposition()
+            commitComposition("resigned")
             keyboardProxy?.resigned(self)
         }
         return resigned
@@ -811,6 +825,15 @@ final class InputOverlayView: UIView, UITextInput, UIGestureRecognizerDelegate {
         if let modifiers { line += " (" + InputOverlayView.modifierNames(modifiers) + ")" }
         if let outcome { line += ": " + outcome }
         print(line)
+        #endif
+    }
+
+    /// DEBUG: each call iPadOS's text system makes here and what went to the Mac ("textinput:
+    /// setMarkedText "ㄋㄧˇ" (3,0)", "textinput: sent "你""), so a device shows what an input method or
+    /// dictation did (#138). Nothing in a Release build.
+    static func textinput(_ line: @autoclosure () -> String) {
+        #if DEBUG
+        print("textinput: " + line())
         #endif
     }
 
@@ -963,24 +986,36 @@ extension InputOverlayView {
 
     func replace(_ range: UITextRange, withText text: String) {
         guard let range = offsets(range) else { return }
+        Self.textinput("replace (\(range.location),\(range.length)) with \(text.debugDescription)")
         setOwnPointer(nil, .none)
         typed(composition.replace(range, with: text))
     }
 
     var selectedTextRange: UITextRange? {
         get { Range(composition.selectedRange) }
-        set {}   // the caret stays at the end: the Mac's caret cannot be moved from here
+        set {
+            // The caret stays at the end: the Mac's caret cannot be moved from here.
+            #if DEBUG
+            if let asked = newValue.flatMap(offsets), asked != composition.selectedRange {
+                Self.textinput("selectedTextRange (\(asked.location),\(asked.length)) asked for, not taken: the caret stays at the end")
+            }
+            #endif
+        }
     }
 
     var markedTextRange: UITextRange? { composition.markedRange.map(Range.init) }
 
     func setMarkedText(_ markedText: String?, selectedRange: NSRange) {
+        Self.textinput("setMarkedText \(markedText?.debugDescription ?? "nil") (\(selectedRange.location),\(selectedRange.length))")
         setOwnPointer(nil, .none)
         composition.setMarked(markedText, selected: selectedRange)
         showComposition()
     }
 
-    func unmarkText() { typed(composition.unmark()) }
+    func unmarkText() {
+        Self.textinput("unmarkText" + (composition.isComposing ? "" : ", nothing composed"))
+        typed(composition.unmark())
+    }
 
     var beginningOfDocument: UITextPosition { Position(0) }
     var endOfDocument: UITextPosition { Position(composition.length) }
@@ -1042,6 +1077,7 @@ extension InputOverlayView {
     /// The keyboard just switched (⌃Space, the Globe key): its name, for a second. Not Emoji's or
     /// dictation's, which are no keyboard typed with (TextInputRules.isKeyboard).
     @objc func inputModeChanged() {
+        Self.textinput("the keyboard is now " + (textInputMode?.primaryLanguage ?? "unknown") + (isFirstResponder ? "" : " (not first responder)"))
         guard isFirstResponder, !composition.isComposing, let language = textInputMode?.primaryLanguage,
               TextInputRules.isKeyboard(language) else { return }
         place(Locale.current.localizedString(forIdentifier: language) ?? language)
