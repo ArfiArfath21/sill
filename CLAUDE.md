@@ -8,6 +8,72 @@ Formerly winstream; the folder still carries the old name.
 
 ## Current step
 
+**The Close timeout and the interrupted picture (2026-10-19, PR #93 from addhumal, finished on its
+branch `audit-fixes`, which has main at 5c323e6 in it; issue #101).** The triage of 2026-10-16 and
+2026-10-19 (sill-handoff/triage): the close half ready; the re-pick, the broken harness and the
+throttle to change. Host, device and one additive kind (44).
+- Close (the contributor's, kept): the button `kAXCloseButtonAttribute` gives is a new element on the
+  system's default timeout, pressed on the host's main actor, so an app whose close asks about unsaved
+  changes, or a hung one, held input, picks and settings for every device that long. It is
+  type-checked (CFGetTypeID, then the cast, as MenuReader does) and given 1 s. `WindowSizer.perform`
+  says what came of a light (`CommandOutcome`): "Window 104 close: no answer in time (the app is busy,
+  or asking about unsaved changes); it may still act" where it said "refused". The contributor's
+  harness (`Scripts/menu-check/run.sh close`, the fixture's Slow Close window) builds again (since #75
+  WindowSizer needs WindowRestore.swift).
+- The interrupted picture, replaced: the PR picked the source again (kind 6) every 2 s, which
+  restarted every device's stream and raised the window in regular mode, for ever if a layer kept
+  failing. Now the device asks for one keyframe: kind 44 `keyframeRequest`, device → host, empty. The
+  host answers with `HEVCEncoder.requestKeyframe` (a still window's last frame encoded again; every
+  device gets it, as when one joins), at most one a second per connection ("Keyframe for ‹device›:
+  its picture was interrupted."; the rest one line a minute), nothing while nothing streams, never a
+  restart or a raise. A host from before skips it, and the picture waits for the window's next
+  keyframe, as it did. There was no device-to-host keyframe request before: the host asked its
+  encoder only for a joining device and a dropped delta.
+- Device: HEVCDisplayView's `checkLayer` (network queue) flushes a layer that failed (`status`,
+  `error`), could not decode a frame (`failedToDecodeNotification`; one posted before the picture last
+  came back is ignored) or needs a flush to decode again (`requiresFlushToResumeDecoding`, and its
+  notification): at each frame, at each notification and when the picture's window becomes active.
+  It says so (`onNeedsKeyframe`), and a keyframe that ends the wait says the picture is back
+  (`onPictureBack`). The rule, `KeyframeRecovery` (pure, main thread): one ask per interruption, owed
+  again after a trip away; only while the picture's window scene is foreground active (each Sill
+  window has its own client) and something streams; 2 s apart at least; a picture that fails again
+  within 10 s of its keyframe, Sill active throughout, waits 4, 8, 16, then 32 s; a trip away or 10 s
+  back ends that. The Mac sends its parameter sets before every keyframe and each sample carries the
+  format, so nothing else is sent again. DEBUG lines "display: …" and "keyframe: …";
+  `-SillLayerFail <s>[,<s>…]` (a frame that cannot decode, enqueued); TEST ONLY
+  `SILL_TEST_STILL_AFTER=<s>` (a synthetic Desktop still from then on) and `sillclient.py
+  --keyframe@T`.
+- With #107 (on hold): its renderer already calls the same `onNeedsKeyframe`. It should drop its own
+  throttle (`PictureSmoothing.DecoderRecovery`) and its re-pick, and call `onPictureBack` where its
+  renderer takes a keyframe, so one rule serves both (Noah on #93, 2026-10-15: "One recovery mechanism
+  should serve all of them"). #66 compiles StreamClient.swift for its Mac client: the new UIScene and
+  UIApplication observers need its platform layer there.
+- Verified: `keyframe-recovery` 51 checks and 20,000 random sessions against a model of the event
+  history, 28 of 28 mutants (on the way it found a real fault: an ask held back until `last + spacing`
+  was held again at that very time by rounding); `pointer-control` takes kind 44 into its kind table
+  (158 checks, its mutants again); `swift build -c release`; the iOS app for the simulator (CI's
+  command), only the known StreamClient warning; `run-all.sh`, all 45; the menu checks against the
+  fixture: reader 40, budget 4, mirror 69 (it failed 7 once while the screen was locked: nothing
+  presses a menu under the login window), close 4 (back in 1.01 s, as no answer, the close
+  delivered, the front app unchanged). Live on a private iPad simulator (iOS 27.0) against a loopback
+  synthetic host on the software encoder, its Desktop still from 3 s: `-SillLayerFail 6` gave the
+  layer's own -11821, one ask, one host line, the picture back 75 to 125 ms after, and one "Synthetic
+  capture" line (no re-pick); `-SillLayerFail 6,6.6,12` asked at once, then 4.0 to 4.2 and 8.1 to
+  8.3 s after the ask before (spacing 2, 4, 8), three host lines, twice; against a host binary built
+  without the handler (as a Mac from before kind 44 is), one ask and nothing more, the flushed layer
+  keeping its last image; a trip to the background (Settings for 2 s): the simulator's layer never
+  stops, nothing asked, the picture as it was; `sillclient.py --keyframe@3
+  --keyframe@3.2 --keyframe@3.4 --keyframe@5.5`: keyframes 50 to 60 ms after the two taken, one
+  "ignored" line, and nothing for a request while nothing streams.
+- **Untested, for Noah:** on the iPad (and the iPhone) with this build and a Sill.app from this
+  branch: a still window (TextEdit, nothing changing), Sill sent to the background for 2 s and back:
+  the console's "display: the picture was interrupted …", one "Keyframe for …" in Sill.log, the
+  picture at once, no "Capture started" and the window not raised; ten quick trips (a line each); a
+  video playing in Split View beside Sill; two Sill windows, one swapped out and back; Close on a
+  TextEdit window with unsaved changes: its alert on the Mac, "no answer in time" in Sill.log, input
+  and picks unaffected meanwhile; this iPad against Sill for Mac 0.5.1 (nothing asked of it,
+  nothing else different).
+
 **The clipboard both ways (2026-10-14, branch `clipboard` from main at 985a733; issue #64; PR #78;
 the plan, its open questions with the default taken for each, the results and the review's fixes are
 in `docs/clipboard-plan.md`).** Noah: work on the clipboard (after #67/#68, #69, #59, #57, #58), text
@@ -4932,7 +4998,9 @@ good.
   which change of the Mac's pasteboard the host sends and to whom, and only
   while macOS allows every read (`MacAccess`); the device's subscription,
   which text from the Mac it writes, a Paste's receipt, the chip and its time,
-  every word; pure, `Tests/checks/clipboard`).
+  every word; pure, `Tests/checks/clipboard`). Kind 44, `keyframeRequest`
+  (device → host, no payload: this device's picture was interrupted and waits
+  for a keyframe; issue #101), has no type of its own.
 - `Sources/SillHost/` — the `SillHostCore` library. `StreamCoordinator` (main
   actor; owns the pipeline, switches sources on client request, raises the
   picked window in regular mode (never on the virtual display), applies
@@ -4945,8 +5013,9 @@ good.
   from near the Mac, Direct Wireless never from away), sends kind 18 with the
   catalog, says goodbye (kind 22) at quit, sends the streamed app's menus to
   the devices that ask (`MenuMirror`; a window source's app made active and
-  its window key first, as a click does: `focusForMenus`), and writes
-  `HostStatus`),
+  its window key first, as a click does: `focusForMenus`), answers a device's
+  keyframe request (kind 44) with `HEVCEncoder.requestKeyframe`, at most one a
+  second per connection, never a restart, and writes `HostStatus`),
   `HostConfig` (the knobs: maxFPS, captureScale, bitrate per 60 fps, the
   away pair awayBitrate and awayCaptureScale, prioritizeSpeed, virtualDisplay,
   directWireless, remoteAccess, remotePort, internetAccess, requirePairing,
@@ -4972,7 +5041,9 @@ good.
   connected; icons; installed apps in the background),
   `WindowCapture` (ScreenCaptureKit), `SyntheticCapture` (test pattern for
   `--synthetic`; SILL_TEST_PATTERN=noise adds a square of noise,
-  SILL_TEST_PATTERN=picture:<path> shows a still picture instead), `HEVCEncoder` (VideoToolbox with one frame inside, a
+  SILL_TEST_PATTERN=picture:<path> shows a still picture instead,
+  SILL_TEST_STILL_AFTER=<s> sends no frame from s seconds on, as a window that
+  stopped changing), `HEVCEncoder` (VideoToolbox with one frame inside, a
   one-slot mailbox behind it and a hang watchdog; hardware or software; says
   whether a stalled frame came back; gives a stream whose session settled in
   the slow state a new one), `EncoderSlowState` (when that is, and whether the
@@ -5012,7 +5083,9 @@ good.
   `Tests/checks/key-strokes`),
   `WindowSizer` (Accessibility resize for the Aa scale, returning what it did,
   `Fit`; `placement/move/restore` for the virtual display; `AXWindows`,
-  WindowRestore's reads and writes through Accessibility), `WindowRestore` (a
+  WindowRestore's reads and writes through Accessibility; `perform`, a window's
+  lights (kind 15), each element with a timeout, Close's button 1 s, and what
+  came of it, `CommandOutcome`: done, refused or no answer in time), `WindowRestore` (a
   window Sill sized for a device goes back when it stops streaming: each fit's
   record and `movedSince`, the decision at the stop, the sequences that fit a
   window and put it back over `WindowRestore.Access` (`fit`, `stop`,
@@ -5198,7 +5271,7 @@ good.
   `--expect=K=V[,…]` against the last kind 16, which it prints one per line,
   and each second's frames with their kB (the encoder's output);
   `--host`, `--device`, `--big-payload`, `--flood`, `--stop-ping@T`,
-  `--stop-read@T`, `--pairing-wanted@T`; the remote door with `--tls
+  `--stop-read@T`, `--pairing-wanted@T`, `--keyframe@T` (kind 44); the remote door with `--tls
   --identity=DIR`, `--pair-url`, `--pair-code`, `--pin=FP|none` and
   `--expect-tls-fail`, printing kinds 18, 20 and 22; pairing at home with
   `--pair-ask[=cable]`, `--then-code=FILE`, `--pair-hold=S`, `--pair-cancel`,
@@ -5219,14 +5292,18 @@ good.
   `Scripts/menufixture.swift` (TEST ONLY) is the menu gates' app: an AppKit
   menu bar of known menus (Probe's marks, shortcuts, a disabled item, a
   retitled one, a slow action, Deep three levels, 300 and 600 items), the
-  prohibited policy so it can never take the front, its one window off every
-  display, every delegate call and action logged (an action also as "PRESS
+  prohibited policy so it can never take the front, its windows off every
+  display (the label's, and Slow Close, whose close holds its main thread 4 s
+  and keeps it open, as a close asking about unsaved changes does), every
+  delegate call and action logged (an action also as "PRESS
   'item' in 'menu'"), SIGUSR1 and SIGUSR2 giving Probe › Rebuilt a new NSMenu,
   SIGHUP inserting an item at the top of Probe in place and SIGALRM giving
   Probe a new NSMenu; `menufixture label PID` reads its label over
   Accessibility. `Scripts/menu-check/run.sh` runs the real MenuReader and
   MenuMirror against it with no host and no encoder (safe while Sill.app
-  streams; it needs Accessibility for whatever runs it).
+  streams; it needs Accessibility for whatever runs it, and an unlocked screen),
+  and its `close` step WindowSizer's Close (with WindowRestore.swift, which
+  WindowSizer needs since #75) against Slow Close: back within 1 s, as no answer.
   `Scripts/restore-probe/run.sh` (TEST ONLY; issue #57) drives the real
   `WindowSizer.resize` and a fitted window's way back (WindowRestore's `fit`
   and `stop` through `WindowSizer.AXWindows`) against a window of its own
@@ -5374,7 +5451,16 @@ good.
   host's KeyStrokes), `TrackpadView` (the relative pad: its
   cursor a `PadCursor`, from the anchor; a recognizer that only counts fingers;
   `verticalSpan`, a phone's width ÷ 1.6, and the DEBUG input test),
-  `HEVCDisplayView` (shared display view, the one pointer sprite + DEBUG HUD),
+  `HEVCDisplayView` (shared display view, the one pointer sprite + DEBUG HUD;
+  the picture's interruptions on the network queue: `checkLayer` flushes a layer
+  that failed, could not decode a frame or needs a flush to decode again, at each
+  frame, at its notifications and when the window becomes active, and says so,
+  `onNeedsKeyframe`, then `onPictureBack`; DEBUG `-SillLayerFail`),
+  `KeyframeRecovery` (when the device asks the Mac for a keyframe, kind 44,
+  after its picture was interrupted: one ask per interruption, only while the
+  picture's window is active and something streams, 2 s apart, 4 to 32 s for a
+  picture that keeps failing; pure, `Tests/checks/keyframe-recovery`; pbxproj
+  AC11/FC11),
   `DiagnosticsHUD` (client stats reporter),
   `StreamClient+Viewport`, `ContentView` (connect screen with rows ending in
   Wired, Wi-Fi, Direct or Remote, the hint and Search Nearby, Add a Mac…, and
@@ -5536,7 +5622,8 @@ good.
   `hardware-keyboard` (iOSClient's HardwareKeyboardPolicy),
   `home-device`, `home-model`, `home-records`, `home-txt`, `key-strokes` (the
   host's KeyStrokes and the device's KeyChords, against a model of the Mac's
-  HID state table and of a Mac from before), `ledger`,
+  HID state table and of a Mac from before), `keyframe-recovery` (iOSClient's
+  KeyframeRecovery, against a model of the event history), `ledger`,
   `menu-state` (iOSClient's MacMenuState), `menus` (the host's MenuFormat and
   MenuPolicy, and MacMenu.swift's JSON), `message-reader`, `origin`,
   `pairing-address`, `phone-portrait`, `pointer-control`, `pointer-presence`,
@@ -5595,6 +5682,8 @@ swift run -c release SillHost --print-cable # what the cable rule reads on each 
 swift run -c release SillHost --menu-selftest=TextEdit   # the menus a device would be sent for that app (a pid, or the start of its name), read once; read-only
 python3 Scripts/sillclient.py PORT 5 none --pair-ask --then-code=$T/code --identity=$T/a   # a device's ask at a TLS home door, then the code the host printed (saved in $T/code)
 python3 Scripts/sillclient.py PORT 8 desktop --set=bitrate=25000000@3 --expect=bitrate=25000000   # a device's settings change
+SILL_TEST_LOOPBACK=1 SILL_TEST_SOFTWARE_ENCODER=1 SILL_TEST_NO_ROUTER=1 SILL_TEST_STILL_AFTER=3 .build/release/SillHost --synthetic   # the Desktop still from 3 s on: a device's picture comes back only through its keyframe request
+python3 Scripts/sillclient.py PORT 8 desktop --keyframe@3   # kind 44: "Keyframe for …" on the host, and the summary's "keyframes at" shows the one it brought
 SILL_TEST_LOOPBACK=1 SILL_TEST_SOFTWARE_ENCODER=1 SILL_TEST_POINTER_PATH=$T/path .build/release/SillHost --synthetic   # a scripted pointer on the test pattern, on 127.0.0.1 alone, never the hardware encoder
 python3 Scripts/sillclient.py PORT 6 desktop --pointer --move=0.25,0.25@3   # each kind 26 as it arrives; input goes only to a --synthetic host
 SILL_TEST_INPUT_LOG=1 SILL_TEST_LOOPBACK=1 SILL_TEST_SOFTWARE_ENCODER=1 SILL_TEST_POINTER_PATH=$T/path .build/release/SillHost --synthetic   # prints each event a dry run would post ("Test input: key 49 up (none)")
@@ -5856,7 +5945,11 @@ three dials of it that did not connect), `-SillBrowserFail N` (the normal app
 and `-SillLive 1`: each of the first N network browsers is reported failed with
 -65569, as iOS reports a suspended app's, half a second after it starts, so it
 is made again after 1, 2, 4… s; the console's "browser: …" lines, and the
-reconnect's "reconnect: …"),
+reconnect's "reconnect: …"), `-SillLayerFail <s>[,<s>…]` (the normal app and
+`-SillLive 1`: at each of these seconds after the launch's first picture a frame
+that cannot decode goes onto the display layer, so the picture's recovery runs
+for real, issue #101; the console's "display: …" and "keyframe: …" lines; against
+a host with SILL_TEST_STILL_AFTER the picture comes back only through the ask),
 `-SillPointer mac@X,Y|device@X,Y|hidden|pencil@X,Y` (the pointer sprite in one
 of docs/pointer-visibility-plan.md's states over the mock's frame, which it
 draws as a dim rectangle; `-SillPencilPointer 1` is Q2's flip),
@@ -6004,9 +6097,10 @@ device keeps working with Macs from the first public build on, or each says why
   the plain-TCP `_sill._tcp` door, which only development builds and the CLI without `--pairing`
   keep; the ALPNs `sill/1` and `sill-pair/1`, which every host offers for good at both doors
   (`RemoteTLS.serverALPNs`: a later generation's `sill/2` only ever goes beside them); the 14-byte
-  header; kinds 0–28 and 32 and their payloads (HEVC with ParameterSets; the JSON of Switcher,
+  header; kinds 0–28, 32 and 44 and their payloads (HEVC with ParameterSets; the JSON of Switcher,
   Input, Viewport, HostSettings, Remote, Compatibility, Pointer, MacMenu, Gesture and Clipboard;
-  29 to 31 stay free, 29 the audio plan's, 30 and 31 pull request #66's), inside `sill/1` at
+  44, a device's keyframe request after its picture was interrupted, empty, which a host from
+  before skips; 29 to 31 stay free, 29 the audio plan's, 30 and 31 pull request #66's), inside `sill/1` at
   both doors (19 and 20 on their own `sill-pair/1` connection, the next bullet); the ping echo; a
   kind 16 within 2 s of the first window list, one per connection since Sill for Mac 0.5.1 (away
   from home, docs/remote-bundle-plan.md §4): its `settings` the pair that connection's controls
