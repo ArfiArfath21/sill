@@ -144,7 +144,8 @@ struct ContentView: View {
 ///   simulator can connect to a Mac over Bonjour at a Duo size. Not connected yet shows the normal
 ///   connect screen inside the frame. Without it nothing touches the network, exactly as before.
 /// * `-SillHUD 1` — not a harness argument, but it combines with these: the fps / frame age / RTT
-///   readout on the display view (see `DiagnosticsHUDView`). It works with or without the harness.
+///   readout on the display view (see `DiagnosticsHUDView`). It works with or without the harness. It
+///   is a subview of the display view, so with tiles on a session's end keeps it in the Mac's picture.
 /// * `-SillConnect 127.0.0.1:PORT` — connect straight to that address, in the normal app and under
 ///   `-SillLive 1`. The synthetic test hosts (`SillHost --synthetic`, the bare `SillMenuBar
 ///   --synthetic`) stay off Bonjour, so this is how the simulator reaches them.

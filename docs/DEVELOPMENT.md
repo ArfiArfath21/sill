@@ -992,7 +992,8 @@ simulator:
   switch beside the title, so to try the switch write the default instead:
   `xcrun simctl spawn <udid> defaults write me.saffer.sill
   Sill.connectionStyle tiles`.
-- `-SillHUD 1`: fps, frame age, round trip and frame size over the stream.
+- `-SillHUD 1`: fps, frame age, round trip and frame size over the stream
+  (with tiles on, in the picture a session's end keeps for the Mac's tile).
 - `-SillBrowserFail N` (the normal app and `-SillLive 1`): each of the first N
   network browsers is reported failed as iOS reports a suspended app's
   (-65569), so the device makes it again after 1, 2, 4… s; the simulator's
