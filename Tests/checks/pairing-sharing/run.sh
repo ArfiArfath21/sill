@@ -1,9 +1,10 @@
 #!/bin/bash
 # PairingWindowSharing (Sources/SillMenuBar), whether screen sharing shows the pairing window (issue
 # #108): Settings › Devices' "Show the pairing window to screen sharing" alone decides it, whoever
-# opened the window, and the Log's lines for it. Compiled on its own with swiftc (Foundation only).
+# opened the window; the window's NSWindow.SharingType for each answer; and the Log's lines for it.
+# Compiled on its own with swiftc (Foundation, and AppKit for that enum alone: no window, no screen).
 #   Tests/checks/pairing-sharing/run.sh             compile and run the check
-#   Tests/checks/pairing-sharing/run.sh --mutants   one-line mutants of PairingWindowSharing.swift; each must fail it
+#   Tests/checks/pairing-sharing/run.sh --mutants   mutants of PairingWindowSharing.swift; each must fail it
 here="$(cd "$(dirname "$0")" && pwd)"
 source "$here/../common.sh"
 if [ "${1:-}" = "--mutants" ]; then run_mutants python3 "$here/mutants.py" "$root"; exit; fi

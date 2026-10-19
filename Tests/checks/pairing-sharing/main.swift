@@ -1,13 +1,15 @@
+import AppKit
 import Foundation
 
 // Checks PairingWindowSharing (Sources/SillMenuBar, issue #108): whether screen sharing (Screen
 // Sharing, Apple Remote Desktop, VNC apps) shows the pairing window. Settings › Devices' "Show the
 // pairing window to screen sharing" decides it alone: hidden while off, as before the switch; shown
 // while on, whoever opened the window, the Mac's user from the menu or a pane, or a device by asking
-// (a Mac used only through Screen Sharing pairs through the window a device's tap opens). And the
-// Log's lines, which never carry a code. Pure, so it runs with no AppKit, no window and no screen;
-// PairDeviceWindowController turns `.hidden` into `NSWindow.SharingType.none` and `.shown` into
-// `.readOnly`, AppKit's default.
+// (a Mac used only through Screen Sharing pairs through the window a device's tap opens). Then what
+// the window server is told for each answer (`windowSharingType`, which PairDeviceWindowController
+// sets on the window): `.none` hidden, `.readOnly`, AppKit's default, shown. And the Log's lines,
+// which never carry a code. Pure: AppKit is imported for `NSWindow.SharingType` alone, so it runs
+// with no window and no screen.
 
 var failures = 0
 var checks = 0
@@ -50,6 +52,21 @@ for (what, change, want) in steps {
     change()
     check("one window: \(what)", PairingWindowSharing.pairingWindow(switchOn: switchOn, byDevice: byDevice), want)
 }
+
+// What the window server is told: the part of the rule that reaches Screen Sharing. A swap here
+// would hide the window with the switch on and show it with the switch off, every case above
+// passing. By name, since `NSWindow.SharingType` prints its type's name alone.
+func sharingName(_ type: NSWindow.SharingType) -> String {
+    switch type {
+    case .none: "none"
+    case .readOnly: "readOnly"
+    default: "rawValue \(type.rawValue)"
+    }
+}
+check("hidden → NSWindow.SharingType.none (Screen Sharing and other remote viewers leave the window out)",
+      sharingName(PairingWindowSharing.hidden.windowSharingType), "none")
+check("shown → NSWindow.SharingType.readOnly (AppKit's default: shown as any window is)",
+      sharingName(PairingWindowSharing.shown.windowSharingType), "readOnly")
 
 // The Log's lines: what the switch does, in the house words, and never a code (no digit at all).
 let onLine = PairingWindowSharing.line(on: true)

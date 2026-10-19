@@ -1,10 +1,13 @@
-"""Mutants of PairingWindowSharing.swift (issue #108): each changes it in one place, is compiled with
-the check by build.sh and must make it fail. usage: mutants.py WORKTREE"""
+"""Mutants of PairingWindowSharing.swift (issue #108): each changes it in one place (the rule, the
+window's sharing type for each answer, the Log's lines), is compiled with the check by build.sh and
+must make it fail. usage: mutants.py WORKTREE"""
 import os, subprocess, sys, tempfile
 WT = sys.argv[1]; HERE = os.path.dirname(os.path.abspath(__file__))
 F = os.path.join(WT, "Sources/SillMenuBar/PairingWindowSharing.swift")
 RULE = "        switchOn ? .shown : .hidden\n"
 ON = "on ? \"Pairing window: shown to screen sharing"
+HIDDEN = "        case .hidden: .none\n"
+SHOWN = "        case .shown: .readOnly\n"
 MUTANTS = [
     ("the switch ignored: always hidden", RULE, "        .hidden\n"),
     ("the switch ignored: always shown", RULE, "        .shown\n"),
@@ -15,6 +18,11 @@ MUTANTS = [
     ("the two lines swapped", ON, "!" + ON),
     ("the on line without its warning",
      "; anyone who can see this Mac’s screen remotely can read its code.\"", ".\""),
+    # What the window server is told (windowSharingType, under #if canImport(AppKit)).
+    ("the window's sharing types swapped", HIDDEN + SHOWN,
+     "        case .hidden: .readOnly\n        case .shown: .none\n"),
+    ("hidden told .readOnly: never left out", HIDDEN, "        case .hidden: .readOnly\n"),
+    ("shown told .none: never shown", SHOWN, "        case .shown: .none\n"),
 ]
 caught = 0
 for name, old, new in MUTANTS:

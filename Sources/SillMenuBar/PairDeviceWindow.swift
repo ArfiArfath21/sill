@@ -100,16 +100,6 @@ final class PairDeviceWindowController: NSWindowController, NSWindowDelegate {
     }
 }
 
-extension PairingWindowSharing {
-    /// The window's sharing type: `.none` hidden, AppKit's default `.readOnly` shown.
-    var windowSharingType: NSWindow.SharingType {
-        switch self {
-        case .hidden: .none
-        case .shown: .readOnly
-        }
-    }
-}
-
 /// The window's content, live: the offer, the host's remote status, the Remote Access setting.
 private struct LivePairDeviceView: View {
     let model: AppModel

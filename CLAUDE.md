@@ -5163,8 +5163,9 @@ good.
   (Settings › Remote Access), `PairDeviceWindow` (the QR code and the typed
   code; the window a device's ask opens, and the cable notice),
   `PairingWindowSharing` (whether screen sharing shows that window: hidden
-  unless Settings › Devices' switch is on, whoever opened it; issue #108; pure,
-  `Tests/checks/pairing-sharing`), `PairingWindowAddress` (the address that window gives to type:
+  unless Settings › Devices' switch is on, whoever opened it, and the
+  window's `NSWindow.SharingType` for each, `.none` or `.readOnly`; issue #108;
+  pure, `Tests/checks/pairing-sharing`), `PairingWindowAddress` (the address that window gives to type:
   Tailscale's name and IPv4 first, another VPN's IP only under this network's
   address; pure, checked with swiftc), `UpdatePolicy` (the update check's rules
   and words; pure, checked with swiftc) and `UpdateChecker` (main actor; asks

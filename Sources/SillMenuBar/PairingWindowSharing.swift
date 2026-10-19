@@ -1,9 +1,13 @@
 import Foundation
+#if canImport(AppKit)
+import AppKit
+#endif
 
 /// Whether screen sharing shows the pairing window (issue #108): Settings › Devices' "Show the
 /// pairing window to screen sharing", saved as `showPairingWindowToScreenSharing` (HostSettings).
-/// Pure, so `Tests/checks/pairing-sharing` runs it with swiftc; PairDeviceWindowController turns it
-/// into the window's `NSWindow.SharingType`.
+/// Pure, so `Tests/checks/pairing-sharing` runs it with swiftc, the window's `NSWindow.SharingType`
+/// for each answer included (`windowSharingType`, below, which PairDeviceWindowController sets: the
+/// check imports AppKit for that enum alone, and makes no window).
 ///
 /// The pairing window is the one window Sill keeps out of what other apps see of the screen
 /// (`.none`): Screen Sharing, Apple Remote Desktop and VNC apps such as Screens leave it out
@@ -40,3 +44,17 @@ enum PairingWindowSharing: Equatable {
            : "Pairing window: hidden from screen sharing (Settings › Devices)."
     }
 }
+
+#if canImport(AppKit)
+extension PairingWindowSharing {
+    /// What the window server is told (`NSWindow.sharingType`): `.none` hidden, so Screen Sharing,
+    /// Apple Remote Desktop and VNC apps leave the window out; `.readOnly`, AppKit's default for any
+    /// window, shown.
+    var windowSharingType: NSWindow.SharingType {
+        switch self {
+        case .hidden: .none
+        case .shown: .readOnly
+        }
+    }
+}
+#endif
