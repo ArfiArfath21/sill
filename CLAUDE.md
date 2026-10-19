@@ -8,6 +8,45 @@ Formerly winstream; the folder still carries the old name.
 
 ## Current step
 
+**A sleeping display wakes for a device (2026-10-19, PR #151 from acalatrava's
+`fix/keep-display-awake`, reworked on top of its 2b8be47; issue #134).** Noah: "Modify the black
+windows pull request to implement it properly (user activity when a device connects as you said)."
+Host only: no wire change, nothing on the device, no setting.
+- The rule (`DisplayWake`, pure; `Tests/checks/display-wake`, 57 checks and 24 of 24 mutants, in CI's
+  matrix): user activity is declared on the Mac as a key press would declare it
+  (`IOPMAssertionDeclareUserActivity`, `kIOPMUserActiveLocal`: `DisplayActivity`, on a queue of its
+  own) when a device's session connects (every connection, the coordinator's `deviceActive`), and
+  for a pick or an app launched (kinds 6, 7) and input (kinds 8, 15, 25, 28) only 5 s or more after
+  the last declaration. Nothing is held: the display sleeps again by the Mac's own setting, counted
+  from the last declaration. One line, only when the main display was asleep just before
+  (`CGDisplayIsAsleep`): "Woke the display for iPad (iPad14,1), which connected."; `disp.wake` in
+  the stats line. A test host (`--synthetic`, as `injector.dryRun`) declares nothing and counts
+  `disp.wakeDry`. docs/DEVELOPMENT.md, "A sleeping display".
+- Changed from the PR as opened: its PreventUserIdleDisplaySleep assertion, held for every session
+  (the panel lit all session long, against #133's privacy mode, and at home the Mac kept from idle
+  sleep), and its single `kIOPMUserActiveRemote` declaration at the first device are gone; nothing
+  runs on test hosts; no NSLog. Its device change (the idle timer off while the stream screen shows)
+  is dropped: one window's stream screen leaving put auto-lock back while another window's session
+  went on, a window closed mid-session may never run its onDisappear, and a device kept lit beside a
+  Mac whose display now sleeps by itself shows black; it is its own decision, for its own PR.
+- Verified: `swift build -c release`, only the CaptureProbe warning (both binaries import
+  `IOPMAssertionDeclareUserActivity` and `CGDisplayIsAsleep`; the real call never ran here); the
+  check and its mutants; `run-all.sh`, all 45; a loopback synthetic host on the software encoder
+  with `sillclient.py` connecting, picking the Desktop and sending input for 17 s: `disp.wakeDry 1`
+  at the connect, at a move 6.2 s in and at one 12.5 s in, nothing for a pick at 8 s, the moves
+  between, a tap, a gesture or a key; again with a pick of nothing 6 s in (not counted) and the
+  Desktop 7 s in (counted); no `disp.wake`, no "Woke" line, and `pmset -g assertions` listing
+  nothing of the host's.
+- **Untested, for Noah,** with Sill.app from this branch: `pmset displaysleepnow`, then connect the
+  iPad at home and through Tailscale: the picture, not black windows, and Sill.log's "Woke the
+  display for …, which connected."; `pmset -g assertions` lists `UserIsActive named: "Sill: a
+  device is using this Mac"`, its timeout the display-sleep setting; with the iPad left connected
+  and untouched the display sleeps by its own setting, and a touch on the stream wakes it; a locked
+  Mac (⌃⌘Q, the display asleep): its lock screen on the iPad; and whether a capture stops while the
+  display sleeps: "Capture stopped: …" in Sill.log, then "…, which picked what to stream." without a
+  touch, would mean the device's automatic Desktop request wakes the display each time it sleeps
+  (then Desktop picks should stop counting).
+
 **The clipboard both ways (2026-10-14, branch `clipboard` from main at 985a733; issue #64; PR #78;
 the plan, its open questions with the default taken for each, the results and the review's fixes are
 in `docs/clipboard-plan.md`).** Noah: work on the clipboard (after #67/#68, #69, #59, #57, #58), text
@@ -5098,6 +5137,16 @@ good.
   `InputInjector.chord` posts it (`in.gesture`), its key up with the HID
   state table's flags from before it (`KeyStrokes.chord`;
   `in.gestureModifiersLeft` if some stay).
+  A sleeping display (issue #134): `DisplayWake` (when the host declares user
+  activity on the Mac for a device, as a key press would: a session's connect
+  every time, a pick or an app launched and input (kinds 8, 15, 25, 28) only 5 s
+  or more after the last declaration; a test host counts `disp.wakeDry`
+  instead; the "Woke the display for …" line, only for a display that was
+  asleep, and the refusal's, once; pure, `Tests/checks/display-wake`) and
+  `DisplayActivity` (IOPMAssertionDeclareUserActivity with kIOPMUserActiveLocal
+  on its own queue, the main display's sleep state read just before it,
+  `disp.wake`; nothing held: the display sleeps again by the Mac's own
+  setting); the coordinator's `deviceActive` feeds the rule.
 - `Sources/SillHostCLI/main.swift` — the CLI: flags, `dispatchMain` vs
   `NSApplication.run`, the Terminal permission hint; `--pairing` (the home
   door's TLS with pairing required, a throwaway identity, the code and link
@@ -5528,7 +5577,7 @@ good.
   sources with `import StreamProtocol` stripped), or a `module.txt` naming the
   files `module.py` compiles as one module (pairing at home's checks):
   `addresses`, `ask-limits`, `cable-link`, `clientlink`, `clipboard`, `compatibility`,
-  `device-gate`, `dmg-layout` (Scripts/dmg-layout's `.DS_Store` and alias
+  `device-gate`, `display-wake`, `dmg-layout` (Scripts/dmg-layout's `.DS_Store` and alias
   writer, against Finder's own layout of the file, make-dmg.sh's layout
   arguments and the SVG's size and edge), `door-policy`, `duo` (DuoPosture;
   `tour` and `phone-portrait` take the Duo's real sizes too), `encoder-mailbox`,

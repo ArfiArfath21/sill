@@ -385,6 +385,37 @@ sequences that fit a window and put it back (over `WindowRestore.Access`, which
 docs/restore-window-frames-plan.md has the reasons, and The restore probe
 (below) checks it against a real window.
 
+## A sleeping display
+
+While the Mac's display is asleep (the Mac idle, or locked) macOS draws nothing
+new, so the stream is black (issue #134). The host tells macOS that someone is
+using the Mac, as a key press on it does (`IOPMAssertionDeclareUserActivity`
+with `kIOPMUserActiveLocal`, the declaration `caffeinate -u` makes): when a
+device's session connects, and when it picks a window, the Desktop or an app to
+open, or sends input (a touch, a key, a scroll, a trackpad gesture, a menu item
+chosen, a window's buttons), at most once every 5 s. A display that was asleep
+powers on (a locked Mac wakes to its lock screen), and the stream shows it again
+once it is on, as when someone wakes it at the Mac. Nothing is held: the
+display sleeps again by the Mac's own setting (System Settings › Lock Screen),
+counted from the device's last input, as after the last key press. So a device
+left connected and untouched lets the display sleep, the picture goes black,
+and the next touch on the stream wakes it again. Only an admitted session
+counts (a paired device, or any device at home with Require pairing off); a
+request to pair does not. It wakes a display, never a Mac that is asleep, and
+cannot light a closed laptop's display.
+
+The log says "Woke the display for iPad (iPad14,1), which connected." (or
+"…, which picked what to stream.", "…, which sent input.") only when the main
+display was asleep just before; the stats line counts each declaration as
+`disp.wake`, and `pmset -g assertions` lists it as `UserIsActive named: "Sill: a
+device is using this Mac"` (its "Timeout will fire in" should count down from the
+display-sleep setting, as WindowServer's does after a key press). A test
+host (`--synthetic`, in the CLI and in the app alike) declares nothing and
+touches no display: it counts `disp.wakeDry` instead, so a test client's
+connect, pick and input show what a real host would declare.
+`Sources/SillHost/DisplayWake.swift` is the rule (`Tests/checks/display-wake`),
+`DisplayActivity.swift` the call.
+
 ## Trackpad gestures
 
 Three fingers on the device's glass, on the portrait trackpad or over the
@@ -706,7 +737,8 @@ If it doesn't connect:
 
 - "didn't answer": the Mac is asleep or off, or the VPN is off on the Mac.
   While a device is connected remotely Sill keeps the Mac from going to sleep
-  by itself (the display may still sleep), but it cannot wake a sleeping Mac:
+  by itself (the display may still sleep, and a device's input wakes it: A
+  sleeping display, above), but it cannot wake a sleeping Mac:
   for a Mac that should stay reachable, prevent automatic sleeping in System
   Settings › Energy (or Battery).
 - "Tailscale looks off on this iPad": turn it on on the device.
@@ -788,8 +820,9 @@ ends, which three-finger strokes are gestures and what the Mac does with one,
 which modifiers a device's keys leave set on the Mac,
 the first-run tour, pairing at home (the doors, the cable, the device's rows),
 which keychain Sill.app keeps its identity in, the away quality and the link's
-judgement, the iPhone Duo's layouts, and what of the clipboard goes between
-the Mac and a device) on their own with a check each, and
+judgement, the iPhone Duo's layouts, what of the clipboard goes between
+the Mac and a device, and when the Mac's display is woken for a device) on their
+own with a check each, and
 runs them: about five minutes, no device, permission or encoder. `--mutants`
 also checks that each check fails when its file is changed in one place (well
 over an hour).
@@ -1169,6 +1202,9 @@ AirDrop, Sidecar and Universal Control can hold AWDL on too.
 - Read the host's stats line. `cap` counting with `enc.out` stuck at zero means
   the encoder, not the capture. `cap` at zero means the window is not
   repainting (covered on the Mac, or the app is idle).
+- Black windows, thumbnails too: the Mac's display is probably asleep. A
+  device's connect, pick or input wakes it (A sleeping display, above), so
+  touch the stream; the log's "Woke the display for …" says it was asleep.
 - The Mac has one hardware video encoder, shared by every app. When it keeps
   a frame for 1.5 s the log says "switching to the software encoder" and the
   stream restarts at half resolution on the CPU, up to 60 fps (a launch probe
