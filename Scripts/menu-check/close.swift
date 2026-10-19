@@ -23,10 +23,11 @@ check(window != nil, "the fixture's Slow Close window is found")
 if let window {
     AXUIElementSetMessagingTimeout(window, 1.0)
     let started = CFAbsoluteTimeGetCurrent()
-    let done = MainActor.assumeIsolated { WindowSizer.perform(.close, element: window) }   // main.swift's top level runs on the main thread
+    let outcome = MainActor.assumeIsolated { WindowSizer.perform(.close, element: window) }   // main.swift's top level runs on the main thread
     let took = CFAbsoluteTimeGetCurrent() - started
-    print(String(format: "     close took %.2f s, %@", took, done ? "done" : "refused"))
+    print(String(format: "     close took %.2f s: %@", took, outcome.words))
     check(took < 1.5, "the close comes back within 1.5 s while the app holds its main thread")
+    check(outcome == .noAnswer, "and says the app did not answer in time, not that it refused")
     Thread.sleep(forTimeInterval: 0.3)
     check(log().contains("windowShouldClose 'Slow Close' (sleeping 4 s)"), "the press reached the window's close")
     Thread.sleep(forTimeInterval: 4.5)     // the fixture's sleep, so it exits cleanly

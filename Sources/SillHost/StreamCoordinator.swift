@@ -889,15 +889,15 @@ package final class StreamCoordinator {
             // Accessibility. The staged window's element is already matched; others are looked up.
             guard let cmd = Wire.decode(WindowCommand.self, from: message.payload) else { return }
             gestureChords.forget()              // a window's own button: a view a gesture opened is left behind
-            let done: Bool
+            let outcome: WindowSizer.CommandOutcome
             if virtualDisplay, let p = stage.placement, p.windowID == cmd.id {
-                done = WindowSizer.perform(cmd.action, element: p.element)
+                outcome = WindowSizer.perform(cmd.action, element: p.element)
             } else if let w = catalog.window(id: cmd.id) {
-                done = sizer.perform(cmd.action, on: w)
+                outcome = sizer.perform(cmd.action, on: w)
             } else {
-                done = false
+                outcome = .refused
             }
-            print("Window \(cmd.id) \(cmd.action.rawValue): \(done ? "done" : "refused")")
+            print("Window \(cmd.id) \(cmd.action.rawValue): \(outcome.words)")
             Stats.shared.bump("win.\(cmd.action.rawValue)")
             await catalog.refreshWindows()      // show the result now, not at the next poll
         case .launchApp:

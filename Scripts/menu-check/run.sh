@@ -15,7 +15,8 @@
 #           read, the app gone, subscribers leaving, the tree changed in place, only subscribers
 #           served, a request's deadline, a sweep's one top-level read)
 #   close   WindowSizer's close (the bar's long-press Close) against the fixture's Slow Close
-#           window, whose close holds its main thread 4 s: back within its own 1 s timeout
+#           window, whose close holds its main thread 4 s: back within its own 1 s timeout, as no
+#           answer (the host's "Window N close: no answer in time …"), the close still delivered
 # usage: Scripts/menu-check/run.sh [reader] [budget] [mirror] [close]   (no argument: all)
 # Everything builds under .build/menu-check/. The fixture runs with the prohibited policy and cannot
 # take the front; `lsappinfo front` is sampled every 0.1 s through each run, and a change fails it.
