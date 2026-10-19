@@ -15,7 +15,8 @@ at 2b114e1, then main at 985a733 (PRs #37, #39 to #56: pairing at home, away
 from home, the iPhone Duo with the iOS 27.1 SDK, the 0.5.1 release) merged in on
 2026-10-13, then main at 5c323e6 (PRs #74, #75, #77, #78, #79, #80, #85, #98)
 merged in on 2026-10-18, never rebased; the plan, its critique, the refresh and the results
-are in `docs/audio-plan.md`).** Noah (2026-09-27), first in what he wants
+are in `docs/audio-plan.md`; PR #94 by Code-Tomato, who finished it from 9288aa6; in, as a beta,
+since 2026-10-20: the last bullet).** Noah (2026-09-27), first in what he wants
 worked on: "Audio: the plan is done and parked as a v2 feature by your earlier
 decision". So the sound is in scope now (docs/BRIEF.md, the decisions below),
 and every open question takes its default (Send Audio off by default, AAC-ELD
@@ -36,9 +37,10 @@ fixed (5126215 to 8bbbe52, below) and verified in the simulator
   device's list). Kinds 16 and 17 gain `sendAudio` (nil from a host without
   sound), the state gains `audioNote`, and ClientStats gains `audioBehindMs`
   and `audioLate`. `SillProtocol` stays 1.
-- Host: Send Audio (`HostConfig.sendAudio`) is off in `standard` and comes
-  from kinds 16 and 17 through either door. It is not in `restartNeeded`, so
-  the picture never restarts for it.
+- Host: Send Audio (`HostConfig.sendAudio`) is off in `standard` and, since
+  the beta, the Mac's alone (its menu and Settings, the CLI's `--audio`): a
+  device's kind 17 `sendAudio` is refused from either door (the plan's Q8).
+  It is not in `restartNeeded`, so the picture never restarts for it.
   - `AudioPipeline` follows the source from `active`'s didSet, where the
     pointer and the menus follow it. The same app keeps its stream through
     every restart of the picture. Another app, the Desktop or the test tone is
@@ -91,11 +93,11 @@ fixed (5126215 to 8bbbe52, below) and verified in the simulator
     cover. Headphones out mute it and say so. The simulator renders offline
     (manual rendering) in every build: nothing opens an output.
   - The Sound button counts Menus whether or not it shows: where only one fits
-    (an iPhone SE sideways, iPad windows under 532 pt upright, and with Larger
-    Picture a phone under 384 pt upright, whose row 1 takes Sound before
-    Settings only where seven buttons of 44 pt fit) Menus keeps its
+    (an iPhone SE sideways, iPad windows under 532 pt upright) Menus keeps its
     place and Sound is the panel's switch alone, as in the iPhone Duo's book
-    pose. A remote session by address takes home's cover, as the Mac counts it.
+    pose and, since the beta, with Larger Picture on every phone (row 1 as
+    Noah approved it: the plan's Q10). A remote session by address takes
+    home's cover, as the Mac counts it.
   - The review's fixes (2026-10-13): 5126215 (the configuration change, nothing
     decoded while silent, a start's reset, unmute retrying a refused session, a
     DEBUG leak), fca4c80 (the fades), 46cc7e4 (the console's "audio: jump -870
@@ -187,10 +189,11 @@ fixed (5126215 to 8bbbe52, below) and verified in the simulator
   docs/audio-plan.md, "Merged with main at 5c323e6"): PRs #74, #75, #77 to #80,
   #85 and #98. Where they meet: kind 32 (#78's clipboard) beside 43, 29–31 and
   33–42 free (#66's); `sendAudio` beside `shareClipboard` in HostConfig and the
-  CLI; with Larger Picture (#79) the Sound button joins row 1 before Settings
+  CLI; with Larger Picture (#79) the Sound button joined row 1 before Settings
   (Apps, Menus, Aa, Keyboard, Desktop, Sound, Settings) only from 384 pt
   (`PhonePortraitLayout.row1Beside`), narrower the panel's switch alone, a
-  question for Noah (the plan's Q10); and #75's regular-mode window that streams
+  question for Noah (the plan's Q10; the beta took it out again: the panel's
+  switch alone there); and #75's regular-mode window that streams
   on through three looks off the catalog's list keeps its sound (`select` keeps
   its app, `streamedPID`, which `audioKey` falls back to; before, a follow then
   stopped it). Verified: `swift build -c release`; the iOS app from a scratch
@@ -5304,11 +5307,13 @@ good.
   `InputInjector.chord` posts it (`in.gesture`), its key up with the HID
   state table's flags from before it (`KeyStrokes.chord`;
   `in.gestureModifiersLeft` if some stay).
-  The Mac's sound (docs/audio-plan.md): `AudioPipeline` (the source it follows
+  The Mac's sound (docs/audio-plan.md; a beta since 2026-10-20): `AudioPipeline` (the source it follows
   from `active`'s didSet, one transition at a time; on `sill.audio` the
   packetizer, the encoder, the epochs and the stamps; the status and kind 16's
-  note), `AudioCapture` (ScreenCaptureKit's audio-only stream of one app, or of
-  every app but Sill's, bounded start and stop; never run by a test),
+  note; `prepare`, AAC-ELD's codec loaded once off `sill.audio` when Send Audio
+  is on), `AudioCapture` (ScreenCaptureKit's audio-only stream of one app, or of
+  every app but Sill's, bounded start and stop, the running stream under a
+  lock; never run by a test),
   `SyntheticAudio` (a synthetic host's test tone; the TEST ONLY
   `SILL_TEST_AUDIO_CHUNK` and `SILL_TEST_AUDIO_PAUSE`), `TestTone` (440 Hz and a
   click at each whole second of the stamps' clock; pure), `AudioPacketizer`
@@ -5690,7 +5695,7 @@ good.
   `AudioDecoder` (AAC-ELD to a buffer per channel, one packet at a time;
   AudioToolbox only), `AudioPlayout` (the sound's timing; pure,
   `Tests/checks/audio-playout`), `AudioOutput` (its queue, the decoder and the
-  engine) and `StreamClient+Audio`: pbxproj AA01–AA04; the host's
+  engine; no video frame taken before the session's first format) and `StreamClient+Audio`: pbxproj AA01–AA04; the host's
   `audio-codec` check and the sound harness's device compile AudioDecoder too.
   `Info-Debug.plist` is the Debug configuration's Info.plist: Info.plist's
   keys, with `_silltest._tcp` beside `_sill._tcp` for the harness's
@@ -5827,7 +5832,7 @@ swift run -c release SillHost --encoder-selftest   # is the hardware encoder ali
 swift run -c release SillHost --virtual-display   # picked windows stream from their own HiDPI display (off by default)
 swift run -c release SillHost --virtual-display-selftest   # create/destroy one display, report what sees it
 swift run -c release SillHost --direct-wireless   # also over peer-to-peer Wi-Fi (AWDL): devices without a shared network (off by default)
-swift run -c release SillHost --audio       # Send Audio for this run: the streamed app's sound to devices that play it (with --synthetic, a test tone; off by default)
+swift run -c release SillHost --audio       # Send Audio (a beta) for this run: the streamed app's sound to devices that play it (with --synthetic, a test tone; off by default; a device cannot change it)
 SILL_TEST_LOOPBACK=1 SILL_TEST_SOFTWARE_ENCODER=1 .build/release/SillHost --synthetic --audio   # the test tone on loopback; sillclient.py PORT 8 desktop --hello=0.6 --audio counts it
 Scripts/audio/run.sh                        # the encoder-free sound harness and its gates (~7 min; no encoder, capture, speaker or device)
 swift run -c release SillHost --remote      # the remote door for this run on any free port (--remote=PORT), a throwaway identity; the code and link print here
@@ -6290,10 +6295,13 @@ device keeps working with Macs from the first public build on, or each says why
   the receiver's clipboard, `image` is reserved for that later generation; a subscription says what
   the device takes, `{}` being text alone, so a host sends `image` only to a connection whose
   subscription carries a later field saying it takes images (`"accepts":2`, say), never to one that
-  sent `{}`; the Mac's sound (kind 43, Audio.swift), once a public build ships it: its two types (a
-  JSON AudioFormat, then packets whose layout never changes: a new layout is a new type),
-  AudioFormat's fields, the hello's `audio`, `sendAudio` and `audioNote`, and kind 43 only to a
-  device whose hello lists a codec the host makes.
+  sent `{}`; the Mac's sound (kind 43, Audio.swift), once a public build ships it, a beta or not:
+  its two types (a JSON AudioFormat, then packets whose layout never changes: a new layout is a new
+  type), AudioFormat's fields, the hello's `audio`, `sendAudio` and `audioNote`, kind 43 only to a
+  device whose hello lists a codec the host makes, and the reader's caps, which a later host keeps
+  within (a device drops a message past them whole): a format at most 4 KB, a packets message at
+  most 16 KB (`AudioMessage.parse`), so a host that batches packets never puts more than 16 KB in
+  one message.
 - Pairing as 1.0 does it (docs/home-pairing-plan.md §3): the Bonjour TXT keys `r` (the recognition
   tag) and `p` ("1" pairing required, "0" open, no `p` a plain door, any other value read as "1");
   a `sill-pair/1` connection is exactly one kind 19, with no hello (the device gate judges sessions
@@ -6364,6 +6372,7 @@ device keeps working with Macs from the first public build on, or each says why
 - Native feel is the bar: Flighty-level polish, iOS conventions, Duo layouts.
 - License: Apache-2.0, LICENSE since PR #15, kept when the repository went
   public on 2026-09-26 (paid plan is gone, so no GPL/CLA needed).
-- v1 out of scope: hole punching, multi-window, layout customization. Audio is in since 2026-09-27
-  (Noah: "Audio: the plan is done and parked as a v2 feature by your earlier decision", first in
-  what he wanted worked on; docs/audio-plan.md, docs/BRIEF.md).
+- v1 out of scope: hole punching, multi-window, layout customization. Audio is in scope since
+  2026-09-27 (Noah: "Audio: the plan is done and parked as a v2 feature by your earlier decision",
+  first in what he wanted worked on; docs/audio-plan.md, docs/BRIEF.md), and in, as a beta, since
+  2026-10-20 (Noah on PR #94: "merge as beta support"): Send Audio, off by default, the Mac's alone.

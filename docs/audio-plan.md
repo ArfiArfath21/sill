@@ -51,6 +51,22 @@ a v2 feature by your earlier decision."
   records the decision in BRIEF.md and CLAUDE.md. Send Audio stays off by default (Q1), so a
   release that carries it changes nothing for anyone who leaves it off.
 
+**A beta (2026-10-20).** Noah, on PR #94: "Check the sound branch and see if it is polished, if
+so then merge as beta support." So Send Audio ships as a beta, off by default: the Mac's status
+menu says "Send Audio (Beta)", Settings › Streaming "Send audio (beta)" with a footnote that starts
+"Beta.", the CLI's `--audio` line "(beta)", and the device's Send Audio row a "Beta" tag ("Send
+Audio, beta" to VoiceOver); the public words (README, the site inside `<!-- Sound` markers, the App
+Store drafts) call the feature a beta, never the app (guideline 2.2). The beta takes four of the
+open questions by default, each one place to change (the last section, "The beta", has the
+changes and their checks): Q8, Send Audio is the Mac's alone, as Share Clipboard is; Q10, no
+seventh button in Larger Picture's row 1; Q4 and Q5 as below (it plays with the silent switch on,
+and devices start unmuted); Q16 and H12, codec quality Medium at +3.9 to +4.4 points of a core in
+the harness, accepted while it is off by default. **What ends the beta:** P1–P16 pass on Noah's
+devices (§11); H12 is met or Noah accepts the cost, with P13 (Sill.app's CPU in Activity Monitor,
+sound on and off) measured; P5 is answered (Virtual Display and a minimized app: whether
+ScreenCaptureKit still hears an app whose window moved off the main display); and P6 (the sync,
+filmed) is measured. Then the labels come off and Send Audio's default is Noah's call (Q1).
+
 ---
 
 ## Decision
@@ -509,6 +525,10 @@ per-connection `away` and `link`, `LinkJudge` in StreamServer's sweep, a second 
   It changes what a device hears of the Mac, not who can reach the Mac (Q8). With PR #39 a change
   from a device away goes through `applyingAway`, which puts the quality on the away pair and
   passes every other field on to `applying`: Send Audio, one value home or away, lands the same.
+  **Since the beta (2026-10-20), refused instead** (Q8's alternative, taken as the beta's default):
+  a device's `sendAudio`, on or off, from either door, is named in the log ("send audio (set on
+  this Mac only)") and the rest of its change applies; only the Mac's menu and Settings, and the
+  CLI's `--audio`, set it. The field stays in kinds 16 and 17.
 - **Not in `restartNeeded`** (StreamCoordinator.swift:555-564): the sound has its own stream;
   `adopt` hands it over (§4.7).
 - **Every other place** HostSettings.swift's header lists for a new setting (Sill.app's
@@ -1022,7 +1042,7 @@ thumbnail strip, as the Menus button (#36) takes its own.
 |---|---|
 | Landscape (`TopBar`, StreamScreen.swift:894-975): the iPad, the Duo's inner display and its outer one (710×500), a phone sideways | After Desktop, before Settings: Apps, the strip, Menus, Aa, Keyboard, Desktop, **Sound**, Settings |
 | The iPad's portrait window bar (`windowBar`, PortraitStreamScreen.swift:264-302): the Duo's inner display, an iPad upright, an iPad window narrower than 600 pt (the compact halves) | After Desktop, before Settings: Apps, the strip, Menus, Aa, Desktop, **Sound**, Settings |
-| A phone held upright, and the Duo's outer display upright (`phoneRow2`, PortraitStreamScreen.swift:398-413; `PhonePortraitLayout`) | Row 1 keeps the approved five (Apps, Aa, Keyboard, Desktop, Settings). **Sound** ends row 2, under Settings, as wide as row 1's buttons and as tall, centred in the strip's height, as Menus sits today; while the Mac's menus show too, Menus moves one place left, under Desktop. The strip ends 8 pt before the first of them. With Larger Picture in effect (main's #79: the switch on while a window streams, so no strip), Menus and Sound join row 1 in the landscape bar's order, Apps, Menus, Aa, Keyboard, Desktop, **Sound**, Settings, equal and 8 pt apart; Sound only where seven buttons are 44 pt or more, Menus counted whether or not it shows: a stream screen 384 pt wide or more (`PhonePortraitLayout.row1Beside`). Narrower (375 pt: the SE, the minis, a 6.7-inch iPhone zoomed), Sound is the Settings panel's switch alone |
+| A phone held upright, and the Duo's outer display upright (`phoneRow2`, PortraitStreamScreen.swift:398-413; `PhonePortraitLayout`) | Row 1 keeps the approved five (Apps, Aa, Keyboard, Desktop, Settings). **Sound** ends row 2, under Settings, as wide as row 1's buttons and as tall, centred in the strip's height, as Menus sits today; while the Mac's menus show too, Menus moves one place left, under Desktop. The strip ends 8 pt before the first of them. With Larger Picture in effect (main's #79: the switch on while a window streams, so no strip), Menus joins row 1 after Apps as main has it, and Sound is the Settings panel's switch alone, on every phone (Q10, the beta's default; the merge with main at 5c323e6 had put Sound in row 1 before Settings from 384 pt, which the beta took out) |
 
 - **Which bars hold it.** A bar shows it where it still holds a whole thumbnail beside it
   (`MacMenuButton.fits`, counting Sound as one more button), after Menus, which keeps the place #36
@@ -1037,9 +1057,8 @@ thumbnail strip, as the Menus button (#36) takes its own.
   Zoom).
 - **Why not in row 1.** Noah approved the phone's row 1 as five buttons; a sixth would make each as
   narrow as row 3's key caps. The row's end is where #36 put the Menus button for the same reason.
-  Larger Picture (#79) has no row 2 while a window streams, so there Menus and Sound go to row 1
-  after all, six or seven to the row and each 44 pt or more, as the table's phone row says; a
-  question for Noah (Q10).
+  Larger Picture (#79) has no row 2 while a window streams, so there Menus goes to row 1 after all
+  (main's), and Sound stays out of it: the Settings panel's switch alone (Q10, the beta's default).
 - **The switch.** In the Settings panel, the group for this device (the last one: Take the Tour's
   today, This iPad or This iPhone with #38's Three-Finger Gestures), first in it: a `Toggle`
   **"Sound from ‹Mac›"**, on unless muted, the same state as the button, with the footnote **"Mutes
@@ -1069,10 +1088,15 @@ thumbnail strip, as the Menus button (#36) takes its own.
   device (§7.6's Sound switch) stays last.
 - **The row:** `Toggle` **"Send Audio"**,
   `binding(sendAudio) { HostSettingsChange(sendAudio: $0) }`, with `RowTitle`'s pending mark like
-  the others.
+  the others. **Since the beta (2026-10-20):** the Mac's value, read-only (a disabled switch, as
+  Direct Wireless's from afar; the Mac refuses a device's change, Q8), its title followed by a
+  small **"Beta"** tag, VoiceOver's label "Send Audio, beta" and its hint "Set in Sill on ‹Mac›."
 - **Footer, off:** **"‹Mac› plays the sound of what streams on every connected device, and keeps
   playing it too."** **On:** **"Every device hears what streams; ‹Mac› keeps playing it too. Sound
-  mutes it on this ‹device› alone."**
+  mutes it on this ‹device› alone."** Since the beta: off, **"Beta. Turn on Send Audio in Sill on
+  ‹Mac› to hear what streams on every connected device; ‹Mac› keeps playing it too."**; on,
+  **"Beta. Every connected device hears what streams; ‹Mac› keeps playing it too. Sound mutes it
+  on this ‹device› alone. Turn Send Audio off in Sill on ‹Mac›."**
 - **`audioNote`:** under the row, as a warning footnote.
 - **The ledger:** `SettingsField.sendAudio`, `only`, `adding`, `fields`, and rule 9
   (HostSettingsLedger.swift:69, :99) for it: never sent to a host that did not report it.
@@ -1202,7 +1226,7 @@ thumbnail strip, as the Menus button (#36) takes its own.
 | H4 | **`audio-codec`** (a new check): Sources/SillHost/AudioEncoder.swift and iOSClient/AudioDecoder.swift in memory; the test tone through the encoder at F 480 and 512, each packet decoded at once | F and P as §3.2; with the first P frames dropped, each click lands at its stamp's sample ±2 frames; 5 s of the busy signal at 120–140 kbps; nothing but AudioToolbox linked |
 | H5 | **The harness at home** (`Scripts/audio/`, step 4: the real StreamServer and sound files with the test tone and fake frames; no VideoToolbox, ScreenCaptureKit or CoreMedia). 60 s of Balanced-sized fake frames at 60 fps; `Scripts/audiocheck.swift` on the home door (a hello with "aac-eld"; it decodes and finds the clicks); the same run with Send Audio off | 100 ± 1 packets a second (93.75 with `SILL_TEST_AUDIO_CHUNK=1024`); no gap in seq; 60 clicks at whole seconds of their stamps ±1 ms; `net.dropped`, `net.sent` and the frames' age the same with and without sound, within run-to-run noise |
 | H6 | **The harness away:** Scripts/pacing's `bottleneck.py` (on main since #34) at 8 and 4 Mbps with 1.5 MB keyframes, and a 12 s dip to 0.5 Mbps; the remote door's slow link through `Scripts/sillrelay.py` at 2 Mbit/s and +150 ms; and the pacing harness's own gate cases (kf25m32, real24, restartkf, stillend) with sound, against the same without | `aud.drop` 0 at 8 and 4 Mbps while `net.dropped` > 0 in the keyframe case; every packet's age at most the frames' age + 20 ms; in the dip, sound and frames arrive late together, and 2 s after it ends the packets' age is back; the pacing cases' fps and drops within their run-to-run noise with sound on (the keyframe asked for while at most 16 KB waits is not held back) |
-| H7 | **Send Audio over the wire.** `sillclient.py --audio --set=sendAudio=1@3 --set=sendAudio=0@8 --expect=sendAudio=0` against a synthetic host started without `--audio` | The answers carry it; the first packet within 300 ms of the first answer, the last within 100 ms of the second; "Settings from sillclient: send audio off → on" and "… on → off"; no "Streaming …" line (the picture never restarted) |
+| H7 | **Send Audio over the wire.** `sillclient.py --audio --set=sendAudio=1@3 --set=sendAudio=0@8 --expect=sendAudio=0` against a synthetic host started without `--audio` | The answers carry it; the first packet within 300 ms of the first answer, the last within 100 ms of the second; "Settings from sillclient: send audio off → on" and "… on → off"; no "Streaming …" line (the picture never restarted). **Since the beta (Q8):** both changes refused ("Settings from sillclient refused: send audio (set on this Mac only)"), each answer still `sendAudio` false, no packet; and `SillHost --synthetic --audio` with `sillclient.py --audio`: the format, then packets with no seq gap, and "Audio stopped: nothing streams." when the client picks nothing (the bare app's `-SillSetAfter '<s> sendAudio=0'`: "Audio stopped: Send Audio is off.") |
 | H8 | **Epochs and segments** in the harness: the tone paused for 50 ms, then for 500 ms (`SILL_TEST_AUDIO_PAUSE=0.05@3,0.5@6`), and a source change | Each pause: nothing sent for the gap, a segment start at the resumed chunk placed at its stamp ±1 ms, no packet sent more than 40 ms after its stamp, and audiocheck's model keeps its jitter cover; the source change: a new epoch, its format before its first packet on every client |
 | H9 | **Compatibility.** The base's `sillclient.py` against an `--audio` host; the base's StreamProtocol (swiftc) against a kind 43 header and the new kind 16; the new device decoder against the base host's messages | No kind 43 to the old client; `.unknown`; the old kind 16 decode ignores the keys; nothing new decoded |
 | H10 | **Previews.** The bare app's `-SillRenderPreviews` before and after | Only the Streaming and Permissions panes, menu.txt's Send Audio and the new `sound` card sample differ |
@@ -1226,7 +1250,7 @@ model without a player: its floor, need and late decisions on real arrivals), a 
 | # | Check |
 |---|---|
 | S1 | **Photos**, on a private simulator ("Sill audio"). `-SillSound on` and `muted`, with and without `-SillMacMenu`: at 1000x710, 710x1000 and 710x500; the phone's arrangement at 440x956, 402x874, 375x667 and 320x548 and at the Duo's 500x710; the compact halves (`-SillIdiom pad`) at 500x710 and a 320x700 Slide Over (no button: the panel's switch); at the default size and xxLarge text. `-SillSettingsCase sound` and `soundnote` at the same sizes, the panel scrolled to its end (`-SillSettingsEnd 1`) for the switch. The button in every bar that holds it, the strip one button narrower, Menus beside it on the phone, the row after the closing footnote, the switch first in the device's group; against the base build, every other photo pixel for pixel. Send Noah the sheet |
-| S2 | **Live.** `-SillLive 1 -SillConnect 127.0.0.1:P` against the harness's home door, with `-SillSoundSink manual -SillSoundVolume 0`: the console's format and engine lines; within 3 s "late 0" and a steady "behind the picture"; each rendered click within 2 ms of its stamp plus the delay. A headless tap on Sound: "engine off"; again: on, one jump. The panel's switch the same. `sillclient.py --set=sendAudio=0@…` as a second client: the button and the switch go, and "idle, engine off" 10 s later |
+| S2 | **Live.** `-SillLive 1 -SillConnect 127.0.0.1:P` against the harness's home door, with `-SillSoundSink manual -SillSoundVolume 0`: the console's format and engine lines; within 3 s "late 0" and a steady "behind the picture"; each rendered click within 2 ms of its stamp plus the delay. A headless tap on Sound: "engine off"; again: on, one jump. The panel's switch the same. `sillclient.py --set=sendAudio=0@…` as a second client: the button and the switch go, and "idle, engine off" 10 s later (since the beta the Mac refuses it, Q8: nothing goes; the host's own end of the sound, its client picking nothing or the bare app's `-SillSetAfter '<s> sendAudio=0'`, stands in) |
 | S3 | **A move.** `-SillMoveTest 1` with sound, against the harness, with `-SillSoundSink manual -SillSoundVolume 0`: no double packets (the console's dedupe count), nothing reset, at most one jump at the hand-over |
 
 **Noah's devices (P), handed over at the end:** the iPad mini, the Mac, headphones, an iPhone for
@@ -1355,7 +1379,10 @@ rewritten for the layouts main has since #30 and #36, and Q12 says where the kin
 4. **The session.** Default: **`.playback` with `.mixWithOthers`**: it never stops the iPad's own
    music, and plays on silent like a video app. Alternatives: `.playback` alone (Sill's sound
    pauses other audio, like a video app); `.ambient` (obeys the silent switch, like a game).
-5. **Mute.** Default: **per device, local, remembered.** The alternative: per Mac.
+   Kept for the beta (2026-10-20); the support page says it plays on silent.
+5. **Mute.** Default: **per device, local, remembered.** The alternative: per Mac. Kept for the
+   beta, so a device starts unmuted; with Q8 the Mac's alone, only the Mac's owner turns the sound
+   on for the devices.
 6. **The Mac keeps playing.** Default: **say so** (the menu's subtitle, the footers), and a device
    beside the Mac is muted by its user. The alternative is §14's tap, with a permission of its own.
 7. **Bluetooth headphones and AirPlay.** Default: **the sound trails by the route's latency**
@@ -1363,7 +1390,12 @@ rewritten for the layouts main has since #30 and #36, and Q12 says where the kin
    The alternative delays the picture to match, against "latency beats quality"; for AirPlay,
    another is to mute past 0.5 s and say why.
 8. **Devices turning it on.** Default: **yes**, like the other stream settings: saved on the Mac,
-   from home or away. The alternative: only the Mac's own menu and Settings.
+   from home or away. The alternative: only the Mac's own menu and Settings. **Taken for the beta
+   (2026-10-20): the alternative.** Any device could otherwise turn on, for the whole Mac, every
+   app's sound (calls among it) on every connected device, unmuted (Q5) and on silent (Q4); Share
+   Clipboard is the Mac's alone for a like reason, and PR #66's author proposed the same for its
+   mute-host. `DeviceSettings.accepted` refuses it, the device's row shows it read-only, and
+   kind 17's field stays for a later decision (#66's Mac viewer asked to set it).
 9. **"· sound" on the Mac's card.** Default: **shown** in the source row while a device gets sound.
    The alternative: the menu's check mark only.
 10. **Where the Sound button goes.** Default (§7.6): **after Desktop in every bar that holds it
@@ -1376,7 +1408,9 @@ rewritten for the layouts main has since #30 and #36, and Q12 says where the kin
     a Slide Over. Alternatives: a sixth button in the phone's row 1 (each as narrow as a key cap);
     Sound kept before Menus where only one fits (an iPad has the Mac's menus in its own menu bar on
     iPadOS 26, a phone does not); the switch only where no bar holds the button; with Larger
-    Picture, Sound never in row 1 (the panel's switch alone).
+    Picture, Sound never in row 1 (the panel's switch alone). **Taken for the beta (2026-10-20):
+    with Larger Picture, Sound never in row 1**, which §13's hard rule asks (row 1 as Noah approved
+    it); the rest of the default stands.
 11. **Headphones unplugged.** Default: **mute and say so**, iOS's pause for a live feed. The
     alternative: keep playing on the speaker.
 12. **The kind number.** Default: **29**. 24, 25 and 27 are the Mac's menus and 26 its pointer, on
@@ -1720,7 +1754,10 @@ device; test hosts on 127.0.0.1 and the software encoder, `no-device.sh` before 
 
 16. **The encoder's CPU.** Default: **codec quality Medium** (AudioToolbox's default), about 1 point
     of a core on a tonal signal. The alternative is Low: 0.6 points less, 3–9 dB less SNR on tonal
-    sound.
+    sound. **Kept for the beta (2026-10-20)**, H12 unmet (+3.9 to +4.4 points of a core in the
+    harness, the gate 1.5) and accepted while Send Audio is off by default; Sill.app's real cost
+    (P13) is one of the beta's exit criteria. Two levers if Noah wants them: Low, and two packets a
+    message (about half the per-message cost, for 10.7 ms more; the wire already carries 1 to 255).
 
 ## Merged with main at 985a733 (2026-10-13)
 

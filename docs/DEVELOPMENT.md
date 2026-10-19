@@ -125,7 +125,7 @@ swift run -c release SillHost                        # nothing streams until a d
 swift run -c release SillHost Safari                 # optional: preselect a matching window
 swift run -c release SillHost --virtual-display      # each streamed window on its own HiDPI display; Ctrl-C restores it
 swift run -c release SillHost --direct-wireless      # also over peer-to-peer Wi-Fi, for a device with no shared network
-swift run -c release SillHost --audio                # Send Audio for this run: devices that play it get the streamed app's sound
+swift run -c release SillHost --audio                # Send Audio (a beta) for this run: devices that play it get the streamed app's sound
 swift run -c release SillHost --no-clipboard         # share nothing of the clipboard with devices (on by default, as in Sill.app)
 swift run -c release SillHost --synthetic            # the Desktop streams a test pattern; no Screen Recording needed
 SILL_TEST_PATTERN=picture:/path/to.jpg swift run -c release SillHost --synthetic   # the Desktop a still picture instead (TEST ONLY)
@@ -155,7 +155,8 @@ device's panel says so. Its Virtual Display switch works only when `SillHost`
 runs with `--virtual-display`. `--direct-wireless` starts it with Direct
 Wireless Connection on (see Direct Wireless Connection below); it is off by
 default here too. `--audio` starts it with Send Audio on (The Mac's sound
-below), off by default too; with `--synthetic` the sound is a test tone. The
+below, a beta), off by default too and the only switch for the run (a device
+cannot change it); with `--synthetic` the sound is a test tone. The
 clipboard is shared as in Sill.app (The clipboard, below); `--no-clipboard`
 turns it off for the run.
 
@@ -350,12 +351,15 @@ me.saffer.sill.mac <key>` (`bitrate`, `maxFPS`, `captureScale`, `awayBitrate`,
 `awayCaptureScale`, `prioritizeSpeed`, `virtualDisplay` or `directWireless`)
 and open Sill again.
 
-## The Mac's sound
+## The Mac's sound (beta)
 
-Send Audio (off by default; Sill.app's status menu and Settings › Streaming,
-the CLI's `--audio`, and a device's settings change, whose row in the device's
-Settings panel comes with its playback) sends the sound of what streams
-to every connected device that plays it: the streamed window's app (every window
+Send Audio is a beta (2026-10-20; docs/audio-plan.md's header says what ends
+it), off by default, and the Mac's alone: Sill.app's status menu ("Send Audio
+(Beta)") and Settings › Streaming ("Send audio (beta)"), or the CLI's
+`--audio`, whose line says "(beta)". A device's row in its Settings panel
+shows it read-only with a "Beta" tag, and the Mac refuses a device's change
+("Settings from ‹device› refused: send audio (set on this Mac only)"). It
+sends the sound of what streams to every connected device that plays it: the streamed window's app (every window
 of it: macOS captures sound per app), or every app but Sill for the Desktop.
 The Mac keeps playing it too. It comes from a second, audio-only
 ScreenCaptureKit stream, so rotating, Aa, a quality change or the encoder's
@@ -370,8 +374,8 @@ and `aud.gap` while it runs. `defaults delete me.saffer.sill.mac sendAudio`
 puts it back to off. docs/audio-plan.md has the design.
 
 On the device, the bar's Sound button (where the bar holds it beside Menus; on
-a phone held upright at the end of the thumbnails' row, or with Larger Picture
-in row 1 before Settings, where seven buttons fit) and the Settings panel's
+a phone held upright at the end of the thumbnails' row, and with Larger
+Picture nowhere: the panel's switch alone) and the Settings panel's
 Sound switch mute it on that device alone, remembered across launches
 (`Sill.soundMuted`); the Mac keeps sending. It plays mixed with the device's own
 audio, on silent too, as a video app does, and never in the background.
