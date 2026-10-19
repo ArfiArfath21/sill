@@ -4,7 +4,7 @@ import Foundation
 // still composing (Zhuyin's ㄋㄧˇ, Pinyin's nihao, Japanese kana before conversion), kept on the device
 // and never sent, and a tail of what was typed since the Mac's caret was last moved by something else,
 // so dictation and an input method can revise what they put there (a dictated word corrected a moment
-// later: backspaces on the Mac, then the new text).
+// later: backspaces on the Mac, then the new text). Beside it, `TextInputRules`: whose ⌃Space it is.
 //
 // Pure: Foundation only, so it is checked on its own with swiftc (Tests/checks/text-composition).
 // Offsets are UTF-16, as UITextInput's are; the Mac is sent whole characters.
@@ -103,5 +103,34 @@ struct TextComposition: Equatable {
         if now.count > common { out.append(.text(String(now[common...]))) }
         sent = String(now.suffix(Self.keep))
         return out
+    }
+}
+
+/// The stream's input view's rules beside its document (#138).
+enum TextInputRules {
+    /// The modifier bits a key carries (UIKeyModifierFlags raw values, as KeyModifiers' are).
+    static let shift: UInt64 = 1 << 17
+    static let control: UInt64 = 1 << 18
+    static let option: UInt64 = 1 << 19
+    static let command: UInt64 = 1 << 20
+    /// Space's HID usage.
+    static let space: UInt16 = 0x2C
+
+    /// Whether an active input mode (`UITextInputMode.activeInputModes`, by its primary language) is a
+    /// keyboard a person switches to: every one but Emoji and dictation.
+    static func isKeyboard(_ language: String) -> Bool {
+        language != "emoji" && language != "dictation"
+    }
+
+    /// Whether a hardware key's press is iPadOS's own switch between keyboards, never the Mac's: Space
+    /// with control alone (caps lock aside) while the person set up keyboards in two languages or more
+    /// in Settings › General › Keyboard › Keyboards (Emoji and dictation aside, and a third-party
+    /// keyboard in a language already there counted once), as any iPad text field switches them and as
+    /// macOS's own ⌃Space does with several input sources. With one, ⌃Space is the Mac's shortcut
+    /// (Xcode's completions, VS Code's suggestions). Judged at the press: the release follows wherever
+    /// the press went (ForwardedKeys). The keyboards are asked for only for ⌃Space.
+    static func isKeyboardSwitch(usage: UInt16, modifiers: UInt64, keyboards languages: @autoclosure () -> [String]) -> Bool {
+        guard usage == space, modifiers & (shift | control | option | command) == control else { return false }
+        return Set(languages().filter(isKeyboard)).count >= 2
     }
 }

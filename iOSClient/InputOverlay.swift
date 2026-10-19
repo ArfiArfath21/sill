@@ -815,9 +815,13 @@ final class InputOverlayView: UIView, UITextInput, UIGestureRecognizerDelegate {
                 continue
             }
             #endif
-            // ⌃Space switches iPadOS's input source (to Zhuyin, say): iPadOS's, never the Mac's (#138).
-            if usage == HIDKey.space, UIKeyModifierFlags(rawValue: Int(modifiers)).intersection([.control, .alternate, .command]) == .control {
-                Self.hwkey(usage, down: down, via: channel, modifiers: modifiers, to: "iPadOS's input source switch")
+            // ⌃Space with keyboards in two languages or more set up in iOS Settings: iPadOS's switch
+            // between them (to Zhuyin, say), never the Mac's; with one, the Mac's shortcut, as before
+            // (TextInputRules.isKeyboardSwitch, #138). At the press only: its release follows it, to the
+            // text system unless the press went to the Mac (`forwarded`).
+            if down, TextInputRules.isKeyboardSwitch(usage: usage, modifiers: modifiers,
+                                                     keyboards: UITextInputMode.activeInputModes.compactMap(\.primaryLanguage)) {
+                Self.hwkey(usage, down: down, via: channel, modifiers: modifiers, to: "iPadOS's keyboard switch")
                 unhandled.insert(press)
                 continue
             }
@@ -983,9 +987,11 @@ extension InputOverlayView {
         return CGRect(x: area.midX, y: area.minY + 16, width: 0, height: 0)
     }
 
-    /// The input source just switched (⌃Space, the Globe key): its name, for a second.
+    /// The keyboard just switched (⌃Space, the Globe key): its name, for a second. Not Emoji's or
+    /// dictation's, which are no keyboard typed with (TextInputRules.isKeyboard).
     @objc func inputModeChanged() {
-        guard isFirstResponder, !composition.isComposing, let language = textInputMode?.primaryLanguage else { return }
+        guard isFirstResponder, !composition.isComposing, let language = textInputMode?.primaryLanguage,
+              TextInputRules.isKeyboard(language) else { return }
         place(Locale.current.localizedString(forIdentifier: language) ?? language)
         let shown = compositionLabel.text
         DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in

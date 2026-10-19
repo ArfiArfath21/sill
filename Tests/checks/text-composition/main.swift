@@ -1,11 +1,13 @@
 // TextComposition (iOSClient/TextComposition.swift) on its own: an input method's composition stays on
 // the device until it is committed, and every edit the text system makes reaches the Mac as backspaces
-// and text that leave the Mac's text equal to the document (#138). Scenario by scenario, then 20,000
-// random edit sequences against a model of the Mac's text field.
+// and text that leave the Mac's text equal to the document (#138), and whose ⌃Space it is
+// (TextInputRules). Scenario by scenario, then 20,000 random edit sequences against a model of the
+// Mac's text field.
 //   swiftc -O iOSClient/TextComposition.swift Tests/checks/text-composition/main.swift -o check && ./check
 import Foundation
 
 typealias C = TextComposition
+typealias R = TextInputRules
 var fails = 0, passes = 0
 func check(_ name: String, _ ok: Bool) {
     if ok { passes += 1; print("ok   \(name)") } else { fails += 1; print("FAIL \(name)") }
@@ -111,6 +113,40 @@ do {   // a selection out of range is clamped
     c.setMarked("ㄋㄧ", selected: NSRange(location: 9, length: 4))
     check("the marked selection stays inside the composition", c.selectedRange == NSRange(location: 2, length: 0))
 }
+
+// MARK: - Keyboards and ⌃Space
+
+check("a language's keyboard is a keyboard", R.isKeyboard("en-US") && R.isKeyboard("zh-Hant") && R.isKeyboard("ja-JP"))
+check("Emoji and dictation are not", !R.isKeyboard("emoji") && !R.isKeyboard("dictation"))
+
+let capsLock: UInt64 = 1 << 16, numericPad: UInt64 = 1 << 21
+func switches(_ modifiers: UInt64, _ keyboards: [String], usage: UInt16 = R.space) -> Bool {
+    R.isKeyboardSwitch(usage: usage, modifiers: modifiers, keyboards: keyboards)
+}
+let two = ["en-US", "zh-Hant", "emoji"]
+check("⌃Space with two keyboards is iPadOS's switch", switches(R.control, two))
+check("…with caps lock on too", switches(R.control | capsLock, two) && switches(R.control | numericPad, two))
+check("⌃Space with one keyboard (and Emoji) is the Mac's", !switches(R.control, ["en-US", "emoji"]))
+check("…with one keyboard, Emoji and dictation, the Mac's", !switches(R.control, ["en-US", "emoji", "dictation"]))
+check("…with no keyboard listed, the Mac's", !switches(R.control, []))
+check("a third-party keyboard in the same language counts once", !switches(R.control, ["en-US", "en-US", "emoji"]))
+check("two layouts of one language set up in two languages' keyboards switch", switches(R.control, ["en-US", "en-GB"]))
+check("three keyboards switch", switches(R.control, ["en-US", "zh-Hant", "ja-JP"]))
+check("⌃⇧Space is the Mac's", !switches(R.control | R.shift, two))
+check("⌃⌥Space and ⌃⌘Space are the Mac's", !switches(R.control | R.option, two) && !switches(R.control | R.command, two))
+check("Space alone, ⇧Space, ⌥Space and ⌘Space are not the switch",
+      !switches(0, two) && !switches(R.shift, two) && !switches(R.option, two) && !switches(R.command, two))
+check("⌃ with another key is not the switch", !switches(R.control, two, usage: 0x2B) && !switches(R.control, two, usage: 0x04))
+var keyboardsAsked = 0
+func keyboards() -> [String] { keyboardsAsked += 1; return two }
+_ = R.isKeyboardSwitch(usage: 0x04, modifiers: R.control, keyboards: keyboards())
+_ = R.isKeyboardSwitch(usage: R.space, modifiers: 0, keyboards: keyboards())
+_ = R.isKeyboardSwitch(usage: R.space, modifiers: R.command, keyboards: keyboards())
+check("the keyboards are asked for only for ⌃Space, not for every key", keyboardsAsked == 0)
+_ = R.isKeyboardSwitch(usage: R.space, modifiers: R.control, keyboards: keyboards())
+check("…and are for it", keyboardsAsked == 1)
+check("Space's usage", R.space == 0x2C)
+check("the modifier bits are UIKeyModifierFlags'", R.shift == 1 << 17 && R.control == 1 << 18 && R.option == 1 << 19 && R.command == 1 << 20)
 
 // MARK: - Random edit sequences
 
