@@ -66,7 +66,9 @@ test is Noah's.
   `UserIsActive named: "Sill: a device is using this Mac"`, its timeout the display-sleep setting; with
   the iPad left connected and untouched the display sleeps by its own setting and stays asleep (no
   "Woke" line without a touch, also after "Capture stopped: …"), and a pointer move on the trackpad or
-  a modifier key on the Magic Keyboard wakes it (the key row's modifiers only latch); a locked Mac (⌃⌘Q, the display asleep): its lock screen on the iPad. Then:
+  ⌘ alone on the Magic Keyboard wakes it (Shift alone goes to the device's text system and the key
+  row's modifiers only latch, so neither sends anything); a locked Mac (⌃⌘Q, the display asleep): its
+  lock screen on the iPad. Then:
   whether `kIOPMUserActiveRemote` also wakes the panel, or keeps the picture live with the panel dark
   (#133): quit Sill, `open --env SILL_TEST_USER_ACTIVE=remote /Applications/Sill.app` (Sill.log's
   "TEST: user activity is declared as remote …"), `pmset displaysleepnow`, connect; Virtual Display
