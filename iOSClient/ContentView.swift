@@ -329,7 +329,10 @@ struct ContentView: View {
 ///   wrong code), `homelocked`, `homeopenonmac`, `homerevoked`, `homecabledone`, `homeolder` (a tap
 ///   on an "Update Sill" row) or `pairingrequired`; or `asleep` (issue #69: a saved Mac's row stays
 ///   listed and the automatic reconnect's dials of it have not connected: "Mac mini isn’t answering.
-///   It may be asleep. Sill keeps trying, or tap it to try now."). Ignored with `-SillLive 1`. The
+///   It may be asleep. Sill keeps trying, or tap it to try now."); or `tiles` (issue #116: the Macs as
+///   tiles, five of them, three saved with a picture, in Home, Work and Other: the mock's groups
+///   unless `-Sill.macGroups` gives others, and its pictures 208×132 unless `-SillVideoSize WxH` gives
+///   them that shape, 320 pt wide as a session's end keeps them). Ignored with `-SillLive 1`. The
 ///   mock never browses; Search Nearby and a row's tap only change what it shows (see
 ///   `MockCatalog.ConnectCase`).
 /// * `-SillBrowserFail N` — in the normal app and under `-SillLive 1`: each of the first N network
@@ -367,6 +370,14 @@ struct ContentView: View {
 ///   memory of Macs seen with Direct Wireless on, which a launch argument sets for one run (`'()'`
 ///   empties it), in the normal app and under `-SillLive 1`. Unlike `-Sill.savedMacs`, what the
 ///   run learns is still saved.
+/// * `-Sill.connectionStyle tiles|list` and `-Sill.macGroups '{"HOMEPAIRING6":"Home"}'` — not harness
+///   arguments either: the connect screen's arrangement and the saved Macs' groups (ConnectionList),
+///   by Mac ID, for one run, in the mock, under `-SillLive 1` and in the normal app. `-Sill.macGroups`
+///   writes nothing back (`'{}'` empties). A launch argument outranks what the app saves, so under
+///   `-Sill.connectionStyle` the switch beside the title changes nothing until the next run: to try
+///   the switch, write the default instead (`xcrun simctl spawn <udid> defaults write me.saffer.sill
+///   Sill.connectionStyle tiles`). With tiles, a saved Mac's session that ends keeps its picture in
+///   Library/Caches/SillPreviews (the list keeps none, and turning tiles off deletes them).
 /// * Versions, in the normal app too: `-SillHelloVersion <v>` is the version this device's hello
 ///   (kind 23) gives, for a host's device floor under test (`SILL_TEST_MIN_DEVICE_VERSION`);
 ///   `-SillAppStoreURL <https url>` is the App Store link's address while SillLinks has none.
