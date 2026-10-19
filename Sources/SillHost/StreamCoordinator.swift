@@ -620,6 +620,7 @@ package final class StreamCoordinator {
             print("Direct wireless connection on: also advertised over peer-to-peer Wi-Fi (AWDL), which takes this Mac's Wi-Fi off its channel for up to ~100 ms twice a second.")
         }
         if let testMenuLine { print(testMenuLine) }   // TEST ONLY, and only with SILL_TEST_MENU_PID set
+        if config.sendAudio { audio.prepare() }       // the codec, loaded before the first chunk needs it
         server.start()
         remote?.apply(config)        // the remote door, when Remote Access is on (or a pairing window opens later)
         if promptForPermissions || CGPreflightScreenCaptureAccess() { await catalog.refreshWindows() }
@@ -794,7 +795,9 @@ package final class StreamCoordinator {
         status.update { $0.virtualDisplayOn = next.virtualDisplay }
         print("Settings: " + old.changes(to: next))
         // The sound's own stream's, not the pipeline's: at once when nothing is switching; inside a
-        // select, `active`'s didSet follows once the picture has started.
+        // select, `active`'s didSet follows once the picture has started. Turned on, the codec loads
+        // in the background, before the first chunk needs it.
+        if !old.sendAudio, next.sendAudio { audio.prepare() }
         if old.sendAudio != next.sendAudio, !switching { audioFollow() }
     }
 

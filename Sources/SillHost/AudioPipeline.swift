@@ -110,6 +110,20 @@ final class AudioPipeline: @unchecked Sendable {   // main-actor state, and stat
 
     init() {}
 
+    // MARK: The encoder, ready before the first chunk
+
+    /// Send Audio is on (the coordinator: at start, and when it turns on): AudioToolbox's AAC-ELD codec
+    /// is loaded now, in the background, off `sill.audio`. The first encoder of a process pays for the
+    /// load (13 to 53 ms here; 1.9 to 3.3 s on a Mac loaded by other work, the chunks waiting behind it
+    /// on `sill.audio`, so the session's first second came as a burst of late packets: docs/audio-plan.md,
+    /// "The review"), and every later one takes about a millisecond, whatever its packet size. What it
+    /// makes is thrown away: each epoch makes its own encoder on `queue`, at the size its first chunk
+    /// says. Any thread; the load runs once a process (`codecLoaded`), and a failure is the epoch's to say.
+    func prepare() {
+        DispatchQueue.global(qos: .userInitiated).async { _ = Self.codecLoaded }
+    }
+    private static let codecLoaded: Bool = (try? AudioEncoder(framesPerPacket: 480)) != nil
+
     // MARK: The source (main actor)
 
     /// The sound should be of `key` (`.none`: no sound, `reason` saying why for the log's "Audio
