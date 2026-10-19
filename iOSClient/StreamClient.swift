@@ -3307,8 +3307,10 @@ final class StreamClient: ObservableObject {
     }
 
     /// This device's switch for Reverse Scrolling (the Settings panel's This iPad group; issue #143): off
-    /// unless turned on, so a finger's drag scrolls the content the other way (`ScrollDirection`). The
-    /// device's own preference, never sent to the Mac; read when each scroll begins.
+    /// unless turned on. While on, a finger dragged over the picture and two fingers on the on-screen
+    /// trackpad scroll the content the other way, their coast too; a connected trackpad or mouse keeps
+    /// iPadOS's own Natural Scrolling (`ScrollDirection`). The device's own preference, never sent to
+    /// the Mac; read as each scroll begins (`InputOverlayView`, `TrackpadSurface`).
     static let reverseScrollKey = "Sill.reverseScroll"
     static var reverseScrollOn: Bool { UserDefaults.standard.bool(forKey: reverseScrollKey) }
 
