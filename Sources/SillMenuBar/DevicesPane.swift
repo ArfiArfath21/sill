@@ -85,7 +85,7 @@ struct DevicesPane: View {
             Section {
                 Toggle("Show the pairing window to screen sharing", isOn: $showPairingWindowToScreenSharing)
             } footer: {
-                Footnote("Turn this on to pair while you use this Mac through Screen Sharing or another remote desktop app (a Mac without a display, say). While it’s on, anyone who can see this Mac’s screen remotely can read the code. Devices streaming this Mac never show the window.")
+                Footnote("Turn this on to pair while you use this Mac through Screen Sharing or another remote desktop app, as you would a Mac without a display. While it’s on, anyone who can see this Mac’s screen remotely can read the code. Devices streaming this Mac never show the window.")
             }
             pairedDevices
         }
