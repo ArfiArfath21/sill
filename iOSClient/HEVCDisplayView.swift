@@ -30,8 +30,10 @@ final class HEVCDisplayView: UIView {
     /// which a still window on the Mac never sends by itself. The client asks for one
     /// (KeyframeRecovery). On `renderQueue`.
     var onNeedsKeyframe: (() -> Void)?
-    /// A keyframe ended a wait and went onto a layer that reads healthy: the picture is back (after an
-    /// interruption, or a new source's first). On `renderQueue`.
+    /// A keyframe ended a wait: the picture is back (after an interruption, or a new source's first).
+    /// When the layer still read interrupted at that keyframe, `checkLayer` throws it away with its
+    /// flush and says so first, then `onNeedsKeyframe`: for the client the picture came back and was
+    /// lost again at once, so it asks again, as for a repeat (KeyframeRecovery). On `renderQueue`.
     var onPictureBack: (() -> Void)?
     /// The layer's notifications (`observeLayer`).
     private var layerObservers: [NSObjectProtocol] = []
@@ -352,7 +354,15 @@ final class HEVCDisplayView: UIView {
             first[kCMSampleAttachmentKey_DisplayImmediately as String] = true
         }
 
-        if checkLayer("at a frame") { return }
+        var lost: Error?
+        #if DEBUG
+        if resuming, interruptedAt != nil, keyframesToLose > 0 {     // -SillKeyframeLost
+            keyframesToLose -= 1
+            print("display: -SillKeyframeLost: the keyframe that ends the wait is thrown away, as though the layer still read failed (\(keyframesToLose) more)")
+            lost = NSError(domain: "SillKeyframeLost", code: 0)
+        }
+        #endif
+        if checkLayer("at a frame", failedToDecode: lost, droppingKeyframe: resuming) { return }
         if resuming { resumedAt = CACurrentMediaTime() }
         displayLayer.enqueue(sample)
         if resuming {
@@ -374,9 +384,13 @@ final class HEVCDisplayView: UIView {
     /// told, since a still window on the Mac sends none. The Mac sends its parameter sets before
     /// every keyframe and every sample carries the format, so nothing else needs sending again. From
     /// each frame let through, the layer's notifications, and the picture's window becoming active
-    /// (StreamClient). On `renderQueue`. True when it flushed.
+    /// (StreamClient). `droppingKeyframe`: the frame is the keyframe that ends the wait, which the
+    /// flush throws away: `onPictureBack` is told first, so the client counts the picture back and
+    /// lost again and asks again at a repeat's spacing (KeyframeRecovery), rather than taking the
+    /// layer's word as part of an interruption whose keyframe already came. On `renderQueue`. True
+    /// when it flushed.
     @discardableResult
-    func checkLayer(_ why: String, failedToDecode: Error? = nil) -> Bool {
+    func checkLayer(_ why: String, failedToDecode: Error? = nil, droppingKeyframe: Bool = false) -> Bool {
         guard formatDescription != nil else { return false }    // no picture yet: nothing to lose
         let failed = displayLayer.status == .failed || displayLayer.error != nil
         let needsFlush = displayLayer.requiresFlushToResumeDecoding
@@ -385,11 +399,13 @@ final class HEVCDisplayView: UIView {
         let what = failedToDecode.map { "could not decode a frame (\(($0 as NSError).code))" }
             ?? (failed ? "failed (\(displayLayer.error.map { "\(($0 as NSError).domain) \(($0 as NSError).code)" } ?? "no error"))"
                        : "needs a flush to decode again")
-        print("display: the picture was interrupted \(why): the layer \(what)\(needsFlush && failed ? " and needs a flush" : ""); flushed, waiting for a keyframe")
+        print("display: the picture was interrupted \(why): the layer \(what)\(needsFlush && failed ? " and needs a flush" : ""); flushed"
+              + (droppingKeyframe ? " with the keyframe it waited for" : "") + ", waiting for a keyframe")
         if interruptedAt == nil { interruptedAt = CACurrentMediaTime() }
         #endif
         displayLayer.flush()
         waitingForKeyframe = true
+        if droppingKeyframe { onPictureBack?() }    // first: both reach the client in this order
         onNeedsKeyframe?()
         return true
     }
@@ -397,6 +413,11 @@ final class HEVCDisplayView: UIView {
     #if DEBUG
     /// When the picture was first interrupted, for the console's "back, N ms after" line.
     private var interruptedAt: CFTimeInterval?
+    /// `-SillKeyframeLost <n>` (ContentView's harness contract): the first n keyframes that end a wait
+    /// after an interruption are thrown away by `checkLayer`'s flush, as though the layer still read
+    /// failed when they came (as it can while another app holds the decoder), so the client's next
+    /// ask runs for real.
+    private var keyframesToLose = UserDefaults.standard.integer(forKey: "SillKeyframeLost")
     /// `-SillLayerFail <s>[,<s>…]` (ContentView's harness contract): at each of these seconds after the
     /// launch's first picture, a frame that cannot decode goes onto the layer, so the recovery runs for
     /// real: the layer's notification, the flush, the client's one ask (kind 44) and the Mac's keyframe.

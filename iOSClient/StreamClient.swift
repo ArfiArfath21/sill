@@ -435,7 +435,8 @@ final class StreamClient: ObservableObject {
     /// When the device asks the Mac for a keyframe after its picture was interrupted (issue #101).
     /// Main thread.
     private var keyframeRecovery = KeyframeRecovery()
-    /// An ask the spacing holds back, looked at again when it is due. Main thread.
+    /// The next look at the recovery: an ask the spacing holds back, when it is due, or an ask that is
+    /// out, when its keyframe is overdue. Main thread.
     private var keyframeAskWork: DispatchWorkItem?
 
     /// The one display view for the whole session. Landscape and portrait both host it, so a
@@ -457,7 +458,8 @@ final class StreamClient: ObservableObject {
         view.onPictureBack = { [weak self] in
             DispatchQueue.main.async {
                 guard let self else { return }
-                self.keyframeRecovery.pictureBack(now: ProcessInfo.processInfo.systemUptime)
+                // A keyframe that comes while the window is away is the background's (KeyframeRecovery).
+                self.keyframeRecovery.pictureBack(now: ProcessInfo.processInfo.systemUptime, active: self.pictureActive)
                 self.keyframeAskWork?.cancel(); self.keyframeAskWork = nil
             }
         }
@@ -983,30 +985,48 @@ final class StreamClient: ObservableObject {
         return UIApplication.shared.applicationState == .active
     }
 
-    /// Asks the Mac for one keyframe (kind 44) when KeyframeRecovery says one is owed and due; an ask
-    /// the spacing holds back is looked at again when it is due. Never a pick of the source again,
-    /// which would restart every device's stream and, in regular mode, raise the window on the Mac.
-    /// A Mac from before kind 44 skips it, and the picture waits for the window's next keyframe, as it
-    /// did. Main thread.
+    /// Asks the Mac for one keyframe (kind 44) when KeyframeRecovery says one is owed and due, and looks
+    /// again when an ask the spacing holds back is due, or when the keyframe of an ask that is out is
+    /// overdue (`answerWait`: 4 s, or four of the worst round trips), so it can ask again. Never a pick
+    /// of the source again, which would restart every device's stream and, in regular mode, raise the
+    /// window on the Mac. A Mac from before kind 44 skips every ask, and the picture waits for the
+    /// stream's next keyframe, as it did. Main thread.
     private func considerKeyframeAsk() {
         keyframeAskWork?.cancel(); keyframeAskWork = nil
         let now = ProcessInfo.processInfo.systemUptime
-        switch keyframeRecovery.consider(now: now, active: pictureActive, streaming: active != .none) {
+        let wait = KeyframeRecovery.answerWait(worstRttMs: lastRttMaxMs)
+        let wasOut = keyframeRecovery.asked
+        let decision = keyframeRecovery.consider(now: now, active: pictureActive, streaming: active != .none, wait: wait)
+        #if DEBUG
+        // An ask that was out and is owed again (it goes now, or waits for the spacing): no keyframe came.
+        var unanswered = false
+        if wasOut { switch decision { case .askNow, .askAt: unanswered = true; case .nothing, .keyframeDue: break } }
+        let why = unanswered ? "no keyframe \(String(format: "%.1f", wait)) s after the last ask" : "the picture was interrupted"
+        #endif
+        switch decision {
         case .nothing:
             break
         case .askNow:
             send(.keyframeRequest, payload: Data())
+            lookAtKeyframeRecovery(at: now + wait, from: now)
             #if DEBUG
-            print("keyframe: the picture was interrupted; asked the Mac for a keyframe (spacing \(Int(keyframeRecovery.spacingNow)) s)")
+            print("keyframe: \(why); asked the Mac for a keyframe (spacing \(Int(keyframeRecovery.spacingNow)) s)")
             #endif
         case .askAt(let at):
-            let work = DispatchWorkItem { [weak self] in self?.considerKeyframeAsk() }
-            keyframeAskWork = work
-            DispatchQueue.main.asyncAfter(deadline: .now() + max(0, at - now), execute: work)
+            lookAtKeyframeRecovery(at: at, from: now)
             #if DEBUG
-            print("keyframe: the picture was interrupted; the ask waits \(String(format: "%.1f", at - now)) s for the spacing")
+            print("keyframe: \(why); the ask waits \(String(format: "%.1f", at - now)) s for the spacing")
             #endif
+        case .keyframeDue(let at):
+            lookAtKeyframeRecovery(at: at, from: now)
         }
+    }
+
+    /// `considerKeyframeAsk` again at `at` (uptime seconds). Main thread.
+    private func lookAtKeyframeRecovery(at: TimeInterval, from now: TimeInterval) {
+        let work = DispatchWorkItem { [weak self] in self?.considerKeyframeAsk() }
+        keyframeAskWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + max(0, at - now), execute: work)
     }
 
     /// Starts the network browser, once; from then on it is only made again (`rebuildBrowser`). The
