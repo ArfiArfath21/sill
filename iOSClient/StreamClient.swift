@@ -395,8 +395,10 @@ final class StreamClient: ObservableObject {
     /// Whether the Mac sent its sound when a move handed the session over: the Sound button and switch
     /// stay until the new connection's first kind 16 says (the same Mac). Nil outside a move. Main.
     var soundAcrossMove: Bool?
-    /// The sound's output: its queue, the playout, the decoder and the engine.
-    let sound = AudioOutput(refresh: 1 / Double(max(1, UIScreen.main.maximumFramesPerSecond)))
+    /// The sound's output: its queue, the playout, the decoder and the engine. The panel's refresh is
+    /// this device's screen's, as the viewport reads it (`screenMaximumFPS`: the scene's screen, not
+    /// `UIScreen.main`), once, as the client is made on the main thread.
+    let sound = AudioOutput(refresh: 1 / Double(StreamClient.screenMaximumFPS()))
 
     /// The Mac's current cursor image (hotspot and size in points), for the pointer sprite, whichever
     /// pointer it shows. Not @Published for the same reason as `presence`. Main thread.
