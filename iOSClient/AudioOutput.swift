@@ -593,6 +593,14 @@ private final class SoundEngine {
         self.queue = queue
     }
 
+    /// Freed while it played (its window's client went with its output): stopped as `stop` stops it, so
+    /// the app's session is given back, or `SharedSession` would count it for good and no other window's
+    /// last stop could ever let the session go. (Holding the session implies running: `stop` and
+    /// `abandon` give it back as they end the run.)
+    deinit {
+        stop()
+    }
+
     /// Which sink: the simulator never opens an output unless a DEBUG build asks (`-SillSoundSink
     /// device`); a device opens it unless a DEBUG build asks for `manual`.
     static var sinkFromLaunchArguments: Sink {
