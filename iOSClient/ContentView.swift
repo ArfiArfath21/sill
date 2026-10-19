@@ -1032,7 +1032,10 @@ struct ConnectScreen: View {
         .ignoresSafeArea(.keyboard, edges: .bottom)
         .alert("New Group", isPresented: Binding(get: { newGroupFor != nil }, set: { if !$0 { newGroupFor = nil } })) {
             TextField("Name", text: $newGroupName)
+            // A blank name, or Other (where the Macs with no group already are), names no group: Add
+            // would only take the Mac out of the one it is in.
             Button("Add") { if let id = newGroupFor { client.setGroup(newGroupName, for: id) } }
+                .disabled(ConnectionList.cleanGroup(newGroupName) == nil)
             Button("Cancel", role: .cancel) {}
         }
         // Tiles turned off, by the switch beside the title or a saved Mac's menu: the pictures go, shown
@@ -1248,15 +1251,15 @@ struct ConnectScreen: View {
             }
             let currentGroup = ConnectionList.cleanGroup(client.macGroups[id])
             Menu {
-                Button { client.setGroup(nil, for: id) } label: {
-                    if currentGroup == nil { Label("None", systemImage: "checkmark") } else { Text("None") }
-                }
-                Divider()
-                ForEach(ConnectionList.availableGroups(in: client.macGroups), id: \.self) { group in
-                    Button { client.setGroup(group, for: id) } label: {
-                        if currentGroup == group { Label(group, systemImage: "checkmark") } else { Text(group) }
+                // One choice of None and the groups: the system's checkmark on the current one, and
+                // VoiceOver's "selected".
+                Picker("Group", selection: Binding(get: { currentGroup }, set: { client.setGroup($0, for: id) })) {
+                    Text("None").tag(String?.none)
+                    ForEach(ConnectionList.availableGroups(in: client.macGroups), id: \.self) { group in
+                        Text(group).tag(String?.some(group))
                     }
                 }
+                .pickerStyle(.inline)
                 Divider()
                 Button { newGroupName = ""; newGroupFor = id } label: {
                     Label("New Group…", systemImage: "folder.badge.plus")

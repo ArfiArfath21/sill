@@ -1,9 +1,10 @@
 import Foundation
 import CoreGraphics
 
-/// The connect screen's list vs. tiles arrangement, per-Mac groups, and stored preview pictures
-/// (Windows App's Connection Center: tiles with live/stored screenshots and custom groups).
-/// Pure rules: Foundation and CoreGraphics only, checked by `Tests/checks/connection-list`.
+/// The connect screen's arrangement (rows, or tiles with each saved Mac's last picture), the groups a
+/// saved Mac can be put in, and the stored pictures (issue #116; Windows App's Connection Center:
+/// tiles with stored screenshots and custom groups). Pure rules: Foundation and CoreGraphics only,
+/// checked by `Tests/checks/connection-list`.
 enum ConnectionList {
     enum Style: String, CaseIterable, Equatable {
         case list, tiles
@@ -13,6 +14,9 @@ enum ConnectionList {
     static let styleKey = "Sill.connectionStyle"
     static let groupsKey = "Sill.macGroups"
     static let presetGroups = ["Home", "Work", "Personal"]
+    /// The section of the Macs with no group, once any Mac has one. Never a group's own name: a group
+    /// called Other would be a second section of that title.
+    static let otherTitle = "Other"
     static let maxGroupLength = 32
     static let twoColumnMinWidth: CGFloat = 340
 
@@ -30,13 +34,16 @@ enum ConnectionList {
         style == .tiles && sceneActive && saved
     }
 
-    /// Cleans a group name: collapses whitespace/newlines, caps at `maxGroupLength`, nil when blank.
+    /// Cleans a group name: whitespace and newlines collapsed to single spaces, at most
+    /// `maxGroupLength` characters; a preset's name in any case is the preset ("work" is Work); nil when
+    /// blank or Other in any case (where the Macs with no group already are).
     static func cleanGroup(_ raw: String?) -> String? {
         guard let raw else { return nil }
         let words = raw.components(separatedBy: .whitespacesAndNewlines).filter { !$0.isEmpty }
         guard !words.isEmpty else { return nil }
-        let joined = words.joined(separator: " ")
-        return String(joined.prefix(maxGroupLength))
+        let name = String(words.joined(separator: " ").prefix(maxGroupLength)).trimmingCharacters(in: .whitespaces)
+        if name.caseInsensitiveCompare(otherTitle) == .orderedSame { return nil }
+        return presetGroups.first { $0.caseInsensitiveCompare(name) == .orderedSame } ?? name
     }
 
     static func decodeGroups(_ text: String?) -> [String: String] {
@@ -55,21 +62,43 @@ enum ConnectionList {
         return (try? encoder.encode(groups)).flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
     }
 
+    /// Puts `macID` in `group`, or in none for nil, blank or Other. A name already in use in another
+    /// case ("home office" beside "Home Office") is that group, so one name never makes two sections.
     static func settingGroup(_ group: String?, for macID: String, in groups: [String: String]) -> [String: String] {
         guard !macID.isEmpty, macID.count <= 128 else { return groups }
         var next = groups
         if let clean = cleanGroup(group) {
-            next[macID] = clean
+            next[macID] = groups.values.filter { $0.caseInsensitiveCompare(clean) == .orderedSame }.min() ?? clean
         } else {
             next.removeValue(forKey: macID)
         }
         return next
     }
 
-    /// Preset groups in order, followed by any custom group names currently assigned (sorted).
+    /// A saved record retired for a newer one of the same Mac (SavedMacs.superseding, a re-pairing that
+    /// replaces a record whose Mac has a new key): its group goes to the record that takes its place,
+    /// unless that one has a group of its own.
+    static func carryingGroup(from old: String, to new: String, in groups: [String: String]) -> [String: String] {
+        guard old != new, let group = groups[old] else { return groups }
+        var next = groups
+        next.removeValue(forKey: old)
+        if next[new] == nil { next[new] = group }
+        return next
+    }
+
+    /// The order groups come in, in the Group menu and as sections, whatever order the Macs are listed
+    /// in (so a section never moves as Macs come and go): the presets in their order, then other names
+    /// as Finder sorts them.
+    static func ordered(_ names: Set<String>) -> [String] {
+        presetGroups.filter(names.contains) + names.subtracting(presetGroups).sorted { a, b in
+            let order = a.localizedStandardCompare(b)
+            return order == .orderedSame ? a < b : order == .orderedAscending
+        }
+    }
+
+    /// The Group menu's names: every preset, then the other names in use.
     static func availableGroups(in groups: [String: String]) -> [String] {
-        let custom = Set(groups.values.compactMap(cleanGroup)).subtracting(presetGroups).sorted()
-        return presetGroups + custom
+        ordered(Set(presetGroups).union(groups.values.compactMap(cleanGroup)))
     }
 
     struct Section<Item: Equatable>: Equatable {
@@ -77,24 +106,23 @@ enum ConnectionList {
         let items: [Item]
     }
 
-    /// Groups `items` by each item's `macID` in `groups`. When no item has a group, returns a single
-    /// section with `title: nil` so the connect screen has no section header and matches the flat list.
+    /// Groups `items` by each item's `macID` in `groups`: the groups in `ordered`'s order, each keeping
+    /// the items' own order, then Other for the rest. When no item has a group, a single section with
+    /// `title: nil`, so the connect screen has no header and is the flat list it always was.
     static func sections<Item: Equatable>(for items: [Item], macID: (Item) -> String?, groups: [String: String]) -> [Section<Item>] {
         guard !items.isEmpty else { return [] }
-        var order: [String] = []
         var byGroup: [String: [Item]] = [:]
         var ungrouped: [Item] = []
         for item in items {
             if let id = macID(item), let g = cleanGroup(groups[id]) {
-                if byGroup[g] == nil { order.append(g) }
                 byGroup[g, default: []].append(item)
             } else {
                 ungrouped.append(item)
             }
         }
-        guard !order.isEmpty else { return [Section(title: nil, items: items)] }
-        var out = order.compactMap { name in byGroup[name].map { Section(title: name, items: $0) } }
-        if !ungrouped.isEmpty { out.append(Section(title: "Other", items: ungrouped)) }
+        guard !byGroup.isEmpty else { return [Section(title: nil, items: items)] }
+        var out = ordered(Set(byGroup.keys)).compactMap { name in byGroup[name].map { Section(title: name, items: $0) } }
+        if !ungrouped.isEmpty { out.append(Section(title: otherTitle, items: ungrouped)) }
         return out
     }
 

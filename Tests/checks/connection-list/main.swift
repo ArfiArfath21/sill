@@ -33,6 +33,13 @@ check(C.cleanGroup(nil) == nil && C.cleanGroup("   \n\t ") == nil, "blank group 
 check(C.cleanGroup("  Work \n Office ") == "Work Office", "whitespace and newlines collapse")
 let longGroup = String(repeating: "A", count: 50)
 check(C.cleanGroup(longGroup)?.count == C.maxGroupLength, "group name capped at 32 characters")
+let cutAtSpace = String(repeating: "B", count: 31) + " tail"
+check(C.cleanGroup(cutAtSpace) == String(repeating: "B", count: 31), "a name cut at the cap ends without a space")
+check(C.cleanGroup("Other") == nil && C.cleanGroup(" other ") == nil && C.cleanGroup("OTHER") == nil,
+      "Other in any case is no group: the Macs with no group are already under Other")
+check(C.cleanGroup("Others") == "Others" && C.cleanGroup("Other Macs") == "Other Macs", "only Other itself is reserved")
+check(C.cleanGroup("home") == "Home" && C.cleanGroup("WORK") == "Work" && C.cleanGroup(" personal ") == "Personal",
+      "a preset's name in any case is the preset")
 
 var groups = C.decodeGroups(nil)
 check(groups.isEmpty, "nil JSON decodes empty")
@@ -44,12 +51,26 @@ let encoded = C.encodeGroups(groups)
 check(C.decodeGroups(encoded) == groups, "encode/decode round-trips")
 groups = C.settingGroup("   ", for: "M1", in: groups)
 check(groups == ["M2": "Home"], "blank group removes the Mac's group")
-check(C.decodeGroups(#"{"":"Work","M1":"   ","M2":"Lab"}"#) == ["M2": "Lab"], "decode drops empty keys and blank values")
+check(C.settingGroup("other", for: "M2", in: groups).isEmpty, "Other removes the Mac's group")
+check(C.decodeGroups(#"{"":"Work","M1":"   ","M2":"Lab","M3":"Other"}"#) == ["M2": "Lab"], "decode drops empty keys, blank values and Other")
+check(C.settingGroup("home office", for: "M3", in: ["M1": "Home Office"]) == ["M1": "Home Office", "M3": "Home Office"],
+      "a name in use in another case joins that group")
+check(C.settingGroup("Lab", for: "M3", in: ["M1": "Studio"]) == ["M1": "Studio", "M3": "Lab"], "a new name makes a new group")
 
-// Available groups: presets in order, plus any custom groups sorted and deduplicated.
+// A retired record's group goes to the one that takes its place, unless that one has its own.
+check(C.carryingGroup(from: "OLD", to: "NEW", in: ["OLD": "Work", "M1": "Home"]) == ["NEW": "Work", "M1": "Home"],
+      "a superseded record's group goes to its successor")
+check(C.carryingGroup(from: "OLD", to: "NEW", in: ["OLD": "Work", "NEW": "Lab"]) == ["NEW": "Lab"],
+      "a successor keeps a group of its own")
+check(C.carryingGroup(from: "OLD", to: "NEW", in: ["M1": "Home"]) == ["M1": "Home"], "no group to carry: nothing changes")
+check(C.carryingGroup(from: "M1", to: "M1", in: ["M1": "Home"]) == ["M1": "Home"], "a record that supersedes itself keeps its group")
+
+// Available groups: presets in order, plus any custom groups sorted (as Finder sorts) and deduplicated.
 check(C.availableGroups(in: [:]) == ["Home", "Work", "Personal"], "presets when no custom groups")
 check(C.availableGroups(in: ["M1": "Studio", "M2": "Work", "M3": "Client"]) == ["Home", "Work", "Personal", "Client", "Studio"],
       "custom groups appended sorted without duplicates")
+check(C.availableGroups(in: ["M1": "lab", "M2": "Attic", "M3": "Room 10", "M4": "Room 9"])
+      == ["Home", "Work", "Personal", "Attic", "lab", "Room 9", "Room 10"], "custom groups sorted as Finder sorts them")
 
 // Sections: when no row is grouped, a single unnamed section preserves the exact flat list.
 struct Row: Equatable { let name: String; let macID: String? }
@@ -62,10 +83,14 @@ check(C.sections(for: rows, macID: \.macID, groups: ["OTHER": "Work"]) == [C.Sec
 
 let grouped = C.sections(for: rows, macID: \.macID, groups: ["M1": "Work", "M3": "Work", "M2": "Home"])
 check(grouped == [
-    C.Section(title: "Work", items: [rows[0], rows[3]]),
     C.Section(title: "Home", items: [rows[1]]),
+    C.Section(title: "Work", items: [rows[0], rows[3]]),
     C.Section(title: "Other", items: [rows[2]]),
-], "named groups in first-seen order, then Other for ungrouped rows")
+], "presets in their order whatever order the rows come in, each keeping the rows' order, then Other")
+let customs = C.sections(for: rows, macID: \.macID, groups: ["M1": "Studio", "M2": "Client", "M3": "Personal"])
+check(customs.map(\.title) == ["Personal", "Client", "Studio", "Other"], "presets, then other names sorted, then Other")
+check(C.sections(for: Array(rows.reversed()), macID: \.macID, groups: ["M1": "Studio", "M2": "Client", "M3": "Personal"]).map(\.title)
+      == ["Personal", "Client", "Studio", "Other"], "the sections' order does not follow the rows' order")
 
 let allGrouped = C.sections(for: [rows[0], rows[1]], macID: \.macID, groups: ["M1": "Home", "M2": "Home"])
 check(allGrouped == [C.Section(title: "Home", items: [rows[0], rows[1]])], "no Other section when every row has a group")

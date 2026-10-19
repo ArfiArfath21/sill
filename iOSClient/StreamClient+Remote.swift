@@ -197,7 +197,17 @@ extension StreamClient {
     // MARK: Connection groups and preview pictures (ConnectionList)
 
     func setGroup(_ group: String?, for macID: String) {
-        let next = ConnectionList.settingGroup(group, for: macID, in: macGroups)
+        storeGroups(ConnectionList.settingGroup(group, for: macID, in: macGroups))
+    }
+
+    /// A record retired for a newer one of the same Mac (SavedMacs.superseding, a re-pairing that
+    /// replaced a record whose Mac has a new key) gives its group to that one; before the list is
+    /// stored, which drops the groups of records no longer saved.
+    func carryGroup(from old: String, to new: String) {
+        storeGroups(ConnectionList.carryingGroup(from: old, to: new, in: macGroups))
+    }
+
+    private func storeGroups(_ next: [String: String]) {
         guard next != macGroups else { return }
         macGroups = next
         if !macGroupsSeeded {
@@ -425,6 +435,7 @@ extension StreamClient {
                     print("remote: \(winner.candidate.key) answered with the key of \(newer.macID), saved after \(macID): \(macID) superseded")
                     #endif
                     self.savedMacs = SavedMacs.superseding(old: macID, by: newer.macID, proof: winner.candidate.key, in: self.savedMacs)
+                    if self.savedMac(macID) == nil { self.carryGroup(from: macID, to: newer.macID) }
                     self.persistSavedMacs()
                     if self.reconnect?.macID == macID { self.reconnect?.macID = newer.macID }
                     macID = newer.macID
