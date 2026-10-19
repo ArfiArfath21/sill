@@ -22,9 +22,12 @@ final class PairingWindowState {
 /// taking the keyboard (`WindowPlacement.showInFront`), over a full-screen app too, so a request
 /// can never swallow a password being typed in another app.
 ///
-/// Hidden from third-party screen sharing unless Settings › Devices allows it. `sharingType` is
-/// best effort only (ScreenCaptureKit is reported to ignore it from macOS 15); Sill's Desktop
-/// stream and window catalog always leave Sill's own windows out, regardless of this setting.
+/// Screen sharing (Screen Sharing, Apple Remote Desktop, VNC apps) leaves it out (`sharingType =
+/// .none`) unless Settings › Devices' "Show the pairing window to screen sharing" is on, whoever
+/// opened it (PairingWindowSharing, issue #108); a change applies at once to a window already open
+/// (`applySharing`, from the app delegate). `.none` is a best effort only (ScreenCaptureKit is
+/// reported to ignore it from macOS 15); what keeps the code off every device, whatever the switch
+/// says, is the Desktop stream leaving Sill's own windows out, and the window catalog skipping them.
 @MainActor
 final class PairDeviceWindowController: NSWindowController, NSWindowDelegate {
     private let model: AppModel
@@ -37,11 +40,10 @@ final class PairDeviceWindowController: NSWindowController, NSWindowDelegate {
         window.title = "Pair iPhone or iPad"
         window.isReleasedWhenClosed = false
         window.collectionBehavior.insert([.moveToActiveSpace, .fullScreenAuxiliary])
-        window.sharingType = model.settings.displayQRCodeOnRemoteDesktops ? .readOnly : .none
+        // Before the window is ever on screen (`show` sets it again with its offer).
+        window.sharingType = PairingWindowSharing.pairingWindow(switchOn: model.settings.showPairingWindowToScreenSharing,
+                                                                byDevice: false).windowSharingType
         super.init(window: window)
-        model.settings.onQRCodeVisibilityChange = { [weak window] visible in
-            window?.sharingType = visible ? .readOnly : .none
-        }
         let host = NSHostingController(rootView: LivePairDeviceView(model: model, state: state, close: { [weak self] in self?.close() }))
         host.sizingOptions = [.preferredContentSize]
         window.contentViewController = host
@@ -58,6 +60,7 @@ final class PairDeviceWindowController: NSWindowController, NSWindowDelegate {
         guard let window else { return }
         let wasVisible = window.isVisible
         state.offer = offer
+        applySharing()
         if !wasVisible { window.center() }
         if offer.byDevice {
             WindowPlacement.showInFront(window)
@@ -77,6 +80,13 @@ final class PairDeviceWindowController: NSWindowController, NSWindowDelegate {
     /// The window shows a code or a pairing's outcome.
     var isShowing: Bool { window?.isVisible == true && state.offer != nil }
 
+    /// Settings › Devices' "Show the pairing window to screen sharing" on the window, for its offer:
+    /// as each offer shows, and at once when the switch changes (an open window follows it).
+    func applySharing() {
+        window?.sharingType = PairingWindowSharing.pairingWindow(switchOn: model.settings.showPairingWindowToScreenSharing,
+                                                                 byDevice: state.offer?.byDevice ?? false).windowSharingType
+    }
+
     /// The menu's "‹device› Wants to Pair" while its window is up: forward and key (a click in the
     /// menu, so activating Sill is what the user asked for).
     func bringForward() {
@@ -87,6 +97,16 @@ final class PairDeviceWindowController: NSWindowController, NSWindowDelegate {
     func windowWillClose(_ notification: Notification) {
         model.cancelPairing()      // a no-op once the code was used, expired or stopped
         state.offer = nil
+    }
+}
+
+extension PairingWindowSharing {
+    /// The window's sharing type: `.none` hidden, AppKit's default `.readOnly` shown.
+    var windowSharingType: NSWindow.SharingType {
+        switch self {
+        case .hidden: .none
+        case .shown: .readOnly
+        }
     }
 }
 
