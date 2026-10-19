@@ -342,7 +342,8 @@ the package reference. Nothing else. A new source file needs its four
 A connected iPhone or iPad changes the same settings from its own Settings
 panel (the gear, the last button of its bar): Quality, Resolution, Frame Rate,
 Prioritize Encoding Speed, Virtual Display and Direct Wireless Connection, with
-exactly the Mac's choices. Sill.app saves a device's change like a menu click,
+exactly the Mac's choices; Send Audio shows there read-only, the Mac's alone
+(The Mac's sound, below). Sill.app saves a device's change like a menu click,
 and its Settings window and menu show it; the change applies to every connected
 device, and a streaming setting restarts the stream for a moment. A device away
 from home sets the away quality instead (Remote access, below). To put one
@@ -359,19 +360,20 @@ it), off by default, and the Mac's alone: Sill.app's status menu ("Send Audio
 `--audio`, whose line says "(beta)". A device's row in its Settings panel
 shows it read-only with a "Beta" tag, and the Mac refuses a device's change
 ("Settings from ‹device› refused: send audio (set on this Mac only)"). It
-sends the sound of what streams to every connected device that plays it: the streamed window's app (every window
-of it: macOS captures sound per app), or every app but Sill for the Desktop.
-The Mac keeps playing it too. It comes from a second, audio-only
-ScreenCaptureKit stream, so rotating, Aa, a quality change or the encoder's
-fallback never interrupt it, and it needs no permission beyond Screen
-Recording. AAC-ELD at 128 kbps, 10 ms packets, as kind 43 on the session's own
-connection, only to a device whose hello lists the codec (a device from before
-2026-09-27 is sent none); away from home the sound's bytes count in remote
-pacing's backlog, which drops frames and never the sound. The log says what
-the sound is of ("Audio: capturing Safari's sound (every window of it).") and
-why it stops; the stats line gains `aud.in`, `aud.out`, `aud.sent`, `aud.drop`
-and `aud.gap` while it runs. `defaults delete me.saffer.sill.mac sendAudio`
-puts it back to off. docs/audio-plan.md has the design.
+sends the sound of what streams to every connected device that plays it: the
+streamed window's app (every window of it: macOS captures sound per app), or
+every app but Sill for the Desktop. The Mac keeps playing it too. It comes
+from a second, audio-only ScreenCaptureKit stream, so rotating, Aa, a quality
+change or the encoder's fallback never interrupt it, and it needs no
+permission beyond Screen Recording. AAC-ELD at 128 kbps, 10 ms packets, as
+kind 43 on the session's own connection, only to a device whose hello lists
+the codec (a device from before 2026-09-27 is sent none); away from home the
+sound's bytes count in remote pacing's backlog, which drops frames and never
+the sound. The log says what the sound is of ("Audio: capturing Safari's sound
+(every window of it).") and why it stops; the stats line gains `aud.in`,
+`aud.out`, `aud.sent`, `aud.drop` and `aud.gap` while it runs. `defaults
+delete me.saffer.sill.mac sendAudio` puts it back to off. docs/audio-plan.md
+has the design.
 
 On the device, the bar's Sound button (where the bar holds it beside Menus; on
 a phone held upright at the end of the thumbnails' row, and with Larger

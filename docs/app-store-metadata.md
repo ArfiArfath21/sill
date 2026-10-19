@@ -297,8 +297,9 @@ Free, with no account and no servers. Use any window on your Mac, or the whole d
 The App Store shows another description with 0.5.1 (3,302 characters,
 beginning "Sill shows a window from your Mac, or its whole desktop…"), which
 this file doesn't hold. Paste this block at the next version: it has what that
-one leaves out, the Mac requirement, iPhone Duo, away from home and no sound
-among them.
+one leaves out, the Mac requirement, iPhone Duo and away from home among them.
+Its "no sound" line is for a version without the sound: the next one, which
+carries it as a beta, swaps it for the sound's bullet (below).
 
 ```text
 Sill puts your Mac on your iPhone and iPad. Pick any window, or the whole desktop, and use it with touch, a trackpad, a keyboard or Apple Pencil. Your apps keep running on your Mac. Sill shows them and sends back what you do.
