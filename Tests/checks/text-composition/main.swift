@@ -1,9 +1,13 @@
 // TextComposition (iOSClient/TextComposition.swift) on its own: an input method's composition stays on
 // the device until it is committed, and every edit the text system makes reaches the Mac as backspaces
-// and text that leave the Mac's text equal to the document (#138), and whose ⌃Space it is
-// (TextInputRules). Scenario by scenario, then 20,000 random edit sequences against a model of the
-// Mac's text field.
-//   swiftc -O iOSClient/TextComposition.swift Tests/checks/text-composition/main.swift -o check && ./check
+// and text that leave the Mac's text equal to the document (#138). What was typed is kept whole while
+// the text system may revise it (a long dictation's corrections land where they were made), trimmed only
+// past its limit, and a correction whose range was taken before a forget sends nothing. Then
+// TextInputRules: which input moves the Mac's caret, which input modes are keyboards, and whose ⌃Space
+// it is. Scenario by scenario, then 20,000 seeded random edit sequences against a model of the Mac's
+// text field.
+//   swiftc -O iOSClient/TextComposition.swift Sources/StreamProtocol/Input.swift \
+//       Tests/checks/text-composition/main.swift -o check && ./check
 import Foundation
 
 typealias C = TextComposition
@@ -23,6 +27,14 @@ func apply(_ outputs: [C.Output], to text: inout String) {
     }
 }
 
+/// A range of whole characters of `s`, in UTF-16 offsets, as UIKit's ranges are.
+func utf16Range(_ s: String, characters: Range<Int>) -> NSRange {
+    let chars = Array(s)
+    let loc = String(chars[..<characters.lowerBound]).utf16.count
+    let len = String(chars[characters]).utf16.count
+    return NSRange(location: loc, length: len)
+}
+
 // MARK: - Scenarios
 
 do {   // Zhuyin: symbols composed, then a candidate committed through insertText
@@ -40,8 +52,17 @@ do {   // a composition accepted as it stands (unmarkText), after text already s
     _ = c.insert("a")
     c.setMarked("你好", selected: NSRange(location: 2, length: 0))
     check("the marked range follows what was sent", c.markedRange == NSRange(location: 1, length: 2))
+    check("the length is the document's, the composition's included", c.length == 3 && c.document == "a你好")
+    check("the caret inside a composition is after what was sent", c.selectedRange == NSRange(location: 3, length: 0))
     check("unmark sends the composition", c.unmark() == [.text("你好")] && c.document == "a你好")
     check("unmark with nothing composed sends nothing", c.unmark() == [])
+}
+
+do {   // the input method's caret inside its composition (Japanese, moving between clauses)
+    var c = C()
+    _ = c.insert("x")
+    c.setMarked("きょうは", selected: NSRange(location: 1, length: 2))
+    check("a selection inside the composition is kept, after what was sent", c.selectedRange == NSRange(location: 2, length: 2))
 }
 
 do {   // backspace inside a composition edits it, outside it reaches the Mac
@@ -58,7 +79,7 @@ do {   // an empty composition ends it without sending
     var c = C()
     c.setMarked("ㄅ", selected: NSRange(location: 1, length: 0))
     c.setMarked("", selected: NSRange(location: 0, length: 0))
-    check("an empty composition ends it", !c.isComposing && c.sent.isEmpty)
+    check("an empty composition ends it", !c.isComposing && c.sent.isEmpty && c.markedRange == nil)
     c.setMarked(nil, selected: NSRange(location: 0, length: 0))
     check("a nil composition ends it", !c.isComposing)
 }
@@ -69,8 +90,28 @@ do {   // dictation corrects a word it already typed
     apply(c.insert("I sea it"), to: &mac)
     apply(c.replace(NSRange(location: 2, length: 3), with: "see"), to: &mac)
     check("a correction deletes back to the change and types the rest", mac == "I see it" && c.document == "I see it")
-    apply(c.replace(NSRange(location: 8, length: 0), with: "."), to: &mac)
-    check("an insertion at the end is only typed", mac == "I see it." )
+    let out = c.replace(NSRange(location: 8, length: 0), with: ".")
+    apply(out, to: &mac)
+    check("an insertion at the end is only typed", out == [.text(".")] && mac == "I see it.")
+}
+
+do {   // a long dictation: its corrections land where they were made, however much came before
+    var c = C()
+    var mac = ""
+    var ok = true
+    var phrase = 0
+    while c.sent.count < 1_500 {
+        phrase += 1
+        let start = c.length
+        apply(c.insert("wurd\(phrase) "), to: &mac)          // the first hypothesis
+        apply(c.replace(NSRange(location: start, length: c.length - start), with: "word\(phrase), "), to: &mac)   // corrected
+        if mac != c.document { ok = false; break }
+    }
+    check("a dictation of 1,500 characters corrected phrase by phrase: the Mac's text is the document", ok && mac == c.document)
+    check("…and nothing of it was cut from under a correction", c.sent.count >= 1_500 && c.sent.hasPrefix("word1, "))
+    let first = utf16Range(c.document, characters: 0..<4)
+    apply(c.replace(first, with: "Word"), to: &mac)
+    check("a correction at the very start of a long dictation goes there", mac == c.document && mac.hasPrefix("Word1, "))
 }
 
 do {   // a replacement over the composition commits it
@@ -92,6 +133,11 @@ do {   // emoji and combining marks count as one character on the Mac
     let utf16 = c.document.utf16.count
     apply(c.replace(NSRange(location: 1, length: utf16 - 1), with: "b"), to: &mac)
     check("a replacement over an emoji deletes it once", mac == "ab")
+    let combining = c.insert("e")
+    apply(combining, to: &mac)
+    let accent = c.insert("\u{301}")
+    apply(accent, to: &mac)
+    check("a combining mark that joins the last character retypes it whole", accent == [.backspaces(1), .text("é")] && mac == "abé")
 }
 
 do {   // reset forgets what was sent, not the composition
@@ -102,17 +148,67 @@ do {   // reset forgets what was sent, not the composition
     check("reset forgets what was sent", c.sent.isEmpty && c.marked == "ㄏ" && c.markedRange == NSRange(location: 0, length: 1))
 }
 
-do {   // only a tail is kept
+do {   // a correction taken before a forget: nothing goes to the Mac
     var c = C()
-    _ = c.insert(String(repeating: "字", count: C.keep + 50))
-    check("only the last characters are kept", c.sent.count == C.keep)
+    var mac = "earlier text "
+    apply(c.insert("I sea it"), to: &mac)
+    let stale = NSRange(location: 2, length: 3)        // "sea", taken before the Mac's caret moved
+    c.reset()                                          // a click on the Mac
+    apply(c.insert("x"), to: &mac)                     // typed where the caret is now
+    let out = c.replace(stale, with: "see")
+    check("a range that starts past the document after a forget sends nothing", out == [] && mac == "earlier text I sea itx")
+    check("…and changes nothing here", c.sent == "x" && !c.isComposing)
+    c.setMarked("ㄋ", selected: NSRange(location: 1, length: 0))
+    let underComposition = c.replace(NSRange(location: 9, length: 1), with: "y")
+    check("…a composition in progress carries on", underComposition == [] && c.marked == "ㄋ")
+    c.setMarked(nil, selected: NSRange(location: 0, length: 0))
+    let atEnd = c.replace(NSRange(location: c.length, length: 0), with: "z")
+    apply(atEnd, to: &mac)
+    check("an insertion at the very end still goes", atEnd == [.text("z")] && c.sent == "xz")
+    let overhanging = c.replace(NSRange(location: 1, length: 40), with: "Z")
+    apply(overhanging, to: &mac)
+    check("a range that starts inside and runs past the end is cut at the end",
+          overhanging == [.backspaces(1), .text("Z")] && c.sent == "xZ" && mac == "earlier text I sea itxZ")
+}
+
+do {   // the tail: kept whole to its limit, trimmed past it, never while composing
+    var c = C()
+    _ = c.insert(String(repeating: "字", count: C.limit))
+    check("a tail of exactly the limit wants no trim", !c.wantsTrim && c.sent.count == C.limit)
+    c.trim()
+    check("…and a trim then keeps it all", c.sent.count == C.limit)
+    _ = c.insert("x")
+    check("one character past the limit wants a trim", c.wantsTrim)
+    c.setMarked("ㄅ", selected: NSRange(location: 1, length: 0))
+    check("no trim while an input method composes", !c.wantsTrim)
+    c.trim()
+    check("…and a trim then does nothing", c.sent.count == C.limit + 1 && c.marked == "ㄅ")
+    c.setMarked(nil, selected: NSRange(location: 0, length: 0))
+    c.trim()
+    check("a trim keeps the last characters", c.sent.count == C.keep && c.sent.hasSuffix("字x") && !c.wantsTrim)
+    check("the limits as documented", C.limit == 4_000 && C.keep == 1_000)
 }
 
 do {   // a selection out of range is clamped
     var c = C()
     c.setMarked("ㄋㄧ", selected: NSRange(location: 9, length: 4))
     check("the marked selection stays inside the composition", c.selectedRange == NSRange(location: 2, length: 0))
+    c.setMarked("ㄋㄧ", selected: NSRange(location: 1, length: 9))
+    check("…and so does its length", c.selectedRange == NSRange(location: 1, length: 1))
 }
+
+// MARK: - Which input moves the Mac's caret
+
+check("a click moves the caret", R.movesCaret(.pointer(.leftDown, x: 0.5, y: 0.5)))
+check("a right click moves the caret", R.movesCaret(.pointer(.rightDown, x: 0.5, y: 0.5)))
+check("a pointer move does not", !R.movesCaret(.pointer(.move, x: 0.5, y: 0.5)))
+check("a button's up does not", !R.movesCaret(.pointer(.leftUp, x: 0.5, y: 0.5)) && !R.movesCaret(.pointer(.rightUp, x: 0.5, y: 0.5)))
+check("a key going down does (an arrow, a shortcut, a modifier)",
+      R.movesCaret(.key(hidUsage: 0x50, down: true, modifiers: 0)) && R.movesCaret(.key(hidUsage: 0xE3, down: true, modifiers: R.command)))
+check("a key going up does not", !R.movesCaret(.key(hidUsage: 0x50, down: false, modifiers: 0)))
+check("typed text does not, a backspace among it", !R.movesCaret(.text("a")) && !R.movesCaret(.text("\u{8}")) && !R.movesCaret(.text("\n")))
+check("a scroll does not", !R.movesCaret(.scroll(x: 0.5, y: 0.5, dx: 0, dy: 0.1)))
+check("a scroll's phases do not", [ScrollPhase.began, .ended, .momentumBegan, .momentumEnded].allSatisfy { !R.movesCaret(.scrollGesture($0, x: 0.5, y: 0.5)) })
 
 // MARK: - Keyboards and ⌃Space
 
@@ -150,34 +246,89 @@ check("the modifier bits are UIKeyModifierFlags'", R.shift == 1 << 17 && R.contr
 
 // MARK: - Random edit sequences
 
-var generator = SystemRandomNumberGenerator()
-let alphabet: [String] = ["a", "b", "你", "好", "ㄋ", "ˇ", "👍🏽", "é", " ", "\n"]
-func word() -> String { (0..<Int.random(in: 1...3, using: &generator)).map { _ in alphabet.randomElement(using: &generator)! }.joined() }
-var randomFails = 0
-for _ in 0..<20_000 {
-    var c = C()
-    var mac = ""
-    for _ in 0..<12 {
-        switch Int.random(in: 0..<7, using: &generator) {
-        case 0: apply(c.insert(word()), to: &mac)
-        case 1: c.setMarked(word(), selected: NSRange(location: 0, length: 0))
-        case 2: apply(c.unmark(), to: &mac)
-        case 3: apply(c.deleteBackward(), to: &mac)
-        case 4:
-            // Whole characters only: UIKit's ranges never split one.
-            let chars = Array(c.document)
-            let a = Int.random(in: 0...chars.count, using: &generator)
-            let b = Int.random(in: a...chars.count, using: &generator)
-            let loc = String(chars[..<a]).utf16.count, len = String(chars[a..<b]).utf16.count
-            apply(c.replace(NSRange(location: loc, length: len), with: word()), to: &mac)
-        case 5: c.reset()
-        default: break
-        }
-        // Whatever the Mac held before the last reset, its tail is always the remembered text.
-        if !mac.hasSuffix(c.sent) || c.sent.count > C.keep { randomFails += 1; break }
+/// SplitMix64: the same sequences on every run, so a failure can be run again.
+struct Seeded: RandomNumberGenerator {
+    var state: UInt64
+    mutating func next() -> UInt64 {
+        state &+= 0x9E37_79B9_7F4A_7C15
+        var z = state
+        z = (z ^ (z >> 30)) &* 0xBF58_476D_1CE4_E5B9
+        z = (z ^ (z >> 27)) &* 0x94D0_49BB_1331_11EB
+        return z ^ (z >> 31)
     }
 }
-check("20,000 random sequences: the Mac's text always ends with what is remembered", randomFails == 0)
+var generator = Seeded(state: 0x5111_0138)
+
+/// `runs` sequences of 12 edits each from `alphabet`, with forgets, stale corrections and trims among
+/// them when `forgets`, against a model of the Mac's text field: it always ends with what is
+/// remembered, and is exactly that while nothing was forgotten. The first failure is printed; the
+/// number of failed runs, and of stale corrections tried, are returned.
+func randomRuns(_ runs: Int, alphabet: [String], forgets: Bool) -> (fails: Int, stale: Int) {
+    func word() -> String { (0..<Int.random(in: 1...3, using: &generator)).map { _ in alphabet.randomElement(using: &generator)! }.joined() }
+    var failed = 0, staleTried = 0
+    var firstFailure: String?
+    for run in 0..<runs {
+        var c = C()
+        var mac = ""
+        var everReset = false
+        var stale: NSRange?
+        for step in 0..<12 {
+            let before = c
+            var why: String?
+            switch Int.random(in: 0..<(forgets ? 9 : 5), using: &generator) {
+            case 0: apply(c.insert(word()), to: &mac)
+            case 1:
+                let w = word()
+                c.setMarked(w, selected: NSRange(location: Int.random(in: 0...w.utf16.count, using: &generator), length: 0))
+                if c.sent != before.sent { why = "a composition changed what was sent" }
+            case 2: apply(c.unmark(), to: &mac)
+            case 3: apply(c.deleteBackward(), to: &mac)
+            case 4:
+                // Whole characters only: UIKit's ranges never split one.
+                let chars = Array(c.document)
+                let a = Int.random(in: 0...chars.count, using: &generator)
+                let b = Int.random(in: a...chars.count, using: &generator)
+                let range = utf16Range(c.document, characters: a..<b)
+                if c.length > 0, stale == nil { stale = NSRange(location: c.length + 1, length: Int.random(in: 0...3, using: &generator)) }
+                apply(c.replace(range, with: word()), to: &mac)
+            case 5:
+                c.reset()
+                everReset = true
+            case 6:
+                // A correction whose range the text system took before a forget: past the document's end.
+                guard let range = stale, range.location > c.length else { break }
+                staleTried += 1
+                let out = c.replace(range, with: word())
+                if out != [] || c != before { why = "a stale correction changed something" }
+            case 7:
+                c.trim()
+                everReset = everReset || c.sent != before.sent
+            default: break
+            }
+            if why == nil, c.length != c.document.utf16.count { why = "the length is not the document's" }
+            if why == nil, !mac.hasSuffix(c.sent) { why = "the Mac's text does not end with what is remembered" }
+            if why == nil, !everReset, mac != c.sent { why = "with nothing forgotten, the Mac's text is not what was sent" }
+            if why == nil, let m = c.markedRange, m.location != c.sent.utf16.count { why = "the composition does not follow what was sent" }
+            if let why {
+                failed += 1
+                if firstFailure == nil { firstFailure = "run \(run), step \(step): \(why) (Mac \(mac.debugDescription), sent \(c.sent.debugDescription))" }
+                break
+            }
+        }
+    }
+    if let firstFailure { print("     \(firstFailure)") }
+    return (failed, staleTried)
+}
+
+// Forgets among the edits. No lone combining mark here: one typed right after a forget joins a
+// character the Mac has from before it, which this side never knew (the model's suffix would not hold).
+let forgetful = randomRuns(20_000, alphabet: ["a", "b", "你", "好", "ㄋ", "ˇ", "👍🏽", "é", "e", " ", "\n"], forgets: true)
+check("20,000 seeded random sequences: the Mac's text always ends with what is remembered, and is it while nothing was forgotten",
+      forgetful.fails == 0)
+check("…stale corrections among them (\(forgetful.stale)), none of which sent anything", forgetful.stale > 1_000)
+// No forget: a combining mark that joins the character before it is retyped with it.
+let joining = randomRuns(5_000, alphabet: ["a", "e", "\u{301}", "👍", "\u{1F3FD}", "ㄋ", "ˇ", " "], forgets: false)
+check("5,000 seeded random sequences with combining marks and skin tones: the Mac's text is what was sent", joining.fails == 0)
 
 print("\(passes) passed, \(fails) failed")
 exit(fails == 0 ? 0 : 1)

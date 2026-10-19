@@ -1,13 +1,20 @@
 import Foundation
+// In the app StreamProtocol is its own module; the text-composition check compiles this file together
+// with Sources/StreamProtocol/Input.swift as one module, where there is nothing to import.
+#if canImport(StreamProtocol)
+import StreamProtocol
+#endif
 
 // What the stream's input view holds for iPadOS's text system (#138): the text an input method is
 // still composing (Zhuyin's ㄋㄧˇ, Pinyin's nihao, Japanese kana before conversion), kept on the device
-// and never sent, and a tail of what was typed since the Mac's caret was last moved by something else,
-// so dictation and an input method can revise what they put there (a dictated word corrected a moment
-// later: backspaces on the Mac, then the new text). Beside it, `TextInputRules`: whose ⌃Space it is.
+// and never sent, and what was typed since the Mac's caret was last moved by something else, so
+// dictation and an input method can revise what they put there (a dictated word corrected a moment
+// later: backspaces on the Mac, then the new text). Beside it, `TextInputRules`: which input moves the
+// Mac's caret, and whose ⌃Space it is.
 //
-// Pure: Foundation only, so it is checked on its own with swiftc (Tests/checks/text-composition).
-// Offsets are UTF-16, as UITextInput's are; the Mac is sent whole characters.
+// Pure: Foundation and StreamProtocol's InputEvent only, checked on its own with swiftc
+// (Tests/checks/text-composition). Offsets are UTF-16, as UITextInput's are; the Mac is sent whole
+// characters.
 
 struct TextComposition: Equatable {
     /// What goes to the Mac: text, or that many backspaces (each one deletes one character there).
@@ -16,19 +23,26 @@ struct TextComposition: Equatable {
         case backspaces(Int)
     }
 
-    /// The tail of what was sent since the last `reset`, which the text system may still revise.
+    /// What was sent since the last `reset`, which the text system may still revise. Kept whole while it
+    /// may: the text system's offsets point into it, and cutting its front in the middle of an edit moved
+    /// every offset under a correction still to come (dictation's, say, past 200 characters), which then
+    /// landed at the end and typed the corrected words a second time. Past `limit` the input view trims it
+    /// (`trim`), between edits, with the text system told.
     private(set) var sent = ""
     /// The text being composed, never sent while it is; nil when nothing is.
     private(set) var marked: String?
     /// The selection inside the marked text, relative to its start (UTF-16).
     private(set) var markedSelection = NSRange(location: 0, length: 0)
 
-    /// How much of what was sent is kept, in characters: enough for a dictated sentence's corrections.
-    static let keep = 200
+    /// Past this many characters, the tail is due a trim (`wantsTrim`): only a long stretch of typing or
+    /// dictation with no click, key or pick in it gets there.
+    static let limit = 4_000
+    /// What a trim keeps, in characters: more than any correction dictation or an input method makes.
+    static let keep = 1_000
 
     /// The document the text system sees: what was sent, then what is being composed.
     var document: String { sent + (marked ?? "") }
-    var length: Int { document.utf16.count }
+    var length: Int { sent.utf16.count + (marked?.utf16.count ?? 0) }
     var isComposing: Bool { marked != nil }
 
     var markedRange: NSRange? {
@@ -75,20 +89,34 @@ struct TextComposition: Equatable {
 
     /// `range` of the document replaced with `text` (dictation's corrections, an input method's own
     /// edits): any composition ends, and the Mac is brought to the new document by deleting back to
-    /// where the old and new first differ and typing the rest.
+    /// where the old and new first differ and typing the rest. A range that starts past the document's
+    /// end was taken before this side forgot what it held (`reset`: the Mac's caret moved since), so the
+    /// text it means is no longer just before the caret there: nothing is sent, rather than its
+    /// replacement typed a second time at the caret.
     mutating func replace(_ range: NSRange, with text: String) -> [Output] {
         let utf16 = Array(document.utf16)
-        let start = min(max(range.location, 0), utf16.count)
+        guard range.location <= utf16.count else { return [] }
+        let start = max(range.location, 0)
         let end = min(max(range.location + range.length, start), utf16.count)
         let before = String(utf16CodeUnits: Array(utf16[..<start]), count: start)
         let after = String(utf16CodeUnits: Array(utf16[end...]), count: utf16.count - end)
         return commit(before + text + after)
     }
 
-    /// The Mac's caret moved some other way (a click, an arrow, a shortcut): what was sent is forgotten;
-    /// a composition carries on.
+    /// The Mac's caret moved some other way (a click, an arrow, a shortcut, a pick): what was sent is
+    /// forgotten; a composition carries on.
     mutating func reset() {
         sent = ""
+    }
+
+    /// The tail is past `limit` and nothing is being composed: the input view trims it at its next turn.
+    var wantsTrim: Bool { marked == nil && sent.count > Self.limit }
+
+    /// The tail's last `keep` characters are kept, when it wants a trim. Every offset moves: the input
+    /// view tells the text system, as for a `reset`.
+    mutating func trim() {
+        guard wantsTrim else { return }
+        sent = String(sent.suffix(Self.keep))
     }
 
     /// The document becomes `new`, all of it sent: backspaces over what differs, then the rest.
@@ -101,7 +129,7 @@ struct TextComposition: Equatable {
         var out: [Output] = []
         if old.count > common { out.append(.backspaces(old.count - common)) }
         if now.count > common { out.append(.text(String(now[common...]))) }
-        sent = String(now.suffix(Self.keep))
+        sent = new
         return out
     }
 }
@@ -115,6 +143,20 @@ enum TextInputRules {
     static let command: UInt64 = 1 << 20
     /// Space's HID usage.
     static let space: UInt16 = 0x2C
+
+    /// Whether an input sent to the Mac, by any path (the picture, the portrait trackpad and key row, a
+    /// hardware keyboard, Esc's key command), may move its caret: a button going down (a click, or the
+    /// start of a drag) or a key going down (an arrow, Return as a key, a shortcut, a modifier). Then
+    /// what was typed is no longer just before the caret there, so the input view forgets it
+    /// (`TextComposition.reset`), and a correction dictation makes later never backspaces where the
+    /// caret is now. Typing (text, a backspace among it), moves, scrolls and every up leave it.
+    static func movesCaret(_ event: InputEvent) -> Bool {
+        switch event {
+        case .pointer(let action, _, _): return action == .leftDown || action == .rightDown
+        case .key(_, let down, _): return down
+        case .text, .scroll, .scrollGesture: return false
+        }
+    }
 
     /// Whether an active input mode (`UITextInputMode.activeInputModes`, by its primary language) is a
     /// keyboard a person switches to: every one but Emoji and dictation.

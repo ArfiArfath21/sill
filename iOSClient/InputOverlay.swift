@@ -41,12 +41,16 @@ final class InputOverlayView: UIView, UITextInput, UIGestureRecognizerDelegate {
     /// Fires once a latch has been spent, so the key row can un-highlight itself.
     var onModifiersConsumed: (() -> Void)?
 
-    /// What iPadOS's text system sees: the composition in progress and a tail of what was typed.
+    /// What iPadOS's text system sees: the composition in progress and what was typed since the Mac's
+    /// caret last moved some other way.
     private var composition = TextComposition()
+    /// A trim of what was typed waits for the next turn of the main queue (`typed`).
+    private var trimQueued = false
     /// The composition in progress, drawn over the picture: the Mac has none of it until it is chosen.
     private lazy var compositionLabel: UILabel = {
         let label = PaddedLabel()
         label.font = .preferredFont(forTextStyle: .title3)
+        label.adjustsFontForContentSizeCategory = true
         label.textColor = .label
         label.backgroundColor = .secondarySystemBackground.withAlphaComponent(0.92)
         label.layer.cornerRadius = 8
@@ -174,6 +178,12 @@ final class InputOverlayView: UIView, UITextInput, UIGestureRecognizerDelegate {
     }
 
     required init?(coder: NSCoder) { fatalError() }
+
+    /// A composition on show keeps to the top middle of the picture when this view changes size.
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        if composition.isComposing { layoutCompositionLabel() }
+    }
 
     // MARK: - Coordinates
 
@@ -379,7 +389,7 @@ final class InputOverlayView: UIView, UITextInput, UIGestureRecognizerDelegate {
 
     override func didMoveToWindow() {
         super.didMoveToWindow()
-        if window == nil { momentum.stop(); releaseForwardedKeys() }
+        if window == nil { momentum.stop(); releaseForwardedKeys(); commitComposition() }
         // A session's start, a rotation's other layout, a reconnect's new screen: the proxy takes the
         // keyboard for a hardware keyboard (on the next turn, once this view is settled in the window).
         if window != nil { keyboardProxy?.joined(self) } else { keyboardProxy?.left(self) }
@@ -560,6 +570,15 @@ final class InputOverlayView: UIView, UITextInput, UIGestureRecognizerDelegate {
     @objc var smartDashesType: UITextSmartDashesType = .no
     @objc var spellCheckingType: UITextSpellCheckingType = .no
     @objc var inlinePredictionType: UITextInlinePredictionType = .no
+    // Nor any of iPadOS's newer helpers that rewrite text already typed: what this view remembers is the
+    // Mac's (TextComposition), and a rewrite of it would go out as backspaces and retyping there. Only an
+    // input method or dictation revises it.
+    @available(iOS 18.0, *)
+    @objc var writingToolsBehavior: UIWritingToolsBehavior { get { .none } set {} }
+    @available(iOS 18.0, *)
+    @objc var mathExpressionCompletionType: UITextMathExpressionCompletionType { get { .no } set {} }
+    @available(iOS 27.0, *)
+    @objc var grammarCheckingType: UITextGrammarCheckingType { get { .no } set {} }
 
     /// Always true: there is text on the Mac, and the delete key has to keep working even though
     /// this view holds no text of its own.
@@ -620,7 +639,8 @@ final class InputOverlayView: UIView, UITextInput, UIGestureRecognizerDelegate {
     }
 
     /// What the text system's edit leaves for the Mac: text, and a backspace for each character to
-    /// delete (as the keyboard's own backspace goes); the composition label follows.
+    /// delete (as the keyboard's own backspace goes); the composition label follows. A tail grown past
+    /// `TextComposition.limit` is trimmed at the next turn, outside the text system's call.
     private func typed(_ outputs: [TextComposition.Output]) {
         for output in outputs {
             switch output {
@@ -629,17 +649,42 @@ final class InputOverlayView: UIView, UITextInput, UIGestureRecognizerDelegate {
             }
         }
         showComposition()
+        if composition.wantsTrim, !trimQueued {
+            trimQueued = true
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                self.trimQueued = false
+                guard self.composition.wantsTrim else { return }
+                self.changeUnasked { $0.trim() }
+            }
+        }
     }
 
-    /// The Mac's caret moved some other way than typing (a click, an arrow, a shortcut): what was typed
-    /// can no longer be revised there, so the text system is told it is gone. A composition carries on.
-    private func forgetTyped() {
+    /// The Mac's caret moved some other way than typing (a click, an arrow, a shortcut, a pick, from this
+    /// view or from anywhere else: `InputOverlayProxy.caretMayHaveMoved`): what was typed can no longer be
+    /// revised there, so the text system is told it is gone. A composition carries on.
+    func forgetTyped() {
         guard !composition.sent.isEmpty else { return }
+        changeUnasked { $0.reset() }
+    }
+
+    /// A change to the document the text system did not ask for (a forget, a trim), with it told before
+    /// and after: every offset it holds moves.
+    private func changeUnasked(_ change: (inout TextComposition) -> Void) {
         inputDelegate?.selectionWillChange(self)
         inputDelegate?.textWillChange(self)
-        composition.reset()
+        change(&composition)
         inputDelegate?.textDidChange(self)
         inputDelegate?.selectionDidChange(self)
+    }
+
+    /// What an input method or dictation left composed when this view stops being the text system's
+    /// (it resigns, or leaves its window) goes to the Mac as it stands, as a text field on iPadOS keeps
+    /// it: it would otherwise stay over the picture, never sent, and every hardware key after it would
+    /// go to an input method that no longer composes it (`pressesBegan`).
+    private func commitComposition() {
+        guard composition.isComposing else { return }
+        typed(composition.unmark())
     }
 
     private func consumeLatch() {
@@ -684,6 +729,7 @@ final class InputOverlayView: UIView, UITextInput, UIGestureRecognizerDelegate {
         let resigned = super.resignFirstResponder()
         if resigned {
             releaseForwardedKeys()
+            commitComposition()
             keyboardProxy?.resigned(self)
         }
         return resigned
@@ -780,10 +826,12 @@ final class InputOverlayView: UIView, UITextInput, UIGestureRecognizerDelegate {
 
     // The split between the two keyboard paths, which must not overlap or everything is typed twice:
     //
-    //   • Text path (`insertText` / `deleteBackward`) owns every key that produces characters:
-    //     letters, digits, punctuation, space and backspace, with or without shift, and return and
-    //     tab without it. Those arrive already composed — shifted, dead-keyed, from a Japanese IME,
-    //     from dictation — which is exactly what we want to send as `.text`.
+    //   • Text path (`insertText` / `deleteBackward`, and an input method's and dictation's marked text
+    //     and corrections: `TextComposition`) owns every key that produces characters: letters, digits,
+    //     punctuation, space and backspace, with or without shift, and return and tab without it.
+    //     Those arrive already composed — shifted, dead-keyed, chosen from an input method's
+    //     candidates, dictated — which is exactly what we want to send as `.text`. While an input method
+    //     composes, every key is the text path's (`pressesBegan`).
     //
     //   • Raw path (`.key`) owns only what the text path never delivers: the arrows, escape, the
     //     function keys, home/end/page up/down, forward delete, ⌘, ⌃ and ⌥ themselves, *any* key
@@ -897,20 +945,24 @@ extension InputOverlayView {
         override var isEmpty: Bool { range.length == 0 }
     }
 
-    private func nsRange(_ range: UITextRange) -> NSRange? {
+    /// The offsets `range` spans, lower first, as the text system holds them: past the document's end
+    /// when it took them before what was typed was forgotten (`forgetTyped`), which
+    /// `TextComposition.replace` judges.
+    private func offsets(_ range: UITextRange) -> NSRange? {
         guard let start = range.start as? Position, let end = range.end as? Position else { return nil }
-        let lower = min(max(min(start.offset, end.offset), 0), composition.length)
-        let upper = min(max(max(start.offset, end.offset), 0), composition.length)
+        let lower = max(min(start.offset, end.offset), 0), upper = max(start.offset, end.offset, 0)
         return NSRange(location: lower, length: upper - lower)
     }
 
     func text(in range: UITextRange) -> String? {
-        guard let range = nsRange(range) else { return nil }
-        return (composition.document as NSString).substring(with: range)
+        guard let range = offsets(range) else { return nil }
+        let length = composition.length
+        let lower = min(range.location, length), upper = min(range.location + range.length, length)
+        return (composition.document as NSString).substring(with: NSRange(location: lower, length: upper - lower))
     }
 
     func replace(_ range: UITextRange, withText text: String) {
-        guard let range = nsRange(range) else { return }
+        guard let range = offsets(range) else { return }
         setOwnPointer(nil, .none)
         typed(composition.replace(range, with: text))
     }
@@ -1009,13 +1061,18 @@ extension InputOverlayView {
     /// The composition label, showing `text` at the top middle of the picture.
     private func place(_ text: String) {
         compositionLabel.text = text
+        layoutCompositionLabel()
+        compositionLabel.isHidden = false
+        bringSubviewToFront(compositionLabel)
+    }
+
+    /// The composition label's frame for its text, at the top middle of the picture.
+    private func layoutCompositionLabel() {
         let size = compositionLabel.sizeThatFits(CGSize(width: bounds.width - 32, height: .greatestFiniteMagnitude))
         let anchor = compositionAnchor
         let width = min(size.width, bounds.width - 32)
         compositionLabel.frame = CGRect(x: min(max(anchor.minX - width / 2, 16), bounds.width - 16 - width),
                                         y: anchor.minY, width: width, height: size.height)
-        compositionLabel.isHidden = false
-        bringSubviewToFront(compositionLabel)
     }
 }
 
@@ -1063,6 +1120,12 @@ final class InputOverlayProxy {
     func update(takers: Set<HardwareKeyboardPolicy.Taker>) {
         change(takers.isEmpty ? "nothing open" : takers.map(\.rawValue).sorted().joined(separator: ", ") + " open") { $0.takers(takers) }
     }
+    /// Something that may have moved the Mac's caret went to the Mac, from anywhere on the stream screen
+    /// (StreamClient.onCaretMayMove: the portrait trackpad's clicks, the key row's keys, a pick, a menu
+    /// item, a gesture, and the input view's own clicks and keys): the input view forgets what it
+    /// remembers of what was typed (#138), so a correction dictation makes later never backspaces where
+    /// the caret is now.
+    func caretMayHaveMoved() { view?.forgetTyped() }
 
     // From the view (only the current one counts)
 

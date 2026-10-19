@@ -328,6 +328,11 @@ final class StreamClient: ObservableObject {
     /// Where the sprite's tip goes, a fraction of the video frame, or nil to hide it: the display
     /// view's `setPointer`, set by `StreamView.wirePointer`. Up to 120 times a second. Main thread.
     var onPointerChange: ((CGPoint?) -> Void)?
+    /// Something that may have moved the Mac's caret went to the Mac: a click or a key going down
+    /// (TextInputRules.movesCaret), whichever view sent it, a pick, a launch, a window's button, a menu
+    /// item or a gesture. The stream screen's input view then forgets what it remembers of what was typed
+    /// (InputOverlayProxy.caretMayHaveMoved, #138). Set by StreamScreen. Main thread.
+    var onCaretMayMove: (() -> Void)?
     /// Q1's flip only (`PointerPresence.trackpadLinger`): the one timer that re-renders when the
     /// trackpad's pointer is due to go. Idle while the linger is nil, as it is by default.
     private var lingerRender: DispatchWorkItem?
@@ -3184,6 +3189,7 @@ final class StreamClient: ObservableObject {
     /// is not the person's doing.
     private func request(_ source: StreamSource) {
         choicesSent += 1
+        onCaretMayMove?()   // the Mac raises what it picks: its caret is in another window
         send(.selectSource, Wire.encode(source))
         #if DEBUG
         // Layout harness (mock, no connection): show the pick locally so taps can be checked.
@@ -3194,6 +3200,7 @@ final class StreamClient: ObservableObject {
     /// The bar's long-press menu: close, minimize or full-screen a window on the Mac.
     func command(_ action: WindowCommand.Action, window id: UInt32) {
         noteAction()
+        onCaretMayMove?()
         send(.windowCommand, Wire.encode(WindowCommand(id: id, action: action)))
     }
 
@@ -3238,6 +3245,7 @@ final class StreamClient: ObservableObject {
     func launch(bundleID: String) {
         noteAction()
         choicesSent += 1   // the host picks the launched app's window: a choice, like a pick
+        onCaretMayMove?()
         send(.launchApp, Wire.encode(LaunchApp(bundleID: bundleID)))
     }
 
@@ -3260,6 +3268,8 @@ final class StreamClient: ObservableObject {
         // Every input passes here, a hover and a flick's coast included: the tour's rule counts it
         // as something happening (StreamScreen.considerTour).
         lastInputAt = ProcessInfo.processInfo.systemUptime
+        // A click or a key from any view: what the input view remembers of what was typed goes (#138).
+        if TextInputRules.movesCaret(event) { onCaretMayMove?() }
         #if DEBUG
         // The tour takes every touch and the keyboard while it shows, and holds back the pointer's
         // move to a new frame's middle, so nothing should get here then; the one case expected is a
@@ -3327,6 +3337,7 @@ final class StreamClient: ObservableObject {
                                             generation: TrackpadGesture.generation, windowStreams: windowStreams)
         guard plan.send else { return false }
         if plan.desktopFirst { select(.desktop) }
+        onCaretMayMove?()
         let payload = Wire.encode(TrackpadGesture(gesture: gesture.rawValue, fingers: fingers))
         queue.async { [weak self] in
             guard let self else { return }
@@ -4200,6 +4211,7 @@ extension StreamClient {
         switch menus.press(row, token: menuToken) {
         case .send(let request)?:
             menuToken += 1
+            onCaretMayMove?()
             send(.pressMenuItem, payload: Wire.encode(request))
             #if DEBUG
             print("menus: chose \(row.title) (\(request.id ?? ""))")

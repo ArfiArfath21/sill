@@ -346,6 +346,10 @@ struct StreamScreen: View {
         .onChange(of: windowMenu) { _, menu in if menu != nil { setSettings(false) } }
         .ignoresSafeArea(edges: .bottom)
         .onAppear {
+            // A click, a key, a pick, a menu item or a gesture from anywhere on this screen: the input
+            // view forgets what was typed, which dictation and an input method may revise (#138).
+            let proxy = overlay
+            client.onCaretMayMove = { [weak proxy] in proxy?.caretMayHaveMoved() }
             // A fresh connection starts on the Desktop (the client asks for it as soon as the host
             // reports nothing streaming), so the drawer stays closed until the user opens it.
             sendViewport()
@@ -357,6 +361,8 @@ struct StreamScreen: View {
         }
         .onChange(of: client.active) { _, source in
             if source != .none { withAnimation(.easeOut(duration: 0.18)) { drawerOpen = false } }
+            // Another source, whoever picked it: the Mac's caret is in another window (#138).
+            overlay.caretMayHaveMoved()
             // The host sizes a window as it selects it, from the last viewport it has; this repeat
             // is for a host that restarted, or a window that was picked from the Mac's side.
             sendViewport()
