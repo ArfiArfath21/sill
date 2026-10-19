@@ -58,8 +58,8 @@ package final class StreamCoordinator {
     /// encoder, the launch probe never runs and the re-check never starts, so no test touches the
     /// Mac's one hardware encoder while Noah streams (PointerTestHooks).
     private let softwareOnly: Bool
-    /// The TEST ONLY hooks' lines (PointerTestHooks, InputInjector.testInputLog), printed as `start`
-    /// begins; empty without them.
+    /// The TEST ONLY hooks' lines (PointerTestHooks, InputInjector.testInputLog, `keyframeIgnoreHook`),
+    /// printed as `start` begins; empty without them.
     private let testHookLines: [String]
     /// A picked window streams from its own HiDPI display (see VirtualStage): the CLI's
     /// `--virtual-display`, or the app's setting. Every branch this adds is behind this flag;
@@ -192,9 +192,13 @@ package final class StreamCoordinator {
     }
     /// A device's keyframe requests (kind 44, issue #101: its picture was interrupted): when each
     /// connection's last one was taken, at most one a second, the rest dropped with one line a minute.
-    /// A device asks once per interruption, 2 s apart at least (KeyframeRecovery), and each costs a
-    /// keyframe to every device.
+    /// A device asks once per interruption, again only when the keyframe has not come in 4 s or more,
+    /// 2 s apart at least (KeyframeRecovery), and each costs a keyframe to every device.
     private var keyframeRequestAt: [ObjectIdentifier: CFAbsoluteTime] = [:]
+    /// TEST ONLY. `SILL_TEST_KEYFRAME_IGNORE=<n>` on a --synthetic host: the first n keyframe requests
+    /// it takes are ignored, with a line each, as a Mac from before kind 44 skips every one, so a
+    /// device's ask again after its wait runs for real (`keyframeIgnoreHook`). Zero otherwise.
+    private var keyframeRequestsToIgnore: Int
     static let keyframeRequestSpacing: CFTimeInterval = 1
     private lazy var keyframeRequestDrops = RefusalSummary(queue: .main, categories: ["keyframes"]) { counts in
         "Keyframe requests ignored: \(counts["keyframes"] ?? 0) in a minute, from devices asking more than once a second."
@@ -302,9 +306,11 @@ package final class StreamCoordinator {
         let path = PointerTestHooks.pointerPath(synthetic: synthetic, environment: env)
         let software = PointerTestHooks.softwareEncoder(synthetic: synthetic, environment: env)
         let inputLog = InputInjector.testInputLog(synthetic: synthetic, environment: env)
+        let keyframeIgnore = Self.keyframeIgnoreHook(synthetic: synthetic, environment: env)
         pointer = PointerWatch(synthetic: synthetic, path: path.path)
         softwareOnly = software.on
-        testHookLines = [path.line, software.line, inputLog.line].compactMap { $0 }
+        keyframeRequestsToIgnore = keyframeIgnore.count
+        testHookLines = [path.line, software.line, inputLog.line, keyframeIgnore.line].compactMap { $0 }
         status = HostStatus()
         var home = StreamServer.HomeDoorMode.plain
         if homePairing, let remote {
@@ -970,6 +976,11 @@ package final class StreamCoordinator {
                 return
             }
             keyframeRequestAt[id] = now
+            if keyframeRequestsToIgnore > 0 {      // TEST ONLY: SILL_TEST_KEYFRAME_IGNORE
+                keyframeRequestsToIgnore -= 1
+                print("Test keyframes: ignored a keyframe request from \(deviceName(connection)) (\(keyframeRequestsToIgnore) more to ignore).")
+                return
+            }
             guard active != .none, let encoder else { return }     // nothing streams: the next stream starts with one
             print("Keyframe for \(deviceName(connection)): its picture was interrupted.")
             encoder.requestKeyframe()
@@ -1876,6 +1887,17 @@ package final class StreamCoordinator {
             try? await Task.sleep(for: .milliseconds(20))
         }
         return Self.activePID(trustAppKit: appKitLoop) == pid
+    }
+
+    /// TEST ONLY: `SILL_TEST_KEYFRAME_IGNORE=<n>`, honoured only by a --synthetic host, with the one
+    /// line `start` prints about it. Nothing, and no line, without it.
+    static func keyframeIgnoreHook(synthetic: Bool, environment env: [String: String]) -> (count: Int, line: String?) {
+        guard let raw = env["SILL_TEST_KEYFRAME_IGNORE"], !raw.isEmpty else { return (0, nil) }
+        let shown = SafeText.label(raw, limit: 32)
+        guard synthetic else { return (0, "SILL_TEST_KEYFRAME_IGNORE=\(shown) ignored: only a --synthetic host takes it.") }
+        guard let n = Int(raw), n > 0 else { return (0, "SILL_TEST_KEYFRAME_IGNORE=\(shown) ignored: a number of requests, 1 or more.") }
+        let which = n == 1 ? "the first keyframe request (kind 44)" : "the first \(n) keyframe requests (kind 44)"
+        return (n, "Test keyframes: \(which) ignored, as a Mac from before kind 44 skips every one (SILL_TEST_KEYFRAME_IGNORE).")
     }
 
     /// TEST ONLY: `SILL_TEST_MENU_PID`, honoured only by a --synthetic host (which does not
