@@ -478,6 +478,61 @@ hold, letters, Esc (through `pressesBegan`), ⌘W and two-finger scrolling all
 reached the Mac, and Esc closed Settings without reaching it. A Magic Keyboard
 itself, and which channel brings its Esc, are still untested.
 
+## Other languages and dictation
+
+The stream's input view is a text input (`UITextInput`, issue #138), so typing in
+a language whose input method composes its text, and dictation, reach the Mac.
+An input method (Chinese Zhuyin or Pinyin, Japanese, Korean and the like)
+composes on the device: what it is composing shows at the top middle of the
+picture, its candidates show where iPadOS puts them (on the on-screen keyboard,
+or with a hardware keyboard beside the composition), and only the text chosen
+goes to the Mac, typed as any text is. While it composes, every key is the input
+method's (the arrows pick, Return and Space choose, Esc cancels), so nothing of
+it reaches the Mac until it is chosen. What is still composed when the input
+view stops taking the keyboard (Settings, the Apps list or the tour opens, the
+device turns) goes to the Mac as it stands, as a text field on the device keeps
+it. Dictation types what is said, and the corrections it makes a moment later
+go to the Mac as backspaces back to the first change, then the rest typed again.
+
+There is no setting for it in Sill: the input view follows the keyboards and
+dictation languages set up in the device's Settings › General › Keyboard
+(Keyboards, and Dictation Languages under Dictation). With keyboards in two
+languages or more there, Control-Space switches between them on the device, as
+in any text field there and as on a Mac with several input sources, and while a
+hardware keyboard holds the keyboard the new one's name shows over the picture
+for a second. With keyboards in one language (Emoji and dictation aside),
+Control-Space goes to the Mac as before: Xcode's completions, VS Code's
+suggestions, the Mac's own input source switch. Control-Shift-Space,
+Control-Option-Space and Control-Command-Space always go to the Mac. The Globe
+key switches the device's keyboard too.
+
+A correction needs what is just before the Mac's caret, so the device remembers
+what was typed since the caret last moved some other way, and forgets it at
+anything that may move the caret: a click or a key from any part of Sill (the
+picture, the portrait trackpad, the key row, a hardware keyboard, Esc), another
+window or the Desktop picked by anyone, an app opened, a window's buttons, a
+menu item, a three-finger gesture. A correction of what was forgotten sends
+nothing, rather than typing its words a second time where the caret is now.
+Typing on the Mac itself, and another device's input, Sill does not see: a
+correction made right after either can land in the wrong place. Past 4,000
+characters typed with nothing in between, all but the last 1,000 are forgotten.
+Scribble never writes over the picture (the Apple Pencil is the Mac's mouse
+there), and Writing Tools, math results and grammar suggestions are off in the
+input view, as autocorrection and predictions are: each would rewrite text the
+Mac already has.
+
+`iOSClient/TextComposition.swift` is the rule, checked in
+`Tests/checks/text-composition`. Debug builds print `hwkey: usage 44 down via
+pressesBegan (control): iPadOS's keyboard switch` for a Control-Space that
+stays on the device.
+
+On a device so far: the pull request's author, on an iPad Air (4th generation)
+with a Magic Keyboard against Sill for Mac 0.5.1, typed Zhuyin on the Magic
+Keyboard and on the on-screen keyboard, switched with Control-Space and the
+Globe key, and dictated in Chinese (2026-10-17). Not yet on a device: Pinyin,
+Japanese, English dictation and its corrections, Control-Space with one
+keyboard, an Apple Pencil over the picture, and VoiceOver.
+
 ## The clipboard
 
 Text goes both ways between the Mac and a device (kind 32; the plan and its
@@ -790,8 +845,8 @@ encoder session, the device floor, how a session ends, how the device reads the
 Mac's messages, the update check, the disk image's window, where everything goes
 on a phone held upright, who moves the Mac's pointer, the Mac's menus on both
 ends, which three-finger strokes are gestures and what the Mac does with one,
-which modifiers a device's keys leave set on the Mac,
-the first-run tour, pairing at home (the doors, the cable, the device's rows),
+which modifiers a device's keys leave set on the Mac, what an input method or
+dictation sends the Mac and whose Control-Space it is, the first-run tour, pairing at home (the doors, the cable, the device's rows),
 which keychain Sill.app keeps its identity in, the away quality and the link's
 judgement, the iPhone Duo's layouts, and what of the clipboard goes between
 the Mac and a device) on their own with a check each, and

@@ -5361,9 +5361,17 @@ good.
   says what drew this device's pointer; hardware keys through `ForwardedKeys`,
   let go when the overlay stops taking keys; Esc's key commands; the iPad's
   trackpad's and a wheel's scroll pans beside the finger pan, one scroll path
-  (`scroll(_:at:translation:velocity:from:)`); `InputOverlayProxy`, who holds
+  (`scroll(_:at:translation:velocity:from:)`); a `UITextInput` since #138: an
+  input method's composition over the picture, sent once chosen, dictation and
+  its corrections, ⌃Space to iPadOS with keyboards in two languages, Scribble
+  declined, what was typed forgotten when the Mac's caret may move
+  (`forgetTyped`, from `StreamClient.onCaretMayMove`); `InputOverlayProxy`, who holds
   the keyboard, carrying out `HardwareKeyboardPolicy`; `HardwareKeyboardMonitor`,
-  GameController's keyboard), `HardwareKeyboardPolicy` (when the stream's input
+  GameController's keyboard), `TextComposition` (what the input view holds for
+  iPadOS's text system: the composition, what was typed since the Mac's caret
+  last moved, corrections as backspaces and text; `TextInputRules`, which input
+  moves the Mac's caret and whose ⌃Space it is; pure,
+  `Tests/checks/text-composition`; pbxproj AC0138/FC0138), `HardwareKeyboardPolicy` (when the stream's input
   view holds the keyboard for a hardware keyboard and when it is the person's
   own; pure, `Tests/checks/hardware-keyboard`; pbxproj AC01/FC01), `KeyChords`
   (`KeyModifiers`; a
@@ -5542,7 +5550,8 @@ good.
   `pairing-address`, `phone-portrait`, `pointer-control`, `pointer-presence`,
   `pointer-watch`, `policy` (with its `home.swift`), `protocol`,
   `remote-rules` (with its `home.swift`), `settings-window` (Sill.app's
-  `SettingsWindowFit`), `tour`, `update-policy`,
+  `SettingsWindowFit`), `text-composition` (iOSClient's TextComposition with
+  StreamProtocol's Input.swift), `tour`, `update-policy`,
   `window-restore` (WindowRestore's rule and sequences against a stand-in Mac,
   with a copy of the coordinator's glue around them) (the two encoder checks refuse a binary that links
   VideoToolbox). `run-all.sh

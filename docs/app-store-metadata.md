@@ -419,11 +419,18 @@ Larger Picture, in Settings on iPhone: held upright, a window’s picture takes 
 With a keyboard attached to your iPhone or iPad, what you type goes to your Mac as soon as its picture shows, Esc included, without the Keyboard button. Two fingers on a trackpad, or a mouse’s scroll wheel, now scroll the window under the pointer.
 
 Fixed: after Sill sat in the background for hours, it could stop finding your Mac until you closed and reopened it. Sill now looks again when you come back, keeps trying for a few minutes while your Mac doesn’t answer (when it’s asleep, say), and connects when it does.
+
+Type in Chinese, Japanese, Korean and other languages that compose their text, and dictate: you compose and choose on your iPhone or iPad, with the keyboards and dictation languages you set up in Settings, and what you choose is typed on your Mac.
 ```
 
 Esc and scrolling with a trackpad or a mouse showed on the iPad through Universal Control on 2026-10-15
 (docs/hardware-keyboard-plan.md, "Words that wait for a device"), so their words are in: this draft, the
 description's keyboard bullet, README's How it works and the support page.
+
+Other languages and dictation (#147, issue #138, 247 characters) rest on its author's device test: Zhuyin on a
+Magic Keyboard and on the on-screen keyboard, and Chinese dictation, on an iPad Air against Sill for Mac 0.5.1
+(2026-10-17). Its words are in this draft, README's How it works and the support page; the reporter's test of
+the TestFlight build (Pinyin, Japanese, English dictation, Control-Space with one keyboard) is still to come.
 
 ## 6. Export compliance (encryption)
 
