@@ -92,34 +92,48 @@ final class AudioOutput {
     /// A fading stop: the mixer's 25 ms ramp to the player's volume 0, and an IO buffer and more.
     static let fadeWait = 0.05
 
+    /// The notification observers `init` added, removed in `deinit`: each window's client has an output
+    /// of its own, and a block-based observer stays registered until it is removed.
+    private var observers: [NSObjectProtocol] = []
+
     init(refresh: Double) {
         self.refresh = refresh
         let center = NotificationCenter.default
-        center.addObserver(forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: nil) { [weak self] _ in
+        observers.append(center.addObserver(forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: nil) { [weak self] _ in
             self?.queue.async { self?.appForeground = false; self?.foregroundChanged() }
-        }
-        center.addObserver(forName: UIApplication.willEnterForegroundNotification, object: nil, queue: nil) { [weak self] _ in
+        })
+        observers.append(center.addObserver(forName: UIApplication.willEnterForegroundNotification, object: nil, queue: nil) { [weak self] _ in
             self?.queue.async { self?.appForeground = true; self?.foregroundChanged() }
-        }
-        center.addObserver(forName: UIApplication.didBecomeActiveNotification, object: nil, queue: nil) { [weak self] _ in
+        })
+        observers.append(center.addObserver(forName: UIApplication.didBecomeActiveNotification, object: nil, queue: nil) { [weak self] _ in
             self?.queue.async { self?.activationBlocked = false; self?.updateSilence() }
-        }
-        center.addObserver(forName: AVAudioSession.interruptionNotification, object: nil, queue: nil) { [weak self] note in
+        })
+        observers.append(center.addObserver(forName: AVAudioSession.interruptionNotification, object: nil, queue: nil) { [weak self] note in
             self?.queue.async { self?.interrupted(note) }
-        }
-        center.addObserver(forName: AVAudioSession.routeChangeNotification, object: nil, queue: nil) { [weak self] note in
+        })
+        observers.append(center.addObserver(forName: AVAudioSession.routeChangeNotification, object: nil, queue: nil) { [weak self] note in
             self?.queue.async { self?.routeChanged(note) }
-        }
-        center.addObserver(forName: AVAudioSession.mediaServicesWereResetNotification, object: nil, queue: nil) { [weak self] _ in
+        })
+        observers.append(center.addObserver(forName: AVAudioSession.mediaServicesWereResetNotification, object: nil, queue: nil) { [weak self] _ in
             self?.queue.async { self?.servicesReset() }
-        }
+        })
         // The output's format changed (a route at another rate, Bluetooth's call profile, another app
         // changing the session's rate): the engine has stopped and uninitialized itself. Never torn
         // down in the handler (Apple: it can deadlock there): on `queue`.
-        center.addObserver(forName: .AVAudioEngineConfigurationChange, object: nil, queue: nil) { [weak self] note in
+        observers.append(center.addObserver(forName: .AVAudioEngineConfigurationChange, object: nil, queue: nil) { [weak self] note in
             let changed = note.object as AnyObject?
             self?.queue.async { self?.configurationChanged(changed) }
-        }
+        })
+    }
+
+    /// A window's client is gone (its scene discarded): its observers go, and its timers. An engine
+    /// still playing goes with the output, and gives the app's session back as it goes (SoundEngine's
+    /// deinit), so another window's last stop can still let the session go.
+    deinit {
+        let center = NotificationCenter.default
+        for o in observers { center.removeObserver(o) }
+        deadlineTimer?.cancel()
+        secondTimer?.cancel()
     }
 
     // MARK: - From the client
