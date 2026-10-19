@@ -46,8 +46,8 @@ extension StreamClient {
     }
 
     /// For the sound's guard (rule 3): each frame's stamp, taken as it came, on the monotonic clock the
-    /// sound's packets are taken on; the output keeps none until the session's first format, so a
-    /// session without sound hands it nothing. On `queue`.
+    /// sound's packets are taken on; until the session's first format the output only keeps the last
+    /// few, so a session without sound hands its queue nothing. On `queue`.
     func frameForSound(_ header: StreamHeader) {
         sound.frame(stamp: header.timestamp, arrival: CACurrentMediaTime())
     }

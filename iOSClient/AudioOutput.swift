@@ -74,12 +74,16 @@ final class AudioOutput {
 
     /// Whether a kind 43 format came this session: until one does (Send Audio off, a Mac without
     /// sound), a video frame is not handed to `queue` at all, so a session without sound costs no hop
-    /// and no sorted insert per frame. The guard's frames start with the sound (rule 3 reads the
-    /// frames of the last 2 s, which fill within its first seconds, while the cover dominates the
-    /// delay). Set by `format` on the network queue, cleared at a session's start and end; a move's
-    /// hand-over keeps it, as it keeps the sound. Under its own lock.
+    /// and no sorted insert per frame. Only the stamps of the last `framesKeptBeforeFormat` frames are
+    /// kept meanwhile (`framesBeforeFormat`), and the first format hands them to the model before
+    /// itself, so the guard (rule 3: the sound never ahead of the picture) holds from the sound's first
+    /// packet, as when every frame went to the model. Set by `format` on the network queue, cleared at
+    /// a session's start and end; a move's hand-over keeps it, as it keeps the sound. Under its own lock.
     private let formatSeenLock = NSLock()
     private var formatSeen = false
+    private var framesBeforeFormat: [(stamp: Double, arrival: Double)] = []
+    /// About half a second of frames at 60 fps: the median the guard starts from.
+    static let framesKeptBeforeFormat = 32
 
     // The last closed second, for the client's stats (its network queue) and the HUD.
     private let statsLock = NSLock()
@@ -141,7 +145,7 @@ final class AudioOutput {
     /// A new session connection (a connect, a reconnect): nothing of the last one's sound is kept. A
     /// move's hand-over is not one. Any thread.
     func sessionStarted(away: Bool) {
-        formatSeenLock.withLock { formatSeen = false }
+        formatSeenLock.withLock { formatSeen = false; framesBeforeFormat = [] }
         queue.async { [self] in
             stopEngine(reason: nil, fade: true)
             _ = model.reset(.session)
@@ -160,7 +164,7 @@ final class AudioOutput {
 
     /// The session ended (a tear-down): the engine stops. Any thread.
     func sessionEnded() {
-        formatSeenLock.withLock { formatSeen = false }
+        formatSeenLock.withLock { formatSeen = false; framesBeforeFormat = [] }
         queue.async { [self] in
             sessionLive = false
             stopEngine(reason: nil, fade: true)
@@ -213,17 +217,29 @@ final class AudioOutput {
     /// The pings' median round trip of the last second (rule 13's threshold). Any thread.
     func rtt(median ms: Int?) { queue.async { [self] in model.rtt(median: ms.map { Double($0) / 1000 }) } }
 
-    /// A video frame, stamped as the network queue took it (rule 3); dropped here until the session's
-    /// first format (`formatSeen`).
+    /// A video frame, stamped as the network queue took it (rule 3); until the session's first format
+    /// (`formatSeen`) only kept here, the last `framesKeptBeforeFormat` of them.
     func frame(stamp: Double, arrival: Double) {
-        guard formatSeenLock.withLock({ formatSeen }) else { return }
+        let seen = formatSeenLock.withLock { () -> Bool in
+            if formatSeen { return true }
+            if framesBeforeFormat.count >= Self.framesKeptBeforeFormat { framesBeforeFormat.removeFirst() }
+            framesBeforeFormat.append((stamp, arrival))
+            return false
+        }
+        guard seen else { return }
         queue.async { [self] in model.frame(stamp: stamp, arrival: arrival) }
     }
 
-    /// A kind 43 format.
+    /// A kind 43 format: the session's first hands the frames kept before it to the model first.
     func format(_ f: AudioFormat) {
-        formatSeenLock.withLock { formatSeen = true }
-        queue.async { [self] in receive(f) }
+        let before = formatSeenLock.withLock { () -> [(stamp: Double, arrival: Double)] in
+            defer { formatSeen = true; framesBeforeFormat = [] }
+            return formatSeen ? [] : framesBeforeFormat
+        }
+        queue.async { [self] in
+            for frame in before { model.frame(stamp: frame.stamp, arrival: frame.arrival) }
+            receive(f)
+        }
     }
 
     /// A kind 43 packets message and its header's stamp, as the network queue took it.
