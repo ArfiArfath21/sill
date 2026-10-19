@@ -642,11 +642,14 @@ paired for Remote Access connects at home with no further step.
   pairing window to screen sharing** in Settings › Devices (off by default; it
   applies at once, to a window already open too), then tap the Mac's row on
   the device, or choose Pair iPhone or iPad… in the Sill menu: the window, its
-  QR code and its code show in the remote view. While it is on, anyone who can
-  see the Mac's screen remotely, a screen recording or a video call's shared
-  screen included, can read a code, so turn it off once the device has paired.
-  It covers the pairing window alone, whoever opened it; the cable notice and
-  Sill's other windows are as before, and no device streaming the Mac sees the
+  QR code and its code show in the remote view. What the switch changes is
+  what Screen Sharing, Apple Remote Desktop and VNC viewers see: while it is
+  on, anyone who can see the Mac's screen through them can read a code, so
+  turn it off once the device has paired. A screen recording, or the screen
+  shared in a video call, may show the code either way: ScreenCaptureKit is
+  reported to ignore the window's `.none` from macOS 15. The switch covers the
+  pairing window alone, whoever opened it; the cable notice and Sill's other
+  windows are as before, and no device streaming the Mac sees the
   window either way (the Desktop stream leaves Sill's own windows out). Sill.log
   says "Pairing window: shown to screen sharing …" when it turns on, and at
   each launch while it is on; the bare app takes `-SillSetAfter '<s>
