@@ -408,7 +408,9 @@ counted from the last declaration, which can be up to 5 s before the device's
 last input. So a device left connected and untouched lets the display sleep,
 the picture goes black, and the device's next input wakes it again. A tap on a
 black picture is a click, posted at once at a spot nobody can see; a pointer
-move on the trackpad, or a modifier key, wakes the display without clicking.
+move on the trackpad, or a modifier key on a keyboard attached to the device
+(the key row's modifiers only latch, sending nothing by themselves), wakes the
+display without clicking.
 Every session the host admits counts: a paired device, any device at home with
 Require pairing off, and with the CLI's plain home door (no `--pairing`) any
 device on this Mac's networks or over Direct Wireless; a request to pair does
@@ -1231,9 +1233,9 @@ AirDrop, Sidecar and Universal Control can hold AWDL on too.
   repainting (covered on the Mac, or the app is idle).
 - Black windows, thumbnails too: the Mac's display is probably asleep. A
   device's connect or input wakes it (A sleeping display, above): move the
-  pointer on the trackpad or press a modifier key, since a tap on the black
-  picture clicks at a spot nobody can see. The log's "Woke the display for …"
-  says it was asleep and is on again.
+  pointer on the trackpad or press a modifier key on a keyboard attached to the
+  device, since a tap on the black picture clicks at a spot nobody can see. The
+  log's "Woke the display for …" says it was asleep and is on again.
 - The Mac has one hardware video encoder, shared by every app. When it keeps
   a frame for 1.5 s the log says "switching to the software encoder" and the
   stream restarts at half resolution on the CPU, up to 60 fps (a launch probe
