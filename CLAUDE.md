@@ -59,7 +59,16 @@ test is Noah's.
   stand-in's own move as the restarted stream's parameter sets arrived (6 s after the last
   declaration), the other device's tap 1.3 s after the first's, a key 2 s after a move, or a pick of
   nothing; no `disp.wake`, no line, `pmset -g assertions` nothing of the host's; Sill.app's previews
-  (140 files) identical to main's, rendered from one path.
+  (140 files) identical to main's, rendered from one path. Again on the tree merged with main at
+  4d990e9 (#110, #87, #88; only lists conflicted, kept whole): `swift build -c release`, no warning;
+  the check (190); its mutants re-run until a pause stopped them, 54 of 60 caught and none missed (the
+  rule, its check and the two wire files are byte for byte those of the 60 of 60 run); `run-all.sh`,
+  all 47; the previews (140) identical; loopback runs with two stand-in devices and with two
+  `sillclient.py` devices: `disp.wakeDry` at both connects, a tap, a person's move 3.3 s after a
+  restart, a gesture and ⌘ alone; none for a second device's tap 2 s after the first, a pick of
+  nothing, the Desktop picked again, the device's own re-centres (5.8 to 8.2 s after the last
+  declaration), the viewport, a settings change, the clipboard, a menu fetch or input that does not
+  decode.
 - Known: a connection the device opens by itself counts as a connect (its reconnect after a dropped
   connection, a move to the cable, to Wi-Fi or home), and so does its re-centre when it reaches the Mac
   more than 2 s after the new stream's first parameter sets left (a slow remote link): either can wake
