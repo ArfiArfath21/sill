@@ -61,7 +61,7 @@ open questions by default, each one place to change (the last section, "The beta
 changes and their checks): Q8, Send Audio is the Mac's alone, as Share Clipboard is; Q10, no
 seventh button in Larger Picture's row 1; Q4 and Q5 as below (it plays with the silent switch on,
 and devices start unmuted); Q16 and H12, codec quality Medium at +3.9 to +4.4 points of a core in
-the harness, accepted while it is off by default. **What ends the beta:** P1–P16 pass on Noah's
+the harness (+4.0 on 2026-10-20), accepted while it is off by default. **What ends the beta:** P1–P16 pass on Noah's
 devices (§11); H12 is met or Noah accepts the cost, with P13 (Sill.app's CPU in Activity Monitor,
 sound on and off) measured; P5 is answered (Virtual Display and a minimized app: whether
 ScreenCaptureKit still hears an app whose window moved off the main display); and P6 (the sync,
@@ -2080,3 +2080,129 @@ Compatibility.swift, HostConfig.swift, PhonePortraitLayout.swift), 936, every on
 (`compatibility` 34, `protocol` 34, `pointer-control` 33, `phone-portrait` 81, `tour` 84,
 `clipboard` 72, `menus` 43, `key-strokes` 81). Not run on the merge: the sound and pacing harnesses,
 H2 and the previews.
+
+## The beta (2026-10-20)
+
+Noah, about PR #94: "Check the sound branch and see if it is polished, if so then merge as beta
+support." A pre-review found it polished as engineering, nothing blocking and CI green on 3fc77c7
+(the tree's first Xcode 27.1 build), with three things owed before a merge as a beta: words that say
+beta, the public copy this PR had left for "the release that ships it" (once it merges, main is that
+release), and the open questions it had taken by default, among them its own failing gate (H12). One
+commit each on the contributor's branch, never a rebase:
+- **Q8, the Mac's alone** (fdf78ff). `DeviceSettings.accepted` refuses a device's `sendAudio`, on or
+  off, from either door, names it in the log ("Settings from iPad (iPad14,1) refused: send audio
+  (set on this Mac only)") and applies the rest of the change. The device's row shows the Mac's
+  value as a disabled switch, as Direct Wireless's does from afar, its footnote saying where it is
+  set ("Turn on Send Audio in Sill on ‹Mac› to hear what streams on every connected device; ‹Mac›
+  keeps playing it too."). Kind 17's field stays on the wire, never reused: a later decision may let
+  a device set it again (#66's Mac viewer asked to). `away-quality`: 12 cases, mutants AQ20–AQ24.
+- **The labels** (e42f1a3). The status menu's "Send Audio (Beta)" (in the title, so VoiceOver and
+  menu.txt have it), Settings › Streaming's "Send audio (beta)" and a footnote starting "Beta.", the
+  CLI's "Audio on for this run (beta): …" (only with `--audio`, so H2 holds), and the device's row a
+  small "Beta" tag after its title, "Send Audio, beta" to VoiceOver, both its footnotes starting
+  "Beta.". The bars' Sound button and This iPad's "Sound from ‹Mac›" switch are the device's own
+  mute and carry none.
+- **Q10, no seventh button** (6effec7). With Larger Picture, row 1 is main's again (Apps, Menus
+  while the Mac sent menus, Aa, Keyboard, Desktop, Settings), as §13's hard rule asks, and the sound
+  is the Settings panel's switch alone there; the standard arrangement keeps Sound at row 2's end.
+  `row1Beside` goes. `phone-portrait`: the Sound-in-row-1 cases give way to "no Sound button" on
+  every phone and across the Larger Picture grid (495 checks), A1–A4 to three mutants of the new
+  lines (80 in all); `tour`: its row-1 Sound case goes (111,191).
+- **The pre-review's small defects.** b813164: `AudioCapture`'s running stream under a lock, taken
+  by exactly one of the stop, a failed start and ScreenCaptureKit's end of it. 2e65f06 and 9104023:
+  a session hands the sound's queue no video frame until its first format (every user without sound
+  paid a hop and a sorted insert per frame), keeping only the last 32 frames' stamps, which the
+  first format hands to the model before itself, so the guard (rule 3) holds from the first packet.
+  86de992: the panel's refresh from `StreamClient.screenMaximumFPS()`, not `UIScreen.main`. e8ab324:
+  AudioOutput's seven notification observers removed in its deinit, with its two timers. f448c46: a
+  SoundEngine freed while it played gives the app's session back (else `SharedSession` counted it
+  for good). 6503bc5: AAC-ELD's codec loaded in the background when Send Audio is on at start and
+  when it turns on (`AudioPipeline.prepare`), so the first encoder on `sill.audio` no longer waits
+  for the load: the review's last item left open ("making the encoder off `sill.audio` is not
+  done").
+- **The words** (ba59b74, 841bc2f, 4769266, a2a6901, ecbd4db). README (How it works' "Sound from
+  your Mac" and Good to know); site/privacy.html (what the Mac sends while Send Audio is on, the
+  device's report gaining how far the sound trails and its late packets, the mute kept on the
+  device, Screen Recording's sound) and site/support.html ("Sound from your Mac (beta)") inside
+  `<!-- Sound:` … `<!-- /Sound -->` markers, with their perl line in docs/release-checklist.md part
+  1 §3; docs/app-store-metadata.md for the next version (the description's bullet, What's New's
+  paragraph, one review-notes line, "beta" always on the feature, never the app: guideline 2.2);
+  BRIEF.md, CLAUDE.md (the compatibility floor's kind 43 clause gains the reader's caps: a format at
+  most 4 KB, a packets message at most 16 KB, which a later host that batches keeps within),
+  DEVELOPMENT.md and this plan's header, which says what ends the beta.
+- **Main merged in** (ac4fc92 at d1fa97e, 306ae88 at 9a8e30c, 8f72307 at 4d990e9: #153, #142, #136,
+  #110, #87, #88): only ci.yml's mutants matrix and the checks README met, both sides kept.
+
+**The beta's defaults**, each one place to change: Q8 and Q10 as above; Q4 (it plays on silent, the
+support page says so) and Q5 (a device starts unmuted) kept; Q16, codec quality Medium, with H12
+unmet (+4.0 points of a core in the harness on 2026-10-20, against the gate's 1.5) and accepted
+while Send Audio is off by default, P13 (Sill.app's CPU in Activity Monitor, sound on and off) to be
+measured before the beta ends. Left as the review left it: packets that come while muted or in the
+background still count for the cover (§7.5), so a short trip to the background can hold it at its
+bound (150 ms at home, 600 ms away) for 10 s before the sound jumps back; #152 (the stream kept
+alive in the background) would make that likelier. Leaving them out, or clearing the cover on the
+return, changes §7.5: Noah's.
+
+Verified (2026-10-20, on 9104023 with main at 4d990e9 merged in; this Mac shared with other work all
+along, a load average of 300 to 900):
+- **Builds.** `swift build -c release` from `git archive` (and main's for H2 and H10), only the
+  CaptureProbe warning. The iOS app with Xcode 27.1 (27A9275): Debug for the generic simulator as CI
+  builds it, Release for the generic simulator and Debug for a generic device, the last two from
+  empty derived data, only the known `StreamClient` capture warning (StreamClient.swift:3740).
+- **Checks.** `Tests/checks/run-all.sh`, all 49 (main's 47, `installed-apps` and
+  `virtual-display-api` among them): `away-quality` 83, `ledger` 99, `phone-portrait` 495, `tour`
+  111,191, `audio-playout` 218, `audio-packetizer` 89, `audio-codec` 21, `compatibility` 140,
+  `pointer-control` 158, `clipboard` 259, `key-strokes` 353 (#110's). Mutants: `away-quality` 24 of
+  24, `audio-codec` 9 of 9, `audio-packetizer` 27 of 27, `ledger` 12 of 12, `away-wire` 9 of 9;
+  `audio-playout` (38) and `tour` (84) stopped unfinished at a pause, 21 and 14 caught by then, none
+  missed (to finish); `phone-portrait`'s 80 of 80 ran earlier the same morning on the same
+  PhonePortraitLayout.swift and check (main's merge since touches neither).
+- **H2**, main's CLI against this one, both `--synthetic` on loopback and the software encoder: idle
+  35 s, `sillclient.py PORT 8 desktop`, and the same with `--hello=0.6 --audio`, masked and sorted,
+  identical in each mode across two rounds but for the stop's timing (one heartbeat) and, in one
+  round, the software encoder giving up on a session under that load in main's run; no `Audio` line,
+  no `aud.` key, no kind 43 (`AUDIO 0 packets` in every client).
+- **H7**, the beta's: a device's `sendAudio` on at 3 s and off at 8 s against a host without
+  `--audio`, both refused ("Settings from sillclient refused: send audio (set on this Mac only)"),
+  each answer `sendAudio` false, no kind 43; with `--audio` the format, then 746 packets in 7.4 s
+  with no seq gap, and "Audio stopped: nothing streams." once the client picked nothing; and a
+  second client's `sendAudio=0` refused while the first kept its sound (1,375 packets, one format,
+  no gap).
+- **The sound harness** (`Scripts/audio/run.sh --cases home,home-off,home1024,segments,relay2`; the
+  away and dip cases run Scripts/pacing's bottleneck, not run here): home 100.05 packets a second,
+  no seq gap, 60 of 60 clicks within 1 ms, `net.sent`, `net.dropped` and the frames' age as with
+  sound off; home1024 93.88 a second, 30 of 30 clicks; segments' epochs, formats and six segment
+  starts on both devices, every click within 1 ms; relay2 (2 Mbit/s, +150 ms) no packet dropped, the
+  packets' age with the frames', no eviction. The first round, under that load, stalled the harness
+  host twice (home at 26 s, segments at 10 and 11 s: the frames' age rose with the packets'), so the
+  cover rose to about 72 ms and came back down 10 s later as one jump, and segments' packets were
+  more than 40 ms late in those two seconds: six gates failed on that; home and segments again
+  passed every gate (no late packet, no jump after 3 s, the cover 20 ms). **H12**: the host 5.4 % of
+  a core with sound and 1.4 % without, +4.0 points (2026-10-14: +3.9 to +4.4), against the gate's
+  1.5.
+- **H10**, the bare SillMenuBar's previews of main and of this branch from one path: only menu.txt
+  ("Send Audio (Beta)", and the `sound` sample), the Streaming pane ("Send audio (beta)", "Beta.
+  …"), the Permissions pane and the two sound cards (`card-sound`, `card-remote-sound`, new) differ.
+- **S1–S3**, on a private iPad Pro 13-inch (M5) simulator on iOS 27.0 (the 27.1 runtime here runs
+  only the iPhone Duo), deleted after: S1, the mock's photos from Xcode 27.1's Debug builds of main
+  and of this branch: at 1000×710, 710×1000, 500×710, the phone's 440×956, without the Mac's menus,
+  the Settings panel and its end, and with Larger Picture and `-SillSound on` at 440×956 and
+  375×667, 8 of 9 pixel for pixel main's and the ninth (the panel's end) but for the simulator's
+  home indicator, shown in one and faded in the other: so no Sound button in Larger Picture's row 1.
+  With `-SillSound on` the Sound button after Desktop in the landscape bar (with and without Menus)
+  and in the iPad's portrait window bar, at row 2's end beside Menus on a phone, none in a 500 pt
+  window upright (the panel's switch); and the panel's Send Audio row read-only, its "Beta" tag and
+  footnotes, on and off and at an accessibility text size, where the tag grows with the text. S2,
+  live (`-SillLive 1 -SillConnect` against `SillHost --synthetic --audio`, the engine rendering
+  offline at volume 0): "audio: format aac-eld 48000 Hz 2 ch, 480 frames (priming 240), epoch 1, a
+  test tone", "engine on, manual rendering"; 35 clicks, each heard 0.0 to 0.1 ms from where it was
+  placed; 54 late packets in the first 6 s under that load, none in the 29 s after; the Sound button
+  at 8 s ("engine off (muted)") and 12 s ("unmuted", a new engine, one join); one jump (−95 ms) as
+  the cover's window forgot the start's 150 ms; and a second client's `sendAudio=0` refused
+  ("Settings from second refused: send audio (set on this Mac only)") while the device played on
+  (its reports "sound 71 to 89 ms behind", the clicks heard). S3, `-SillMoveTest 1` with sound: the
+  move to the network with its fence ("fence down … after 15 ms"), the hand-over's copies dropped
+  ("duplicates 31"), nothing reset and no jump, 28 clicks heard within 0.1 ms of their places; later
+  the test host's software encoder, starved by the load, gave up and stopped the stream ("Software
+  encoder hung too"), and the sound followed the Desktop's restart as epoch 2 on the same engine, 15
+  packets late at its start.

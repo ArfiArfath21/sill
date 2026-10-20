@@ -16,7 +16,7 @@ from home, the iPhone Duo with the iOS 27.1 SDK, the 0.5.1 release) merged in on
 2026-10-13, then main at 5c323e6 (PRs #74, #75, #77, #78, #79, #80, #85, #98)
 merged in on 2026-10-18, never rebased; the plan, its critique, the refresh and the results
 are in `docs/audio-plan.md`; PR #94 by Code-Tomato, who finished it from 9288aa6; in, as a beta,
-since 2026-10-20: the last bullet).** Noah (2026-09-27), first in what he wants
+since 2026-10-20: the bullet "A beta").** Noah (2026-09-27), first in what he wants
 worked on: "Audio: the plan is done and parked as a v2 feature by your earlier
 decision". So the sound is in scope now (docs/BRIEF.md, the decisions below),
 and every open question takes its default (Send Audio off by default, AAC-ELD
@@ -206,10 +206,48 @@ fixed (5126215 to 8bbbe52, below) and verified in the simulator
   PhonePortraitLayout), 936, every one caught (`compatibility` 34,
   `protocol` 34, `pointer-control` 33, `phone-portrait` 81, `tour` 84,
   `clipboard` 72). No harness, H2 or previews.
-- **Untested, for Noah:** everything on the devices, the plan's P1–P16.
-  Sill.app's menu and Settings rows can be looked at (previews), and
-  `defaults read me.saffer.sill.mac sendAudio` is absent (off) until it is
-  first set.
+- **A beta (2026-10-20; Noah, about PR #94: "merge as beta support"; docs/audio-plan.md, "The
+  beta").** On the contributor's branch, one commit each, never a rebase: Send Audio the Mac's alone
+  (Q8, fdf78ff: `DeviceSettings.accepted` refuses a device's `sendAudio` from either door and names
+  it, "Settings from ‹device› refused: send audio (set on this Mac only)"; the device's row
+  read-only; `away-quality` 83 and AQ20–AQ24); the labels (e42f1a3: "Send Audio (Beta)" in the menu,
+  "Send audio (beta)" and a footnote starting "Beta." in Settings › Streaming, the CLI's "(beta)", a
+  "Beta" tag on the device's row, "Send Audio, beta" to VoiceOver; none on the Sound button or This
+  iPad's switch); no Sound button in Larger Picture's row 1 (Q10, 6effec7: row 1 as Noah approved
+  it, the panel's switch alone there; `phone-portrait` 495 and A1–A3, `tour` 111,191); the
+  pre-review's small defects (b813164 `AudioCapture`'s stream under a lock; 2e65f06 and 9104023 no
+  frame handed to the sound's queue before the session's first format, the last 32 kept for the
+  guard; 86de992 the refresh from `screenMaximumFPS`, not `UIScreen.main`; e8ab324 AudioOutput's
+  observers removed; f448c46 a freed engine gives the app's session back; 6503bc5 AAC-ELD loaded in
+  the background when Send Audio turns on); the public words (README; site/privacy.html and
+  support.html inside `<!-- Sound` markers, with their perl line in docs/release-checklist.md;
+  docs/app-store-metadata.md's next version, "beta" on the feature, never the app; the compatibility
+  floor's reader caps below). Q4 (plays on silent) and Q5 (starts unmuted) kept; Q16, codec quality
+  Medium, with H12 unmet (+4.0 points of a core in the harness, against 1.5), accepted while it is
+  off by default; packets while muted or in the background still feed the cover (§7.5, Noah's).
+  Merged with main at d1fa97e, 9a8e30c and 4d990e9 (#153, #142, #136, #110, #87, #88). Verified
+  (2026-10-20, this Mac at a load average of 300 to 900 from other work all along):
+  `swift build -c release` from `git archive`, only the CaptureProbe warning; the iOS app with Xcode
+  27.1, Debug and Release for the generic simulator and Debug for a generic device, only the known
+  `StreamClient` warning; `run-all.sh`, all 49; the mutants of `away-quality` (24), `audio-codec`
+  (9), `audio-packetizer` (27), `ledger` (12) and `away-wire` (9), every one caught, and
+  `audio-playout`'s and `tour`'s stopped unfinished at a pause (21 of 38 and 14 of 84 caught by
+  then, none missed); H2, main's CLI and this one identical masked and sorted (idle, a Desktop
+  client, one whose hello plays sound) but for the stop's timing; H7 (a device's Send Audio refused;
+  the CLI's `--audio` tone with no seq gap and its stop; a second client's off refused while the
+  first kept its sound); the sound harness's home, home-off, home1024, segments and relay2, every
+  gate but H12 once home and segments ran again (the first round stalled by the load), H12 +4.0
+  points; H10, only the sound's panes, menu.txt and its two cards; S1 to S3 on a private iPad
+  simulator on iOS 27.0 (the 27.1 runtime here runs only the iPhone Duo): the mock's photos pixel
+  for pixel main's without sound and with Larger Picture, the Sound button where it goes, the
+  read-only Beta row; live, 35 clicks within 0.1 ms of their places, the Sound button off and on, a
+  second client's off refused while the sound played on; a move with its copies dropped, no reset or
+  jump.
+- **Untested, for Noah:** everything on the devices, the plan's P1–P16, which end the beta with H12
+  met or accepted (P13, Sill.app's CPU with sound on and off), P5 answered (Virtual Display, a
+  minimized app) and P6 measured (the sync, filmed). Sill.app's menu and Settings rows can be looked
+  at (previews), and `defaults read me.saffer.sill.mac sendAudio` is absent (off) until it is first
+  set.
 
 **The clipboard both ways (2026-10-14, branch `clipboard` from main at 985a733; issue #64; PR #78;
 the plan, its open questions with the default taken for each, the results and the review's fixes are
@@ -5708,7 +5746,8 @@ good.
   `AudioDecoder` (AAC-ELD to a buffer per channel, one packet at a time;
   AudioToolbox only), `AudioPlayout` (the sound's timing; pure,
   `Tests/checks/audio-playout`), `AudioOutput` (its queue, the decoder and the
-  engine; no video frame taken before the session's first format) and `StreamClient+Audio`: pbxproj AA01–AA04; the host's
+  engine; no video frame handed to its queue before the session's first format, the last 32 kept
+  for the guard) and `StreamClient+Audio`: pbxproj AA01–AA04; the host's
   `audio-codec` check and the sound harness's device compile AudioDecoder too.
   `Info-Debug.plist` is the Debug configuration's Info.plist: Info.plist's
   keys, with `_silltest._tcp` beside `_sill._tcp` for the harness's
