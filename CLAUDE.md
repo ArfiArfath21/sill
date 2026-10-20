@@ -113,7 +113,7 @@ throttle to change. Host, device and one additive kind (44).
   mutants, three of them each finding put back (an ask out never asked again; a trip away keeping
   the spacing; a keyframe shown while away ending the trip); `pointer-control` 158 checks and 33 of
   33 mutants; `run-all.sh`, all 47 (main's new `virtual-display-api` among them); `swift build -c
-  release` from `git archive`, only the CaptureProbe warning; the iOS app for the simulator from
+  release` on the merged tree, complete with no new warning; the iOS app for the simulator from
   clean derived data (CI's command, Xcode 27.1 27A9275), only the known StreamClient warning
   (StreamClient.swift:3819); `Scripts/menu-check/run.sh close`, 9 checks: back in 1.01 s as no
   answer, the close delivered, every action's words, the front app unchanged. The host alone
