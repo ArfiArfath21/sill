@@ -2153,9 +2153,11 @@ along, a load average of 300 to 900):
   `virtual-display-api` among them): `away-quality` 83, `ledger` 99, `phone-portrait` 495, `tour`
   111,191, `audio-playout` 218, `audio-packetizer` 89, `audio-codec` 21, `compatibility` 140,
   `pointer-control` 158, `clipboard` 259, `key-strokes` 353 (#110's). Mutants: `away-quality` 24 of
-  24, `audio-codec` 9 of 9, `audio-packetizer` 27 of 27, `ledger` 12 of 12, `away-wire` 9 of 9;
-  `audio-playout` (38) and `tour` (84) stopped unfinished at a pause, 21 and 14 caught by then, none
-  missed (to finish); `phone-portrait`'s 80 of 80 ran earlier the same morning on the same
+  24, `audio-codec` 9 of 9, `audio-packetizer` 27 of 27, `ledger` 12 of 12, `away-wire` 9 of 9,
+  `audio-playout` 38 of 38 and `tour` 84 of 84: a pause had stopped those two at 21 and 14, none
+  missed, and they ran to the end on 2026-10-26 from a fresh worktree of the same sources, after
+  both checks passed unmutated (218 and 111,191) and `swift build -c release` again had only the
+  CaptureProbe warning; `phone-portrait`'s 80 of 80 ran on the morning of 2026-10-20 on the same
   PhonePortraitLayout.swift and check (main's merge since touches neither).
 - **H2**, main's CLI against this one, both `--synthetic` on loopback and the software encoder: idle
   35 s, `sillclient.py PORT 8 desktop`, and the same with `--hello=0.6 --audio`, masked and sorted,

@@ -230,9 +230,9 @@ fixed (5126215 to 8bbbe52, below) and verified in the simulator
   `swift build -c release` from `git archive`, only the CaptureProbe warning; the iOS app with Xcode
   27.1, Debug and Release for the generic simulator and Debug for a generic device, only the known
   `StreamClient` warning; `run-all.sh`, all 49; the mutants of `away-quality` (24), `audio-codec`
-  (9), `audio-packetizer` (27), `ledger` (12) and `away-wire` (9), every one caught, and
-  `audio-playout`'s and `tour`'s stopped unfinished at a pause (21 of 38 and 14 of 84 caught by
-  then, none missed); H2, main's CLI and this one identical masked and sorted (idle, a Desktop
+  (9), `audio-packetizer` (27), `ledger` (12), `away-wire` (9), `audio-playout` (38) and `tour`
+  (84), every one caught (the last two finished on 2026-10-26, after a pause had stopped them at
+  21 and 14, none missed); H2, main's CLI and this one identical masked and sorted (idle, a Desktop
   client, one whose hello plays sound) but for the stop's timing; H7 (a device's Send Audio refused;
   the CLI's `--audio` tone with no seq gap and its stop; a second client's off refused while the
   first kept its sound); the sound harness's home, home-off, home1024, segments and relay2, every
