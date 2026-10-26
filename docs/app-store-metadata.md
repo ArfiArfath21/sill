@@ -429,8 +429,10 @@ description's keyboard bullet, README's How it works and the support page.
 
 Other languages and dictation (#147, issue #138, 247 characters) rest on its author's device test: Zhuyin on a
 Magic Keyboard and on the on-screen keyboard, and Chinese dictation, on an iPad Air against Sill for Mac 0.5.1
-(2026-10-17). Its words are in this draft, README's How it works and the support page; the reporter's test of
-the TestFlight build (Pinyin, Japanese, English dictation, Control-Space with one keyboard) is still to come.
+(2026-10-17), and on Pinyin, Japanese and Korean in the iPad simulator, each committed once (2026-10-26,
+docs/DEVELOPMENT.md). Its words are in this draft, README's How it works and the support page; the reporter's
+test of the TestFlight build (Pinyin, Japanese, Korean, English dictation, Control-Space with one keyboard) is
+still to come.
 
 ## 6. Export compliance (encryption)
 

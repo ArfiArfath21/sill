@@ -517,7 +517,13 @@ composed when a click, a key or a pick is about to move the Mac's caret (a tap o
 the picture, say): it goes first, where the caret was, as a tap elsewhere in a
 text field keeps a composition. Dictation types what is said, and the
 corrections it makes a moment later go to the Mac as backspaces back to the first
-change, then the rest typed again.
+change, then the rest typed again. Korean builds each syllable in the text
+itself, not in a composition: as each letter comes, its keyboard selects the
+syllable it is building, deletes it and types it again. The input view keeps
+what the text system selects of what was typed for its next edit, as a text
+field does (text typed over the selection, a backspace, or a composition that
+starts over it replaces it), so at each letter the Mac gets backspaces over the
+syllables being rebuilt and those syllables again, and 한글 arrives once.
 
 There is no setting for it in Sill: the input view follows the keyboards and
 dictation languages set up in the device's Settings › General › Keyboard
@@ -556,7 +562,8 @@ first on the screen); what an input method composes is a label it can read.
 pressesBegan (control): iPadOS's keyboard switch` for a Control-Space that
 stays on the device, and a `textinput:` line for each call iPadOS's text system
 makes and for what went to the Mac (`textinput: setMarkedText "ㄋㄧ" (2,0)`,
-`textinput: unmarkText`, `textinput: sent "你好"`, and each time the input view
+`textinput: unmarkText`, `textinput: sent "你好"`, `textinput: selected (0,2) of
+what was typed, for the next edit`, and each time the input view
 takes the keyboard `textinput: first responder; the keyboards set up: en-US,
 zh-Hant, emoji; this one zh-Hant`): what to read in Xcode's console when an
 input method or dictation types something twice, or not at all.
@@ -564,9 +571,20 @@ input method or dictation types something twice, or not at all.
 On a device so far: the pull request's author, on an iPad Air (4th generation)
 with a Magic Keyboard against Sill for Mac 0.5.1, typed Zhuyin on the Magic
 Keyboard and on the on-screen keyboard, switched with Control-Space and the
-Globe key, and dictated in Chinese (2026-10-17). Not yet on a device: Pinyin,
-Japanese, English dictation and its corrections, Control-Space with one
-keyboard, an Apple Pencil over the picture, and VoiceOver.
+Globe key, and dictated in Chinese (2026-10-17). In the iPad simulator (iOS
+27.0, keys from `Tests/keyrig`'s virtual keyboard, against `SillHost
+--synthetic` on loopback with `SILL_TEST_INPUT_LOG=1`, 2026-10-26): Zhuyin
+(ㄋㄧˇㄏㄠˇ, then Return), Pinyin (nihao, then Space), Japanese (nihonn, then
+Return) and Korean (2-Set's g k s r m f) each reached the host once, as 你好,
+你好, 日本 and 한글; a tap on the picture mid-composition sent the composition
+first, then the click; Control-Space stayed on the device with keyboards in two
+languages and reached the host with one; Esc and Command-S reached it as keys.
+That simulator did not read the keyboards written to its `AppleKeyboards`
+preference; launching Sill with `-AppleLanguages '(zh-Hant-TW, en-US)'
+-AppleLocale zh_TW` (or `ko-KR`, `ja-JP`, `zh-Hans-CN`) gives it that
+language's own keyboards. Not yet on a device: Pinyin, Japanese, Korean,
+English dictation and its corrections, Control-Space with one keyboard, an
+Apple Pencil over the picture, and VoiceOver.
 
 ## The clipboard
 
