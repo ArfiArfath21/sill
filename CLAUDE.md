@@ -5720,6 +5720,7 @@ python3 Scripts/sillclient.py PORT 8 none --gesture=swipeUp@3 --gesture=swipeDow
 SILL_TEST_LOOPBACK=1 SILL_TEST_HOTKEYS='108=off,173=off' .build/release/SillHost --synthetic   # TEST ONLY: the gestures read this table (over macOS 27's own; `defaults` alone) instead of this Mac's shortcuts
 swift run -c release SillHost --no-clipboard  # share nothing of the clipboard with devices (on by default, as in Sill.app)
 SILL_TEST_LOOPBACK=1 SILL_TEST_SOFTWARE_ENCODER=1 SILL_TEST_NO_ROUTER=1 SILL_TEST_PASTEBOARD=me.saffer.sill.test.x SILL_TEST_CLIPBOARD_LOG=1 .build/release/SillHost --synthetic   # the clipboard on a pasteboard of its own (never this Mac's), each decision printed with sizes
+SILL_TEST_NO_SCREEN=1 SILL_TEST_LOOPBACK=1 SILL_TEST_SOFTWARE_ENCODER=1 SILL_TEST_NO_ROUTER=1 .build/release/SillHost --synthetic   # TEST ONLY: ScreenCaptureKit never asked (no window list, no thumbnails), so a host an agent runs asks macOS for no screen recording
 python3 Scripts/sillclient.py PORT 6 none --clipboard --copy=hello@2 --expect=clipboard=none   # subscribe, send text as a device's Paste does; each kind 32 printed
 SILL_TOUCHRIG_SIM='Sill touchrig' Tests/touchrig/run.sh new && Tests/touchrig/run.sh --rev origin/main base && Tests/touchrig/compare.py .build/touchrig/base.log .build/touchrig/new.log   # the surfaces under synthesized touches
 Tests/checks/run-all.sh                 # every pure check, as CI runs them (~5 min; --mutants adds the mutants, well over an hour)
@@ -5828,7 +5829,12 @@ sample, points in the 1512×949 pattern, outside allowed; `#` comments; at most
 10,000 steps and 1 MiB, a bad file refused whole with one line): the test
 pattern then has a pointer, a test client's input lands in the pattern's space
 and a dry-run pointer event moves the scripted pointer (the newer of it and a
-step wins); `SILL_TEST_SOFTWARE_ENCODER=1` starts on the software encoder, with
+step wins); `SILL_TEST_NO_SCREEN=1` makes the window catalog leave ScreenCaptureKit alone (an empty
+window list, no thumbnails, no display lookup), so a test host with a client connected asks
+macOS for no screen recording: every ScreenCaptureKit call counts against the responsible app's
+grant (Claude's, for a host an agent runs), and macOS reminds the person once a month and after
+every rebuilt binary; set it on every headless host whose test needs no real window.
+`SILL_TEST_SOFTWARE_ENCODER=1` starts on the software encoder, with
 no launch probe and no re-check, so a test never touches the hardware encoder
 (60 fps at most: a 120 fps sampler test needs the hardware, and so the
 no-device check); `SILL_TEST_INPUT_LOG=1` prints each event the dry run would

@@ -304,11 +304,13 @@ package final class StreamCoordinator {
         let path = PointerTestHooks.pointerPath(synthetic: synthetic, environment: env)
         let software = PointerTestHooks.softwareEncoder(synthetic: synthetic, environment: env)
         let inputLog = InputInjector.testInputLog(synthetic: synthetic, environment: env)
+        let noScreen = PointerTestHooks.noScreen(synthetic: synthetic, environment: env)
+        WindowCatalog.screenless = noScreen.on
         pointer = PointerWatch(synthetic: synthetic, path: path.path)
         softwareOnly = software.on
         let userActive = DisplayWake.userActive(environment: env, testHost: synthetic)
         displayActivity = DisplayActivity(remote: userActive.remote)
-        testHookLines = [path.line, software.line, inputLog.line, userActive.line].compactMap { $0 }
+        testHookLines = [path.line, software.line, inputLog.line, userActive.line, noScreen.line].compactMap { $0 }
         status = HostStatus()
         var home = StreamServer.HomeDoorMode.plain
         if homePairing, let remote {
