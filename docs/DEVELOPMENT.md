@@ -593,11 +593,12 @@ composes on the device: what it is composing shows at the top middle of the
 picture, its candidates show where iPadOS puts them (on the on-screen keyboard,
 or with a hardware keyboard beside the composition), and only the text chosen
 goes to the Mac, typed as any text is. While it composes, every key is the input
-method's (the arrows move through its candidates, Return chooses, and Esc does
-what that input method does with it), so nothing of it reaches the Mac until it
-is chosen. What is still composed when the input view stops taking the keyboard
-(Settings, the Apps list or the tour opens, the device turns) goes to the Mac as
-it stands, as a text field on the device keeps it, and so does what is still
+method's (the arrows move through its candidates, Return chooses, Esc does what
+that input method does with it, and a shortcut such as Command-S goes to it too,
+not to the Mac), so nothing of it reaches the Mac until it is chosen. What is
+still composed when the input view stops taking the keyboard (Settings, the Apps
+list or the tour opens, the device turns) goes to the Mac as it stands, as a
+text field on the device keeps it, and so does what is still
 composed when a click, a key or a pick is about to move the Mac's caret (a tap on
 the picture, say): it goes first, where the caret was, as a tap elsewhere in a
 text field keeps a composition. Dictation types what is said, and the
@@ -663,13 +664,16 @@ Globe key, and dictated in Chinese (2026-10-17). In the iPad simulator (iOS
 Return) and Korean (2-Set's g k s r m f) each reached the host once, as 你好,
 你好, 日本 and 한글; a tap on the picture mid-composition sent the composition
 first, then the click; Control-Space stayed on the device with keyboards in two
-languages and reached the host with one; Esc and Command-S reached it as keys.
+languages and reached the host with one; Esc and Command-S reached it as keys,
+and Command-S pressed mid-composition went to the input method, nothing of it to
+the host. Again on the tree merged with main at 36e7212, the same day, with the
+same results.
 That simulator did not read the keyboards written to its `AppleKeyboards`
 preference; launching Sill with `-AppleLanguages '(zh-Hant-TW, en-US)'
 -AppleLocale zh_TW` (or `ko-KR`, `ja-JP`, `zh-Hans-CN`) gives it that
 language's own keyboards. Not yet on a device: Pinyin, Japanese, Korean,
-English dictation and its corrections, Control-Space with one keyboard, an
-Apple Pencil over the picture, and VoiceOver.
+English dictation and its corrections, Control-Space with one keyboard, a
+shortcut mid-composition, an Apple Pencil over the picture, and VoiceOver.
 
 ## The clipboard
 

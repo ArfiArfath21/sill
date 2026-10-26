@@ -8,6 +8,54 @@ Formerly winstream; the folder still carries the old name.
 
 ## Current step
 
+**Chinese input and dictation reach the Mac (2026-10-19 to 26, PR #147 from cinminori's `zhuyin-input`,
+finished on it, with main at 36e7212 in it; issue #138).** Noah: "Chinese input and dictation if polished
+then merge (detects user language set in iOS settings). Once testflight is enabled, ask users to test."
+Device only: no wire change, nothing on the Mac, no Sill setting: the keyboards and dictation languages
+set up in the device's Settings decide.
+- The PR (kept): the stream's input view (`InputOverlayView`) is a `UITextInput`, not only a
+  `UIKeyInput`, so an input method's composition (Zhuyin, Pinyin, Japanese…) stays on the device, drawn
+  at the top middle of the picture, and only what is chosen goes to the Mac as text; dictation's text and
+  its corrections go as backspaces back to the first difference, then the rest typed; while it composes
+  every key is the input method's (pressesBegan hands them all on; Esc's key commands stand down, and a
+  shortcut such as ⌘S goes to it too); spell checking and inline predictions off.
+- The triage's four changes (2026-10-19), in commits of their own: ⌃Space is iPadOS's switch only
+  with keyboards in two languages or more (`TextInputRules.isKeyboardSwitch`: Emoji and dictation aside, a
+  language counted once, judged at the press; ⌃⇧, ⌃⌥ and ⌃⌘Space always the Mac's), else the Mac's as on
+  main (the PR gave every ⌃Space to iPadOS); Scribble declined (a `UIScribbleInteraction` refusing every
+  start: the Pencil is the Mac's mouse); the dictation tail: what was typed kept whole while the text
+  system may revise it (the PR cut it to 200 characters inside every edit, unseen by the text system, so a
+  correction past 200 landed at the end and typed its words twice), trimmed past 4,000 to the last 1,000
+  between edits with the text system told, forgotten wherever the Mac's caret may move (a click or a key
+  from any view, a pick, a launch, a window's button, a menu item, a gesture:
+  `StreamClient.onCaretMayMove`, before it goes out, the pick and the rest now behind queued input,
+  `sendAfterInput`), a correction taken before a forget or a trim sending nothing (`generation`), and a
+  composition still in progress then, or when the input view resigns or leaves its window, sent first, as
+  it stands; and mutants for its check.
+- Also: Korean (2-Set selects the syllables it rebuilds and types them again: `TextComposition.selection`;
+  한글 reached a simulator Mac as 한한한글 before); VoiceOver (the input view stays no element); Writing
+  Tools, math results and grammar checking off; Debug `textinput:` lines; #110's latched-shift Return and
+  Tab behind `!composition.isComposing` (Noah's conflict comment). Docs: docs/DEVELOPMENT.md, "Other
+  languages and dictation"; README's How it works; site/support.html's paragraph inside `<!-- Other
+  languages` markers (docs/release-checklist.md part 1 §3's perl line); the next What's New
+  (docs/app-store-metadata.md); docs/hardware-keyboard-plan.md's item 11 answered.
+- Verified (2026-10-26, on the tree merged with main at 36e7212): `Tests/checks/text-composition` 99
+  checks and 60 of 60 mutants (in CI's matrix); key-strokes 353; `swift build -c release`; the iOS app
+  Debug and Release for the simulator and Debug for a device, only the known StreamClient capture
+  warning; the touch rig, 72 scenarios; a private iPad simulator (iOS 27.0) against a loopback synthetic
+  host (software encoder, `SILL_TEST_INPUT_LOG`, a scripted pointer), keys from `Tests/keyrig`: Zhuyin
+  (ㄋㄧˇㄏㄠˇ, Return), Pinyin (nihao, Space), Japanese (nihonn, Return) and Korean (2-Set's g k s r m f)
+  each reached the host once (你好, 你好, 日本, 한글); a scripted tap mid-composition sent 好 first, then
+  the click; ⌃Space stayed on the device with keyboards in two languages and reached the host (key 49
+  with control) with one; letters as text, ⌘S and Esc as keys, ⌘S mid-composition nowhere;
+  `-SillInputTest 1` as before. The simulator takes a language's keyboards from `-AppleLanguages` and
+  `-AppleLocale`, not from its `AppleKeyboards` preference.
+- **Untested, for Noah and #138's testers (TestFlight):** Zhuyin and Pinyin on the on-screen keyboard and
+  on a Magic Keyboard (the candidates beside the composition), Japanese, Korean, dictation in Chinese and
+  in English with its corrections and punctuation (nothing typed twice), ⌃Space with one keyboard and
+  with two, the Globe key, Caps Lock's switch to and from ABC, a tap mid-composition, a shortcut
+  mid-composition, an Apple Pencil over the picture (no handwriting), VoiceOver.
+
 **The Close timeout and the interrupted picture (2026-10-19 and 20, PR #93 from addhumal, finished on
 its branch `audit-fixes`, which has main at 4d990e9 in it; issue #101).** The triage of 2026-10-16 and
 2026-10-19 (sill-handoff/triage): the close half ready; the re-pick, the broken harness and the
