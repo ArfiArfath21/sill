@@ -2131,7 +2131,13 @@ commit each on the contributor's branch, never a rebase:
   most 4 KB, a packets message at most 16 KB, which a later host that batches keeps within),
   DEVELOPMENT.md and this plan's header, which says what ends the beta.
 - **Main merged in** (ac4fc92 at d1fa97e, 306ae88 at 9a8e30c, 8f72307 at 4d990e9: #153, #142, #136,
-  #110, #87, #88): only ci.yml's mutants matrix and the checks README met, both sides kept.
+  #110, #87, #88): only ci.yml's mutants matrix and the checks README met, both sides kept. Then
+  382bfc1 at 7b4c313 (2026-10-26: #151, a sleeping display woken for a device): ci.yml's matrix,
+  CLAUDE.md, the checks README and the release checklist's markers met, both sides kept (the
+  checklist's Clipboard, Display wake and Sound blocks, and their three perl lines).
+  `display-wake`'s check counts every message kind and fails until each is decided: kind 43, the
+  Mac's sound, which only a host sends, is one more that never declares (DisplayWake's `default`
+  already said so), 193 checks, with a mutant that makes it count (M61, 61 in all).
 
 **The beta's defaults**, each one place to change: Q8 and Q10 as above; Q4 (it plays on silent, the
 support page says so) and Q5 (a device starts unmuted) kept; Q16, codec quality Medium, with H12
@@ -2208,3 +2214,16 @@ along, a load average of 300 to 900):
   the test host's software encoder, starved by the load, gave up and stopped the stream ("Software
   encoder hung too"), and the sound followed the Desktop's restart as epoch 2 on the same engine, 15
   packets late at its start.
+- **Again on the merge with 7b4c313** (2026-10-26, a fresh worktree; the load average 15 to 900 from
+  other work): `swift build -c release` from `git archive`, only the CaptureProbe warning;
+  `run-all.sh`, all 50 (`display-wake` 193); `display-wake`'s mutants, 61 of 61. H2, main's CLI at
+  7b4c313 against this one, both `--synthetic` on loopback and the software encoder: the host's
+  output identical masked and sorted idle 35 s, with `sillclient.py PORT 8 desktop` and with
+  `--hello=0.6 --audio` (the client's own lines differ only in kind 16's `sendAudio`, which main's
+  host does not send, and in timing). H7: a host without `--audio` refused a device's `sendAudio` on
+  at 3 s and off at 8 s ("Settings from sillclient refused: send audio (set on this Mac only)",
+  twice, each answer `sendAudio` false, no kind 43); with `--audio`, the format at 0.22 s and 979
+  packets in 9.8 s with no seq gap, "Audio stopped: nothing streams." once the client picked
+  nothing, and a second client's off refused while the first kept its sound. The iOS app's sources
+  and StreamProtocol are 9104023's, and the sound harness compiles none of the files the merge
+  changed, so the iOS builds, S1–S3 and the harness's numbers above stand.

@@ -225,8 +225,9 @@ fixed (5126215 to 8bbbe52, below) and verified in the simulator
   floor's reader caps below). Q4 (plays on silent) and Q5 (starts unmuted) kept; Q16, codec quality
   Medium, with H12 unmet (+4.0 points of a core in the harness, against 1.5), accepted while it is
   off by default; packets while muted or in the background still feed the cover (§7.5, Noah's).
-  Merged with main at d1fa97e, 9a8e30c and 4d990e9 (#153, #142, #136, #110, #87, #88). Verified
-  (2026-10-20, this Mac at a load average of 300 to 900 from other work all along):
+  Merged with main at d1fa97e, 9a8e30c, 4d990e9 and 7b4c313 (#153, #142, #136, #110, #87, #88,
+  #151: `display-wake` counts kind 43 among the kinds that never declare, 193 checks and M61).
+  Verified (2026-10-20, this Mac at a load average of 300 to 900 from other work all along):
   `swift build -c release` from `git archive`, only the CaptureProbe warning; the iOS app with Xcode
   27.1, Debug and Release for the generic simulator and Debug for a generic device, only the known
   `StreamClient` warning; `run-all.sh`, all 49; the mutants of `away-quality` (24), `audio-codec`
@@ -242,7 +243,11 @@ fixed (5126215 to 8bbbe52, below) and verified in the simulator
   for pixel main's without sound and with Larger Picture, the Sound button where it goes, the
   read-only Beta row; live, 35 clicks within 0.1 ms of their places, the Sound button off and on, a
   second client's off refused while the sound played on; a move with its copies dropped, no reset or
-  jump.
+  jump. Again on the merge with 7b4c313 (2026-10-26): `swift build -c release` from `git archive`,
+  only the CaptureProbe warning; `run-all.sh`, all 50; `display-wake`'s mutants, 61 of 61; H2
+  against main's CLI at 7b4c313, the host's output identical masked and sorted in all three modes;
+  H7 as above (979 packets, no seq gap); the iOS app's sources and StreamProtocol 9104023's, and
+  none of the files the merge changed in the sound harness.
 - **Untested, for Noah:** everything on the devices, the plan's P1–P16, which end the beta with H12
   met or accepted (P13, Sill.app's CPU with sound on and off), P5 answered (Virtual Display, a
   minimized app) and P6 measured (the sync, filmed). Sill.app's menu and Settings rows can be looked
