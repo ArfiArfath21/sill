@@ -138,6 +138,16 @@ serves the root or `/docs`, never `/site`. So:
   as "what you copy" in its lede and "never what you copy" in both log lines are), and `grep -n -i
   keyframe ../sill-site/*.html` prints nothing. The release that ships each deletes its markers in
   `site/` and keeps the words.
+  `<!-- Clipboard` and `<!-- /Clipboard -->`, and the display wake's (PR #151, support.html's
+  paragraph on Sill waking a sleeping display) between `<!-- Display wake` and
+  `<!-- /Display wake -->`. A republish before that release (for words that hold for the builds
+  already out, such as support.html's on a Mac asleep or restarted, or on a black picture) deletes
+  those blocks in the sill-site copy after the rsync below (the perl lines) and puts privacy.html's
+  date back to the one last published; then `grep -n -i clipboard ../sill-site/*.html` prints only
+  privacy.html's log line ("which devices share the clipboard", true of the builds out too, as "what
+  you copy" in its lede and "never what you copy" in both log lines are), and `grep -n "wakes your
+  Mac’s display" ../sill-site/*.html` prints nothing. The release that ships each deletes its
+  markers in `site/` and keeps the words.
 - Once sill is public, it can serve the site itself: `git subtree push --prefix site origin gh-pages`,
   then Settings › Pages › gh-pages, / (root). Retire sill-site then.
 
@@ -146,6 +156,7 @@ git clone https://github.com/Saffsanity/sill-site.git ../sill-site     # once
 rsync -a --delete --exclude .git --exclude .github --exclude .nojekyll site/ ../sill-site/   # when the site changes
 perl -0pi -e 's/[ \t]*<!-- Clipboard:.*?<!-- \/Clipboard -->\n//gs' ../sill-site/*.html   # only before the clipboard's release
 perl -0pi -e 's/[ \t]*<!-- Keyframe:.*?<!-- \/Keyframe -->\n//gs' ../sill-site/*.html   # only before the keyframe request's release (PR #93)
+perl -0pi -e 's/[ \t]*<!-- Display wake:.*?<!-- \/Display wake -->\n//gs' ../sill-site/*.html   # only before the display wake's release
 git -C ../sill-site add -A && git -C ../sill-site commit -m "Update the site" && git -C ../sill-site push
 ```
 
