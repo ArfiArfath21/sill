@@ -95,8 +95,8 @@ that compile the whole of StreamProtocol (docs/home-pairing-plan.md, Results), `
 is the `hardware-keyboard` branch's (#67, #68: Esc's key command; the `spotlight-modifier-fix` branch's
 before it), `hardware-keyboard` came with that branch, `home-device`, `home-model` and
 `remote-rules` grew with #44 and #46, `policy` with #69 (`sleep.swift`), `installed-apps` came
-with #136 (#76), its depth #135's, `virtual-display-api` with #87 (#62), and `display-wake` with
-#151 (issue #134).
+with #136 (#76), its depth #135's, `virtual-display-api` with #87 (#62), `display-wake` with #151
+(issue #134), and `protocol`'s Reverse Scrolling cases and mutants with #159 (issue #143).
 
 A mutant changes the checked file in one place and must make the check fail: `run.sh --mutants`
 (or `run-all.sh --mutants`) passes only when the script's last line counts every mutant as caught.
