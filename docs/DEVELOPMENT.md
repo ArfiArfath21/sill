@@ -461,10 +461,10 @@ sent to the Mac, so it works with every Sill for Mac. A trackpad or mouse
 connected to the iPad (below) is left alone: its scroll events come already
 turned the way iPadOS's own Natural Scrolling setting says (with the
 trackpad's and the mouse's settings, under Settings › General), and turning
-them again would undo it; the switch's footnote says so on an iPad. Each scroll reads the switch as it begins and
-keeps that direction to the end of its coast.
-`Sources/StreamProtocol/ScrollDirection.swift` is the rule, checked in
-`Tests/checks/protocol`.
+them again would undo it; the switch's footnote says so on an iPad. Each
+scroll reads the switch as it begins and keeps that direction to the end of
+its coast. `Sources/StreamProtocol/ScrollDirection.swift` is the rule, checked
+in `Tests/checks/protocol`.
 
 ## A hardware keyboard and trackpad on the device
 
