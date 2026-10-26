@@ -951,6 +951,7 @@ host on this Mac, which posts nothing. The clipboard's flags (`--clipboard`,
 `--copy`, `--copy-bytes`, `--raw32`, `--expect=clipboard=`) are under The
 clipboard, above: with `SILL_TEST_PASTEBOARD` the host's pasteboard is a
 private one, never this Mac's clipboard.
+`SILL_TEST_NO_SCREEN=1` (a `--synthetic` host only) keeps the window catalog off ScreenCaptureKit altogether: the window list stays empty and no thumbnail is taken, so a headless test host asks macOS for no screen recording, which otherwise counts against the grant of whatever launched it and brings up macOS's reminder after every rebuilt binary.
 
 `Scripts/sillrelay.py --listen 0 --to HOST:PORT [--delay-ms N] [--rate-mbps R]
 [--blackhole-after S] [--record PREFIX]` sits between a client and a host, and
