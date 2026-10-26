@@ -1142,9 +1142,11 @@ surfaces as they are at REV, and `Tests/touchrig/compare.py BASE.log NEW.log
 [OFF.log]` checks that one- and two-finger strokes send what they sent before
 (and the same right after a gesture as made fresh) and that each stroke of three
 or more fingers, placed slowly, beside a resting thumb or with a brief extra
-contact too, sends its one gesture, or nothing, and nothing else. It runs on
-a simulator of its own (`SILL_TOUCHRIG_SIM`, made and deleted when missing),
-never XCUITest or a recording.
+contact too, sends its one gesture, or nothing, and nothing else. Reverse
+Scrolling is off there (`Stubs.swift`), so every scroll goes the natural way,
+as at a revision from before the switch. It runs on a simulator of its own
+(`SILL_TOUCHRIG_SIM`, made and deleted when missing), never XCUITest or a
+recording.
 
 ### The key rig
 
