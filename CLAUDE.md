@@ -8,6 +8,81 @@ Formerly winstream; the folder still carries the old name.
 
 ## Current step
 
+**Send Audio and Mute in the device's Settings panel (2026-10-27, branch `sound-toggle` from main at
+b4caa91, main at 3b54637 (#117, #234) merged in, not rebased; PR #235; the bullet "Two switches" in the
+sound's entry below and docs/audio-plan.md's last section have the details).** Noah: "I've decided the
+audio setting should not be in the main button tray but instead in settings. Sound should be a toggle in
+the settings menu." Two switches in the device's Settings panel: **Send Audio** (the Mac's group, its
+"Beta" tag), which a device turns on and off for every device as it does Quality (the host accepts kind
+17's `sendAudio` again and Sill.app saves it, no picture restart; a Mac from the beta refuses it and the
+switch goes back; for a Mac without sound the row is off and disabled, "Update Sill on ‹Mac›…"), and
+This iPad's **Mute** (`soundMuted`, the device's own), shown for every Mac with sound, Send Audio on or
+off. No Sound button in any bar.
+- Merged with main at 3b54637 (2026-10-27: #117, the connect screen's tiles, and #234, the capture scale
+  follow-ups; one merge commit). Only iOSClient/ContentView.swift conflicted, in SettingsScript's doc
+  comment: both kept (this branch's `set … sendAudio` and #117's `disconnect` step). CLAUDE.md,
+  Tests/checks/README.md (both sides' rows: #117's `connection-list` 154 and 72, #234's `capture-scale`,
+  this branch's `away-quality`, `ledger`, `phone-portrait` and `tour`), DEVELOPMENT.md, MockCatalog.swift
+  (#117's `tiles` connect case beside this branch's settings cases), StreamClient.swift and
+  site/privacy.html (#117's Tiles items beside the Sound item, the date October 27, 2026) merged by
+  themselves. Verified on the merge: `swift build -c release`; the iOS app, Debug for the generic
+  simulator as CI builds it, only the known `StreamClient` capture warning (StreamClient.swift:4067);
+  `run-all.sh ledger away-quality phone-portrait tour connection-list capture-scale`, all passed (100,
+  89, 484, 111,189, 154 and 122 checks).
+- **Untested, for Noah:** the bullet "Two switches"' list (Send Audio from the iPad's panel heard on
+  the iPhone too, Mute on one device, Mute before the sound is turned on elsewhere, VoiceOver on both
+  switches, this iPad against a Sill.app from the beta and against 0.5.1).
+
+**Capture scale follow-ups (2026-10-27, branch `capture-scale-followups` from main at b4caa910; PR #234).**
+The post-merge verification of #233 (sill-handoff's
+`triage/2026-10-20-reports/verdicts-2026-10-26/pr233-verdict.md`) left small follow-ups, all taken here.
+Host only: no wire change, no device file.
+- A window's odd side, drawn whole (`CaptureScale.windowPixels`, `windowSize`, `windowNeedsRestart`,
+  pure): on a 1x display a 1117×610-point window was asked 1116×610 (`evenPixels`, down to even), and
+  ScreenCaptureKit, which only scales a window down (`scalesToFit` left false), shrank its 1117 columns
+  into 1116: up to half a pixel of blur mid-picture, where a text stem is one pixel wide. A window
+  captured at its display's own scale is drawn 1:1 at the buffer's top-left, so an odd side now rounds
+  up to even: 1118×610, one black column past the window (Sill.log's 818×565, 728×535 and 377×235:
+  818×566, 728×536, 378×236); a half point on a 2x display the same; Standard on a 2x display (scaled
+  down anyway), the Desktop, a staged crop and the test pattern as before. Chosen over asking even
+  points in the Aa fit (`fitToViewport`), which would reach only windows Sill sizes and that take the
+  size, not one sized by hand, one with Aa unset or an app that keeps its own steps. The device draws
+  the frame aspect-fit on black (HEVCDisplayView): the column joins a letterbox beside it, or is a black
+  hairline (a frame's pixel) at the picture's right edge where the frame fills its panel; the viewport
+  it sends is the panel or the room, never the frame's shape, so nothing feeds back into a fit. A
+  device's position lands as the same fraction of the window (InputLanding), and the Mac's arrow is
+  drawn at its fraction of the frame: at most a pixel apart from the picture, at the far side, the far
+  edges still landing on the window's last pixel row and column. `select` (and the real window after a
+  failed stage) sizes a window with `windowSize`; `windowsChanged` asks `windowNeedsRestart`, the same
+  rule, so a rounded-up window never restarts at every poll (the old comparison would have: 1116 against
+  an encoder at 1118) and 1117 to 1118 points needs no restart; `catalogPolled` still compares only the
+  scale.
+- The words, true on a 1x display too (Retina and Standard capture the same there, and the software
+  encoder runs at the hardware's size): the status menu's Resolution › Standard, "On a Retina display, a
+  quarter of the pixels to encode" (it was "A quarter of the pixels; much lighter to encode"); the
+  fallback's two lines, "switching to the software encoder, capturing at 1x, until …" (CaptureScale.words
+  of the software knob; it was "at half scale"); the coordinator's comments and DEVELOPMENT.md's "restarts
+  at half resolution on the CPU".
+- Verified: `swift build -c release` from `git archive` of 70e3d171 (the code; the commits after it are
+  docs) and of main at b4caa910, only the CaptureProbe warning; `Tests/checks/capture-scale` 122 checks
+  and 30 of 30 mutants (eleven new: the window rule's ten, `evenPixels`' one; in CI's mutants matrix);
+  `Tests/checks/run-all.sh`, all 54 (473 s); H2 against main's CLI, both from `git archive`,
+  `--synthetic` on loopback (the software encoder, no router, no screen; Noah's iPad streamed from
+  Sill.app over the cable meanwhile, and nothing here touched the hardware encoder): idle 35 s identical
+  masked and sorted (8 lines), and with `sillclient.py PORT 8 desktop` every host line but the stats
+  lines, and every client line but the count of kinds received, identical masked and sorted (the test
+  pattern keeps `evenPixels`, 1512×948, and SILL_TEST_SOFTWARE_ENCODER prints no fallback line, so no
+  new words reach H2), the stats lines and the count of cursor shapes differing as main's from itself in
+  a second run (`cursor.shape` follows the Mac's own cursor; the second the client leaves in); the
+  previews from the two bare SillMenuBar binaries, run from one path: identical but menu.txt's Standard
+  line, in each of its 25 samples. Not run: any capture of this Mac's screen or windows, the hardware
+  encoder, input to this Mac, `--virtual-display-selftest`, Sill.app.
+- **Untested, for Noah** (Sill.app from this branch, release-signed with the embedded profile; the iPad,
+  the 2560×1440 display at 1x): a window with an odd width at Aa 1x (Sill.log: "Capture started: 1118×610
+  … filter (1117.0, 610.0) scale 1.0, capturing at 1x, the display's own (2x asked)") shows its text as
+  sharp as the Desktop's, with at most a black hairline at the picture's right edge; the window made a
+  point wider on the Mac (1117 to 1118): no second "Capture started"; Resolution › Standard's new line.
+
 **Capture at the display's own pixel scale (2026-10-27, branch `capture-scale` from main at
 74d099c2, main at 76bc100 (#157) and 48a4ef3 (#147) merged in; PR #233).** Noah, tonight, Sill.app from 74d099c2 on
 this Mac with its lid closed, an external 2560×1440 display at 1x as the main one and a 1920×1080 at
@@ -26,7 +101,8 @@ Dock. Host only: no wire change, no device file, VirtualStage and VirtualDisplay
   captured (`pointPixelScale`, the capture line's "scale"; not CGDisplayMode's pixel width ÷ point
   width: only the filter's is the scale it draws that content at, a window across two displays
   held to the one it picks, so no rule of Sill's can disagree). On a 1x display Retina and Standard
-  both capture at 1x (2560×1440, that window 1116×610); a 2x display as before; the test pattern
+  both capture at 1x (2560×1440, that window 1116×610 at the merge, 1118×610 since its follow-ups (#234):
+  an odd side rounded up, drawn whole); a 2x display as before; the test pattern
   1512×949 × the knob; a window staged on Sill's 2x virtual display at the knob. The same scale
   sizes a window's restart on a resize, each catalog poll restarts a window that moved onto a
   display of another scale (`catalogPolled`: the list never changes for it), the away pair goes
@@ -46,7 +122,9 @@ Dock. Host only: no wire change, no device file, VirtualStage and VirtualDisplay
   display only for a push against the edge (a Dock last shown on the 1920×1080 display).
 - Verified: `swift build -c release` from `git archive` of b2bb428 and of main at 76bc100, only the
   CaptureProbe warning; `Tests/checks/capture-scale` 79 checks and 19 of 19 mutants (the first
-  commit alone 42 and 9 of 9), in CI's mutants matrix; `Tests/checks/run-all.sh`, all 53 (454 s);
+  commit alone 42 and 9 of 9), in CI's mutants matrix; `Tests/checks/run-all.sh`, all 53 at b2bb428
+  (454 s; 54 since the merge of 48a4ef3 brought `text-composition`: all 54 on the follow-ups' branch,
+  473 s);
   H2 against main's CLI at 76bc100, both from `git archive`, `--synthetic` on loopback (the software
   encoder, no router, no screen): idle 35 s identical masked and sorted (8 lines), and with
   `sillclient.py PORT 8 desktop` identical masked and sorted but for the stats lines of the seconds
@@ -64,6 +142,17 @@ Dock. Host only: no wire change, no device file, VirtualStage and VirtualDisplay
   to the picture's bottom edge (the portrait trackpad, the Magic Keyboard's trackpad) brings up the
   Dock (if not, note which display it was last on); a window dragged between the two 1x displays
   streams on with no restart; with Virtual Display on, a picked window still at 2x.
+- From the post-merge verification, for Noah (no code; the verdict, in the entry above): a drag-select
+  past a text window's bottom or right edge may no longer creep-scroll. A device's far edge now lands on
+  the window's last pixel row or column (InputLanding), where main's landed one pixel outside the
+  window, and AppKit autoscrolls a text view only while the pointer is outside the view: in a window
+  whose text reaches its edge, the last row is still inside it. A hypothesis, not tried: if a selection
+  dragged to the picture's edge stops scrolling the text, that is why, and a drag alone could land a
+  pixel outside again. And the Desktop reads its display's scale once, at `select` (its filter's
+  `pointPixelScale`); nothing reads it again while it streams (a window's is looked at each catalog
+  poll, `catalogPolled`), so a display misreported at the moment of a pick (the verification saw one, a
+  display going away as the lid closed) keeps that capture size until the next restart (a pick, a
+  settings change, the encoder's fallback).
 
 **Chinese input and dictation reach the Mac (2026-10-19 to 27, PR #147 from cinminori's `zhuyin-input`,
 finished on it, with main at 76bc100 in it; issue #138).** Noah: "Chinese input and dictation if polished
@@ -4352,8 +4441,8 @@ frames submitted | completed) shows neither was a wedge:
 
 What the host does now:
 - The fallback is temporary. `enterSoftwareFallback` (a hardware hang, or the
-  launch probe) says "… (busy or stuck); switching to the software encoder at
-  half scale until the hardware keeps up again (next check in 30 s)." While a
+  launch probe) says "… (busy or stuck); switching to the software encoder,
+  capturing at 1x, until the hardware keeps up again (next check in 30 s)." While a
   device is connected (an idle host opens no session; the task ends with the
   last device) `recheckLoop` tests the hardware at the size the stream would
   have on it (the running one's at full scale, else the Desktop's):
@@ -5575,8 +5664,9 @@ only one. Protections now in the host:
   session hung after 1.5 s and calls `onHung`. A stream whose session settles
   in the hardware's slow state gets a new session in place
   (`EncoderSlowState`; Current step, "A new session for the slow state").
-- The coordinator then restarts the source on the software encoder at half
-  scale (slow, ~10 fps under load, but live) and says so in the log; three
+- The coordinator then restarts the source on the software encoder, capturing
+  at 1x (half scale on a Retina display, the display's own on a 1x one; slow,
+  ~10 fps under load, but live) and says so in the log; three
   software hangs stop the stream instead of looping. Since 2026-09-25 that
   lasts only until a re-check finds the hardware keeping up (Current step,
   "The hardware encoder: busy, not stuck"); before, it lasted until the host
@@ -6360,7 +6450,34 @@ good.
   `Sill.tourSkipped`, `TouchWatcher`, a recognizer on the window that counts
   every touch and takes none, and DEBUG `TourDebug`); StreamScreen runs it
   (targets, the rule's inputs, the layer above the layouts and under the
-  pairing overlay, Take the Tour from the Settings panel's last row).
+  pairing overlay, Take the Tour from the Settings panel's last row). The
+  connect screen's tiles and groups (issue #116, PR #117): `ConnectionList`
+  (rows or tiles, `Sill.connectionStyle`, the rows by default; when a session's
+  end keeps a picture, `takesPreview`: only with tiles, from the session's own
+  window in front, for a saved Mac; the saved Mac a row stands for, `tileMac`:
+  its tag's or record's, else the one it is taken for by name, so every row
+  of one Mac (Wired, Wi-Fi, Direct, Remote) shows its one picture and is listed
+  under its group; what a launch or a change of style does,
+  `previewPlan`: the list hides the pictures and keeps their files, tiles show
+  them again, only the files of Macs no longer saved go; the picture's size,
+  `previewPixels`, 640 pixels wide at most, and `looksBlack`;
+  `keepsDecodedPicture`; whether Disconnect asks the Mac for a keyframe
+  first, `freshPicture`, every Mac whatever version it says; group names,
+  `Sill.macGroups`, and the sections' order; a superseded record's group; the
+  pictures' file names; pure, with KeyframeRecovery's spacing,
+  `Tests/checks/connection-list`; pbxproj AF01/FF01). ConnectScreen draws them
+  (the switch beside the title, the tiles, a saved Mac's Group menu and New
+  Group…), StreamClient+Remote keeps them (`savePreview` with complete file
+  protection in Library/Caches/SillPreviews, `syncPreviews` at launch and at a
+  change of style; only Remove Preview Picture and Forget delete a Mac's),
+  and StreamClient takes the picture: the session's last keyframe with its
+  parameter sets (`lastKeyframe`, on the network queue, one frame, dropped at
+  `tearDown`), decoded at the session's end by `KeyframePicture` (a
+  VTDecompressionSession of its own, off the main thread, 1 s at most;
+  pbxproj AF02/FF02), never a snapshot of the screen, which a device draws
+  black where the video is; Disconnect waits up to 300 ms for a fresh keyframe
+  first (kind 44, every Mac; one that skips it, Sill for Mac 0.5.1, costs that
+  pause, its picture the keyframe kept).
   `AudioDecoder` (AAC-ELD to a buffer per channel, one packet at a time;
   AudioToolbox only), `AudioPlayout` (the sound's timing; pure,
   `Tests/checks/audio-playout`), `AudioOutput` (its queue, the decoder and the
@@ -6446,7 +6563,7 @@ good.
   `audio-packetizer`, `audio-playout` (iOSClient's AudioPlayout on a simulated
   clock), `away-copy`, `away-quality`, `away-wire`, `cable-link`, `capture-scale`, `clientlink`,
   `clipboard`, `compatibility`,
-  `device-gate`, `display-wake`, `dmg-layout` (Scripts/dmg-layout's `.DS_Store` and alias
+  `connection-list`, `device-gate`, `display-wake`, `dmg-layout` (Scripts/dmg-layout's `.DS_Store` and alias
   writer, against Finder's own layout of the file, make-dmg.sh's layout
   arguments and the SVG's size and edge), `door-policy`, `duo` (DuoPosture;
   `tour` and `phone-portrait` take the Duo's real sizes too), `encoder-mailbox`,
@@ -6784,9 +6901,9 @@ plays through the Mac's speakers, never in a gate) with `-SillSoundVolume 0`,
 console's "audio: …" lines say what happened (the format, the engine and its
 latencies, a line a second, each jump with its size and cause, and in manual
 rendering where each click of a synthetic host's test tone was heard),
-`-SillSettingsScript '<t> set K=V[,K=V] | suggestion; …'` (a live session to a
-synthetic host on loopback: the panel's controls and the link callout's button,
-t seconds after the first window list), `-SillMoveHomeTest to:HOST:PORT|refused|
+`-SillSettingsScript '<t> set K=V[,K=V] | suggestion | disconnect; …'` (a live
+session to a synthetic host on loopback: the panel's controls, the link
+callout's button and Disconnect, t seconds after the first window list), `-SillMoveHomeTest to:HOST:PORT|refused|
 other:PORT` (with `-SillDialSaved 1`: the saved Mac listed as a network row a
 second into the remote session at a door that speaks TLS, so the move home
 runs against a synthetic `--remote --pairing` host with SILL_TEST_REMOTE_ORIGIN
