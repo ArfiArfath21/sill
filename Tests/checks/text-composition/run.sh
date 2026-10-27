@@ -4,7 +4,8 @@
 # method's edits reach the Mac as backspaces and text (#138); what was typed is kept whole while the
 # text system may revise it, trimmed only past its limit, and a correction taken before a forget or a
 # trim sends nothing; a Return or a Tab typed as text makes what came before it final (the fence: a
-# correction of it sends nothing, one of what follows it goes); and TextInputRules: which input moves
+# correction of it sends nothing, one of what follows it goes, Korean's rebuild across it sends the
+# Return once); and TextInputRules: which input moves
 # the Mac's caret, where a Return or a Tab typed ends, which input modes are keyboards, and whose
 # ⌃Space it is.
 #   Tests/checks/text-composition/run.sh             compile and run the check

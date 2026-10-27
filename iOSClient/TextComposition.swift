@@ -51,10 +51,10 @@ struct TextComposition: Equatable {
     /// any text field: Korean's input method selects the syllables it is still building, deletes them and
     /// types them again (한ㄱ selected, deleted, then 한 and 그 typed; with the selection ignored, 한글
     /// reached the Mac as 한한한글 in the iPad simulator, 2026-10-20), and the text system selects the
-    /// character a backspace deletes. Never empty, never while composing, and never starting before the
-    /// `fence`: nil is the caret at the end, where every edit, a forget and a trim put it back. An empty
-    /// selection elsewhere (the caret moved, as the on-screen keyboard's trackpad does) is not kept: the
-    /// Mac's caret cannot be moved from here.
+    /// character a backspace deletes. Never empty, never while composing, and never wholly before the
+    /// `fence` (one that only starts before it is kept: `retype`): nil is the caret at the end, where every
+    /// edit, a forget and a trim put it back. An empty selection elsewhere (the caret moved, as the
+    /// on-screen keyboard's trackpad does) is not kept: the Mac's caret cannot be moved from here.
     private(set) var selection: NSRange?
     /// Which document the text system's positions were taken in: each `forget` and each trim
     /// starts a new one, as every offset moves then. A correction whose range was taken in an older one
@@ -75,6 +75,15 @@ struct TextComposition: Equatable {
     /// typing loses none of its words. 0 when nothing is final; a forget puts it back at 0, a trim moves
     /// it with the text it keeps.
     private(set) var fence = 0
+    /// What a selection that reached back across the fence would have deleted before it, which its
+    /// deletion left in place, here and on the Mac: Korean's input method rebuilds the character before
+    /// the syllable it is building together with it, so right after a Return it selects that Return with
+    /// the syllable, deletes both and types both again (한글⏎, then ㅎ and ㅏ: "\nㅎ" selected, deleted,
+    /// then "\n" and "하" typed; the iPad simulator, 2026-10-27, where the refused selection let a second
+    /// "\n" through). Only what followed the fence goes from the Mac; text typed next that starts with
+    /// this is not typed again, and text that does not would change what is final, and sends nothing.
+    /// Empty but right after such a deletion; the next edit, and a new selection, end it.
+    private(set) var retype = ""
 
     /// Past this many characters, the tail is due a trim (`wantsTrim`): only a long stretch of typing or
     /// dictation with no click, key or pick in it gets there.
@@ -101,31 +110,43 @@ struct TextComposition: Equatable {
     /// The text system selects `range` of the document for its next edit: kept, inside what was sent,
     /// when it selects something while nothing is being composed (the input method's own selection is
     /// the marked text's then); an empty one, the caret moved, puts the caret back at the end, and so does
-    /// one that starts before the fence, whose edit would reach into what is final on the Mac (the next
-    /// edit then goes at the end: a backspace deletes the last character, as the person's own does).
+    /// one wholly before the fence, in what is final on the Mac (the next edit then goes at the end: the
+    /// text system selects the character a backspace deletes, so the person's backspace right after a
+    /// Return deletes that Return, as asked). One that reaches back across the fence from after it is
+    /// kept: its deletion leaves what is final in place (`retype`).
     mutating func select(_ range: NSRange) {
         guard marked == nil else { return }
         let count = sent.utf16.count
         let start = min(max(range.location, 0), count)
         let end = min(max(range.location + range.length, start), count)
-        selection = end > start && start >= fence ? NSRange(location: start, length: end - start) : nil
+        selection = end > start && end > fence ? NSRange(location: start, length: end - start) : nil
+        if selection != nil { retype = "" }
     }
 
     /// Text typed or committed: it replaces the marked text if there is any, else the selection if there
-    /// is one, and goes to the Mac.
+    /// is one, and goes to the Mac. Over a selection that reaches back across the fence it goes only
+    /// while it leaves what is final as it is; right after such a selection's deletion, what it starts
+    /// with of what that deletion left in place (`retype`) is not typed again.
     mutating func insert(_ text: String) -> [Output] {
-        if marked == nil, let selection { return commit(sentReplacing(selection, with: text)) }
-        return commit(sent + text)
+        if marked == nil, let selection {
+            let new = sentReplacing(selection, with: text)
+            guard keepsFinal(new) else { self.selection = nil; return [] }
+            return commit(new)
+        }
+        guard let rest = typedAfterRetype(text) else { return [] }
+        return commit(sent + rest)
     }
 
     /// The input method's composition so far (an empty one ends it: nothing is sent). One that starts
-    /// over a selection replaces it, as in a text field: the selected text goes from the Mac first, and
-    /// the composition follows what was sent, as every composition does here.
+    /// over a selection replaces it, as in a text field: the selected text goes from the Mac first (what
+    /// of it follows the fence, when the selection reaches back across it, nothing held back for the
+    /// composition), and the composition follows what was sent, as every composition does here.
     @discardableResult
     mutating func setMarked(_ text: String?, selected: NSRange) -> [Output] {
         guard let text, !text.isEmpty else { marked = nil; markedSelection = NSRange(location: 0, length: 0); return [] }
         var out: [Output] = []
-        if marked == nil, let selection { out = commit(sentReplacing(selection, with: "")) }
+        if marked == nil, let selection { out = deleteSelection(selection) }
+        retype = ""
         marked = text
         let count = text.utf16.count
         let location = min(max(selected.location, 0), count)
@@ -136,6 +157,7 @@ struct TextComposition: Equatable {
     /// The composition is accepted as it stands: sent.
     mutating func unmark() -> [Output] {
         guard let marked else { return [] }
+        retype = ""
         return commit(sent + marked)
     }
 
@@ -144,14 +166,16 @@ struct TextComposition: Equatable {
     /// deletes. It is the person's (the on-screen keyboard's, a hardware one's without ⌘, ⌃ or ⌥, both
     /// as text), the one edit that goes back across the fence: deleting the Return typed last deletes it
     /// on the Mac as the person asked (in an editor it joins the lines; in a chat that sent the line it
-    /// deletes nothing), and the fence comes back to what is left (`commit`), all of it still final.
+    /// deletes nothing), and the fence comes back to what is left (`commit`), all of it still final. A
+    /// selection that reaches back across the fence is deleted only after it (`deleteSelection`).
     mutating func deleteBackward() -> [Output] {
+        retype = ""
         if var text = marked {
             text.removeLast()
             setMarked(text, selected: NSRange(location: text.utf16.count, length: 0))
             return []
         }
-        if let selection { return commit(sentReplacing(selection, with: "")) }
+        if let selection { return deleteSelection(selection) }
         guard !sent.isEmpty else { return [.backspaces(1)] }
         return commit(String(sent.dropLast()))
     }
@@ -165,6 +189,7 @@ struct TextComposition: Equatable {
     /// (the message sent twice, the command run twice).
     mutating func replace(_ range: NSRange, with text: String, taken: Int? = nil) -> [Output] {
         guard refusal(range, with: text, taken: taken) == nil else { return [] }
+        retype = ""
         return commit(replacing(range, with: text))
     }
 
@@ -196,6 +221,7 @@ struct TextComposition: Equatable {
         generation += 1
         selection = nil
         fence = 0
+        retype = ""
         return out
     }
 
@@ -212,6 +238,7 @@ struct TextComposition: Equatable {
         sent = kept
         generation += 1
         selection = nil
+        retype = ""
     }
 
     /// The document with `range` of it replaced by `text`, the range cut at the document's end.
@@ -227,6 +254,30 @@ struct TextComposition: Equatable {
     /// Whether `new` keeps what lies before the fence as the Mac has it, unit for unit.
     private func keepsFinal(_ new: String) -> Bool {
         new.utf16.starts(with: sent.utf16.prefix(fence))
+    }
+
+    /// A selection deleted (a backspace over it, or a composition starting over it): what of it follows
+    /// the fence goes from the Mac; what of it lies before, final, stays, and becomes `retype`.
+    private mutating func deleteSelection(_ selection: NSRange) -> [Output] {
+        guard selection.location < fence else { return commit(sentReplacing(selection, with: "")) }
+        let units = Array(sent.utf16)
+        let kept = String(utf16CodeUnits: Array(units[selection.location..<fence]), count: fence - selection.location)
+        let out = commit(sentReplacing(NSRange(location: fence, length: selection.location + selection.length - fence), with: ""))
+        retype = kept
+        return out
+    }
+
+    /// What of text typed right after a selection's deletion left what is final in place is still to be
+    /// typed: what it starts with of `retype` is on the Mac already. All of it when it is part of
+    /// `retype` (the rest of which waits for the next text); nil when it starts otherwise, as it would
+    /// change what is final. `retype` is spent.
+    private mutating func typedAfterRetype(_ text: String) -> String? {
+        let pending = retype
+        retype = ""
+        guard !pending.isEmpty else { return text }
+        if text.hasPrefix(pending) { return String(text.dropFirst(pending.count)) }
+        if pending.hasPrefix(text) { retype = String(pending.dropFirst(text.count)); return "" }
+        return nil
     }
 
     /// What was sent with `range` of it (UTF-16) replaced by `text`: a selection's edit.

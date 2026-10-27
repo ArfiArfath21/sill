@@ -6,7 +6,8 @@
 // wherever its offsets fall now; what the text system selects is replaced by its next edit (Korean's
 // syllables); a Return or a Tab typed as text goes whole and makes what came before it final, through
 // the app's own path (`type`): what was typed is kept, and a correction that would change what came
-// before it sends nothing (the fence), while one of what follows it goes. Then TextInputRules: which
+// before it sends nothing (the fence), while one of what follows it goes, and Korean's rebuild of the
+// Return with the syllable after it sends that Return once. Then TextInputRules: which
 // input moves the Mac's caret, where a Return or a Tab typed ends, which input modes are keyboards, and
 // whose ⌃Space it is. Scenario by scenario, then 25,000 seeded random edit sequences against a model of
 // the Mac's text field.
@@ -286,6 +287,8 @@ do {   // dictation types a phrase, the person presses Return (a chat sends the 
     type(itself, into: &c, mac: &mac, chat: &chat)
     check("…nor does one that would replace the Return itself (no second message)",
           itself == [] && mac == "send the build\n" && chat.messages == ["send the build"])
+    c.select(NSRange(location: 14, length: 1))          // the text system selects the character a backspace deletes
+    check("the Return selected for a backspace is wholly final: not kept", c.selection == nil)
     let back = c.deleteBackward()
     type(back, into: &c, mac: &mac, chat: &chat)
     check("the person's backspace right after it still reaches the Mac, and the fence comes back to what is left",
@@ -458,13 +461,78 @@ do {   // Zhuyin and Korean right after a Return: the composition and the syllab
     type(k.insert("글"), into: &k, mac: &kmac)
     check("…and 한⏎글 reaches the Mac once", kmac == "한\n글" && k.sent == kmac)
     k.select(NSRange(location: 0, length: 1))
-    check("one that starts before the fence is not kept: the caret stays at the end",
+    check("one wholly before the fence is not kept: the caret stays at the end",
           k.selection == nil && k.selectedRange == NSRange(location: 3, length: 0))
-    k.select(NSRange(location: 1, length: 2))
-    check("…nor one that only starts before it", k.selection == nil)
+    k.select(NSRange(location: 0, length: 2))
+    check("…nor one that ends at it", k.selection == nil)
     let back = k.deleteBackward()
     type(back, into: &k, mac: &kmac)
     check("…so the next backspace deletes the last character, as the person's own does", back == [.backspaces(1)] && kmac == "한\n")
+}
+
+do {   // Korean right after a Return as its input method does it (2-Set on a hardware keyboard, the iPad
+       // simulator, 2026-10-27: g k s r m f, Return, g k s): it rebuilds the character before the syllable
+       // it is building together with it, so it selects the Return with the syllable, deletes both and types
+       // both again; with that selection refused the Mac got a second Return at each of the first
+       // syllable's letters
+    var c = C()
+    var mac = ""
+    var chat = Chat()
+    for text in ["한", "글", "\n", "ㅎ"] { type(c.insert(text), into: &c, mac: &mac, chat: &chat) }
+    c.select(NSRange(location: 2, length: 2))           // "\nㅎ"
+    check("a selection that reaches back across the fence from after it is kept", c.selection == NSRange(location: 2, length: 2))
+    let deleted = c.deleteBackward()
+    type(deleted, into: &c, mac: &mac, chat: &chat)
+    check("…its deletion deletes only what follows the fence, the Return left in place here and on the Mac",
+          deleted == [.backspaces(1)] && mac == "한글\n" && c.sent == "한글\n" && c.retype == "\n" && c.fence == 3)
+    let again = c.insert("\n")
+    type(again, into: &c, mac: &mac, chat: &chat)
+    check("…the Return the input method types again goes no second time", again == [] && mac == "한글\n" && c.retype.isEmpty)
+    type(c.insert("하"), into: &c, mac: &mac, chat: &chat)
+    c.select(NSRange(location: 2, length: 2))           // "\n하", for ㄴ
+    type(c.deleteBackward(), into: &c, mac: &mac, chat: &chat)
+    type(c.insert("\n한"), into: &c, mac: &mac, chat: &chat)
+    check("…nor when it comes with the syllable: 한글⏎한 once, one message",
+          mac == "한글\n한" && c.sent == mac && chat.messages == ["한글"] && chat.field == "한" && c.fence == 3)
+    c.select(NSRange(location: 2, length: 2))
+    let over = c.insert("\n하")
+    type(over, into: &c, mac: &mac, chat: &chat)
+    check("text typed over such a selection that keeps the Return goes as the syllable alone",
+          over == [.backspaces(1), .text("하")] && mac == "한글\n하" && chat.messages == ["한글"])
+    c.select(NSRange(location: 2, length: 2))
+    let changed = c.insert("하")
+    check("…and one that would replace the Return sends nothing", changed == [] && c.selection == nil && mac == "한글\n하")
+    c.select(NSRange(location: 2, length: 2))
+    type(c.deleteBackward(), into: &c, mac: &mac, chat: &chat)
+    let other = c.insert("x")
+    check("after such a deletion, text that does not start with what it left would change what is final: nothing sent",
+          other == [] && mac == "한글\n" && c.sent == mac && c.retype.isEmpty)
+    type(c.insert("\t"), into: &c, mac: &mac, chat: &chat)
+    c.select(NSRange(location: 2, length: 2))           // the Return and the Tab, all of it final
+    check("a selection wholly before the fence is not kept", c.selection == nil)
+    var d = C()
+    var dmac = ""
+    for text in ["ab\n", "c"] { type(d.insert(text), into: &d, mac: &dmac) }
+    d.select(NSRange(location: 1, length: 3))           // "b\nc"
+    type(d.deleteBackward(), into: &d, mac: &dmac)
+    check("what such a deletion left is all of what it took before the fence", d.retype == "b\n" && dmac == "ab\n")
+    check("…typed again in pieces, none of it goes again", d.insert("b") == [] && d.retype == "\n" && d.insert("\nC") == [.text("C")])
+    d.select(NSRange(location: 1, length: 3))
+    type(d.deleteBackward(), into: &d, mac: &dmac)
+    d.select(NSRange(location: 3, length: 0))
+    check("…an empty selection keeps it", d.retype == "b\n")
+    var e = C()
+    var emac = ""
+    for text in ["ab\n", "cd"] { type(e.insert(text), into: &e, mac: &emac) }
+    e.select(NSRange(location: 1, length: 3))           // "b\nc"
+    type(e.deleteBackward(), into: &e, mac: &emac)
+    check("…(what it left: \"b\\n\", the Mac's \"ab\\nd\")", e.retype == "b\n" && emac == "ab\nd" && e.sent == emac)
+    e.select(NSRange(location: 3, length: 1))           // "d", after the fence
+    check("…a new selection ends it", e.retype.isEmpty)
+    type(e.insert("D"), into: &e, mac: &emac)
+    let next = e.insert("b\nY")
+    type(next, into: &e, mac: &emac)
+    check("…so text typed after it that starts as that did goes whole", next == [.text("b\nY")] && emac == "ab\nDb\nY")
 }
 
 do {   // a CRLF, one character of two scalars, and a CR typed apart from the LF after it
@@ -723,14 +791,16 @@ func typeLow(_ outputs: [C.Output], into c: inout C, mac: inout String) -> (forg
 /// comes with a forget or a trim, and only then (a Return or a Tab typed starts none); what was sent
 /// before the fence is never changed or deleted on the Mac but by the person's own backspace, which
 /// alone takes the fence back, and what follows the fence never holds a Return or a Tab; a selection is
-/// never empty, never while composing, inside what was sent and after the fence, and gone after an edit.
+/// never empty, never while composing, inside what was sent and not wholly before the fence, and gone
+/// after an edit; what a selection's deletion left before the fence is the end of what is final.
 /// The first failure is printed; the number of failed runs, of stale corrections tried (past the end,
 /// and taken in a document since forgotten), of selections an edit replaced, of edits that sent a
-/// Return or a Tab (each moving the fence after it), and of corrections of what is final (none of which
-/// sent anything), are returned.
-func randomRuns(_ runs: Int, alphabet: [String], forgets: Bool) -> (fails: Int, stale: Int, taken: Int, replaced: Int, fenced: Int, refused: Int) {
+/// Return or a Tab (each moving the fence after it), of corrections of what is final (none of which
+/// sent anything), and of selections reaching back across the fence that a backspace or a composition
+/// deleted (what is final left in place), are returned.
+func randomRuns(_ runs: Int, alphabet: [String], forgets: Bool) -> (fails: Int, stale: Int, taken: Int, replaced: Int, fenced: Int, refused: Int, crossed: Int) {
     func word() -> String { (0..<Int.random(in: 1...3, using: &generator)).map { _ in alphabet.randomElement(using: &generator)! }.joined() }
-    var failed = 0, staleTried = 0, takenTried = 0, replaced = 0, fenced = 0, refused = 0
+    var failed = 0, staleTried = 0, takenTried = 0, replaced = 0, fenced = 0, refused = 0, crossed = 0
     var firstFailure: String?
     for run in 0..<runs {
         var c = C()
@@ -747,14 +817,18 @@ func randomRuns(_ runs: Int, alphabet: [String], forgets: Bool) -> (fails: Int, 
             var why: String?
             var low = mac.utf16.count
             var returned = false
-            let op = forgets ? Int.random(in: 0..<11, using: &generator) : [0, 1, 2, 3, 4, 9].randomElement(using: &generator)!
+            var rebuilt = false
+            let op = forgets ? Int.random(in: 0..<12, using: &generator) : [0, 1, 2, 3, 4, 9].randomElement(using: &generator)!
             switch op {
             case 0: (_, low, returned) = typeLow(c.insert(word()), into: &c, mac: &mac)
             case 1:
                 let w = word()
                 (_, low, returned) = typeLow(c.setMarked(w, selected: NSRange(location: Int.random(in: 0...w.utf16.count, using: &generator), length: 0)), into: &c, mac: &mac)
                 if let selected = before.selection {
-                    if c.sent != (before.sent as NSString).replacingCharacters(in: selected, with: "") {
+                    // What of it follows the fence, when it reaches back across it.
+                    let from = max(selected.location, before.fence)
+                    let gone = NSRange(location: from, length: selected.location + selected.length - from)
+                    if c.sent != (before.sent as NSString).replacingCharacters(in: gone, with: "") {
                         why = "a composition over a selection did not replace it"
                     }
                 } else if c.sent != before.sent { why = "a composition changed what was sent" }
@@ -823,15 +897,48 @@ func randomRuns(_ runs: Int, alphabet: [String], forgets: Bool) -> (fails: Int, 
                 refused += 1
                 let out = c.replace(utf16Range(c.document, characters: a..<b), with: "¶" + word(), taken: c.generation)
                 if out != [] || c != before { why = "a correction of what is final changed something" }
+            case 11:
+                // Korean's rebuild right after a Return: the last characters before the fence selected with
+                // what follows it, deleted, then typed again with the next text, or not.
+                guard c.fence > 0, !c.isComposing, c.fence < c.sent.utf16.count else { break }
+                let finalCharacters = String(utf16CodeUnits: Array(c.sent.utf16.prefix(c.fence)), count: c.fence).count
+                let chars = Array(c.sent)
+                let a = Int.random(in: max(finalCharacters - 2, 0)..<finalCharacters, using: &generator)
+                let selected = utf16Range(c.sent, characters: a..<chars.count)
+                let kept = String(utf16CodeUnits: Array(Array(c.sent.utf16)[selected.location..<c.fence]), count: c.fence - selected.location)
+                let afterFence = String(utf16CodeUnits: Array(c.sent.utf16.dropFirst(c.fence)), count: c.sent.utf16.count - c.fence).count
+                c.select(selected)
+                rebuilt = true
+                let deleted = c.deleteBackward()
+                low = typeLow(deleted, into: &c, mac: &mac).low
+                crossed += 1
+                let w = word()
+                let retyped = Bool.random(using: &generator)
+                let out = c.insert(retyped ? kept + w : w)
+                low = min(low, typeLow(out, into: &c, mac: &mac).low)
+                if deleted != [.backspaces(afterFence)] || c.sent.utf16.count < before.fence {
+                    why = "a selection reaching back across the fence deleted what was final"
+                } else if retyped, out != [C.Output.text(w)] {
+                    why = "what a selection's deletion left was typed again, or the rest not"
+                } else if !retyped, !w.hasPrefix(kept), !kept.hasPrefix(w), out != [] {
+                    why = "text in place of what was final went"
+                }
             default: break
             }
             let unchanged = c == before
             if why == nil, let selected = c.selection,
-               c.isComposing || selected.length == 0 || selected.location + selected.length > c.sent.utf16.count || selected.location < c.fence {
-                why = "a selection while composing, empty, past what was sent or before the fence"
+               c.isComposing || selected.length == 0 || selected.location + selected.length > c.sent.utf16.count
+                || selected.location + selected.length <= c.fence {
+                why = "a selection while composing, empty, past what was sent or wholly before the fence"
+            }
+            if why == nil, !c.retype.isEmpty,
+               !String(utf16CodeUnits: Array(c.sent.utf16.prefix(c.fence)), count: c.fence).hasSuffix(c.retype) {
+                why = "what a selection's deletion left is not the end of what is final"
             }
             if why == nil, [0, 3, 4, 5].contains(op), c.selection != nil, !unchanged { why = "an edit or a forget kept the selection" }
             if before.selection != nil, [0, 1, 3].contains(op) { replaced += 1 }
+            if let selected = before.selection, selected.location < before.fence, op == 1 || op == 3 { crossed += 1 }
+            if rebuilt, c.selection != nil { why = why ?? "a rebuild kept its selection" }
             let newDocument = op == 5 || (op == 7 && before.wantsTrim)
             if why == nil, c.generation != before.generation + (newDocument ? 1 : 0) {
                 why = "the document's generation moved without a forget or a trim, or stayed through one"
@@ -866,7 +973,7 @@ func randomRuns(_ runs: Int, alphabet: [String], forgets: Bool) -> (fails: Int, 
         }
     }
     if let firstFailure { print("     \(firstFailure)") }
-    return (failed, staleTried, takenTried, replaced, fenced, refused)
+    return (failed, staleTried, takenTried, replaced, fenced, refused, crossed)
 }
 
 // Forgets among the edits. No lone combining mark here: one typed right after a forget joins a
@@ -880,6 +987,8 @@ check("…stale corrections among them (\(forgetful.stale) past the end, \(forge
 check("…and \(forgetful.replaced) selections replaced by the next insert, backspace or composition", forgetful.replaced > 500)
 check("…and \(forgetful.fenced) edits that sent a Return or a Tab, each making what came before it final", forgetful.fenced > 1_000)
 check("…and \(forgetful.refused) corrections of what was final, none of which sent anything", forgetful.refused > 1_000)
+check("…and \(forgetful.crossed) selections reaching back across the fence deleted (Korean's rebuild after a Return among them), what was final left in place",
+      forgetful.crossed > 1_000)
 // No forget: a combining mark that joins the character before it is retyped with it.
 let joining = randomRuns(5_000, alphabet: ["a", "e", "\u{301}", "👍", "\u{1F3FD}", "ㄋ", "ˇ", " "], forgets: false)
 check("5,000 seeded random sequences with combining marks and skin tones: the Mac's text is what was sent",

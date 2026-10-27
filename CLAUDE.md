@@ -85,7 +85,7 @@ set up in the device's Settings decide.
   generation, goes whole, and makes what was sent up to just after its last Return or Tab final; a
   correction whose first change falls before it sends nothing (`refusal`'s `.final`), wherever its
   range starts, so an utterance sent again whole from its start that only adds words after the Return
-  goes; a selection starting before it is not kept (the next edit goes at the end); an edit's
+  goes; a selection wholly before it is not kept (the next edit goes at the end); an edit's
   backspaces stop at it (the difference looked for after it, so a CR and an LF typed later cost no
   backspace over the CR); the person's own backspace (text, from the on-screen keyboard and from a
   hardware one without ⌘, ⌃ or ⌥) goes back across it and takes it back to what is left, which stays
@@ -102,7 +102,18 @@ set up in the device's Settings decide.
   that; the testers' "new line" step would show it). Docs: DEVELOPMENT.md's "Other languages and
   dictation" (the fence, and plainly: after a click, a key or a pick a correction through a range built
   again from offsets kept, starting where what was typed began, is typed again at the caret, as before;
-  after a Return or a Tab it sends nothing), the checks README.
+  after a Return or a Tab it sends nothing), the checks README. Found live and fixed in a commit of its
+  own: Korean's 2-Set rebuilds the character before its syllable together with it, so right after a
+  Return it selected "\nㅎ", deleted it and typed "\n" and "하" again, and with that selection refused
+  (the verifier's variant did the same: its harness's S18) the Mac got a second Return at each of the
+  first syllable's letters. A selection that reaches back across the fence from after it is now kept:
+  its deletion deletes only what follows the fence and leaves the rest in place as `retype`, which the
+  text typed next does not type again (in pieces too; text that starts otherwise would change what is
+  final, and sends nothing; a new selection, or any other edit, ends it); text typed over it goes only
+  while it keeps what is final; a composition over it deletes only after the fence, nothing held back;
+  one wholly before the fence is still not kept (the text system selects the character a backspace
+  deletes, so the person's backspace right after a Return deletes that Return). Telling the text
+  system at a Return (an experiment) did not change what the input method selects.
 - **Untested, for Noah and #138's testers (TestFlight):** Zhuyin and Pinyin on the on-screen keyboard and
   on a Magic Keyboard (the candidates beside the composition), Japanese, Korean, dictation in Chinese and
   in English with its corrections and punctuation (nothing typed twice), Return right after dictating in

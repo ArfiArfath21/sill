@@ -665,7 +665,10 @@ a late touch to the line before the Return (its capital, its full stop) is left
 out, in an editor too, where that line keeps the words it had. The person's own
 backspace still goes back across a Return (in an editor it joins the lines; in
 a chat that sent the line it deletes nothing), and what was before the deleted
-Return stays final.
+Return stays final. Korean's keyboard rebuilds the character before the
+syllable it is building together with it, so right after a Return it deletes
+the Return with the syllable and types both again: only the syllable goes from
+the Mac and back, and the Return goes once.
 
 After a click, a key or a pick, a correction of what was forgotten sends
 nothing when the text system hands back the range it took before (dictation's

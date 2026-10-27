@@ -628,7 +628,8 @@ final class InputOverlayView: UIView, UITextInput, UIGestureRecognizerDelegate {
     // Either way the latch is spent afterwards: it is a one-shot, like a sticky key.
 
     func insertText(_ text: String) {
-        Self.textinput("insertText \(text.debugDescription)" + (composition.isComposing ? " over the composition" : ""))
+        Self.textinput("insertText \(text.debugDescription)" + (composition.isComposing ? " over the composition" : "")
+                       + (composition.retype.isEmpty ? "" : ", after a deletion that left \(composition.retype.debugDescription) before the fence"))
         setOwnPointer(nil, .none)
         if !composition.isComposing, !latchedModifiers.isDisjoint(with: .shortcutMakers), text.count == 1,
            let character = text.first, let usage = HIDKey.usage(for: character) {
@@ -658,6 +659,9 @@ final class InputOverlayView: UIView, UITextInput, UIGestureRecognizerDelegate {
             return
         }
         typed(composition.deleteBackward())
+        if !composition.retype.isEmpty {
+            Self.textinput("what it selected before the last Return or Tab typed stays: \(composition.retype.debugDescription)")
+        }
         consumeLatch()
     }
 
@@ -1053,8 +1057,8 @@ extension InputOverlayView {
             if asked != composition.selectedRange {
                 Self.textinput("selectedTextRange (\(asked.location),\(asked.length)) asked for, not taken: "
                                + (composition.isComposing ? "the input method composes"
-                                  : asked.length > 0 && asked.location < composition.fence
-                                    ? "it starts before a Return or a Tab typed, the caret stays at the end"
+                                  : asked.length > 0 && asked.location + asked.length <= composition.fence
+                                    ? "it is all before a Return or a Tab typed, the caret stays at the end"
                                     : "the caret stays at the end"))
             } else if composition.selection != nil {
                 Self.textinput("selected (\(asked.location),\(asked.length)) of what was typed, for the next edit")
