@@ -312,7 +312,7 @@ Sill needs the free Sill for Mac on the Mac you want to use. Get it at getsill.a
 
 Get started
 • Open Sill for Mac and allow Screen Recording and Accessibility.
-• Open Sill on your iPhone or iPad. Your Mac shows up in the list. Tap it. The first time, scan the code your Mac shows.
+• Open Sill on your iPhone or iPad. Your Mac shows up. Tap it. The first time, scan the code your Mac shows.
 • Pick a window from the Apps list, or tap Desktop to see the whole screen.
 • The first time, a short tour shows you the controls.
 
@@ -452,6 +452,8 @@ Fixed: after Sill sat in the background for hours, it could stop finding your Ma
 
 Type in Chinese, Japanese, Korean and other languages that compose their text, and dictate: you compose and choose on your iPhone or iPad, with the keyboards and dictation languages you set up in Settings, and what you choose is typed on your Mac.
 
+Your Mac computers now show as tiles, each with its screen as you last left it. Touch and hold one to put it in a group, such as Home or Work. To list them instead, tap the button beside Connect to a Mac; Sill remembers your choice.
+
 Sound from your Mac, a beta feature: turn on Send Audio in the Sill menu on your Mac, and your iPhone or iPad plays the sound of the window you’re using, or of every app for the Desktop, a moment behind the picture. Tap the Sound button to mute it on one device. It needs Sill for Mac from this release.
 ```
 
@@ -468,6 +470,11 @@ Magic Keyboard and on the on-screen keyboard, and Chinese dictation, on an iPad 
 docs/DEVELOPMENT.md). Its words are in this draft, README's How it works and the support page; the reporter's
 test of the TestFlight build (Pinyin, Japanese, Korean, English dictation, Control-Space with one keyboard) is
 still to come.
+
+The tiles (PR #117, 232 characters) are the connect screen's default since 2026-10-27 (Noah: "make tiles
+not list the default behavior of the app"), in this draft as the default; the list is one tap away and
+a choice is kept. #117 passed Noah's iPad test that day (a tile's picture as each session ended, list and
+tiles back and forth, every tile of one Mac its one picture); a fresh install showing tiles is his to see.
 
 ## 6. Export compliance (encryption)
 
@@ -830,6 +837,11 @@ Safe:
   draft 1,266 characters; the rest unchanged. With the sound's paragraph too
   (main at 74d099c, #94, merged into PR #147's branch, 2026-10-27), the
   draft 1,571 characters, the languages' paragraph before the sound's.
+- With tiles the connect screen's default (2026-10-27, after PR #117): the
+  description's Get started bullet says "Your Mac shows up." (no longer "in
+  the list"), 3,032 characters (3,044 before); the next What's New gains the
+  tiles' paragraph, 232 characters, before the sound's: the draft 1,805
+  characters; the rest unchanged.
 - The encryption key, now in `iOSClient/Info.plist`: Release builds of this
   branch for the simulator and for a device each have
   `"ITSAppUsesNonExemptEncryption" => false` in the built Sill.app's
