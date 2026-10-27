@@ -35,5 +35,12 @@ M = [
     ("replacingNewKey keeps the marked Mac", S, "        return list.filter { $0.macID != old }", "        return list"),
     ("recognize: any tag names the first Mac", S, "        return list.first { mac in mac.recognitionKeyData.map { RecognitionTag.matches(tag, recognitionKey: $0) } ?? false }?.macID",
      "        return list.first?.macID"),
+    # 13: a row keeps its TXT record while its name stays listed (the cable pulled, 2026-10-27).
+    ("rowRecords: a result without a record reads as none (the rule undone, as before the fix)", F,
+     "            next[item.name] = item.record ?? previous[item.name]", "            next[item.name] = item.record"),
+    ("rowRecords: a record kept after its name left the results", F,
+     "        var next: [String: RowRecord] = [:], seen = Set<String>()", "        var next: [String: RowRecord] = previous, seen = Set<String>()"),
+    ("rowRecords: the kept record wins over one that comes", F,
+     "            next[item.name] = item.record ?? previous[item.name]", "            next[item.name] = previous[item.name] ?? item.record"),
 ]
 sys.exit(0 if module.mutate("home-model", M, sys.argv[1]) else 1)

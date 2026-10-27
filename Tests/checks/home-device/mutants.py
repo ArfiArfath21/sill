@@ -194,5 +194,16 @@ M = [
     ("removalRevokes: a remote session never revokes", F, "        if remote { return true }\n", "        if remote { return false }\n"),
     ("removalRevokes: no saved key still revokes", F, "        guard let savedKey else { return false }\n        if remote",
      "        guard let savedKey else { return remote }\n        if remote"),
+    # A row keeps its TXT record while its name stays listed (the cable pulled, Noah's iPad, 2026-10-27).
+    ("rowRecords: a result without a record reads as none (the rule undone, as before the fix)", F,
+     "            next[item.name] = item.record ?? previous[item.name]", "            next[item.name] = item.record"),
+    ("rowRecords: a record kept after its name left the results", F,
+     "        var next: [String: RowRecord] = [:], seen = Set<String>()", "        var next: [String: RowRecord] = previous, seen = Set<String>()"),
+    ("rowRecords: the kept record wins over one that comes", F,
+     "            next[item.name] = item.record ?? previous[item.name]", "            next[item.name] = previous[item.name] ?? item.record"),
+    ("rowRecords: a name listed twice read by its last result", F,
+     "        for item in listed where seen.insert(item.name).inserted {", "        for item in listed {"),
+    ("rowRecords: another name's record kept for a result without one", F,
+     "            next[item.name] = item.record ?? previous[item.name]", "            next[item.name] = item.record ?? previous.values.first"),
 ]
 sys.exit(0 if module.mutate("home-device", M, sys.argv[1]) else 1)

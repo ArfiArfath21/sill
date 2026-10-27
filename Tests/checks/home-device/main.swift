@@ -597,5 +597,145 @@ check("reconnectEnd: a Mac marked newKey ends the reconnect with its words",
       && C.newKey(mac: noah, device: "iPad") == "Noah’s MacBook Pro has a new key since this iPad paired. Tap it to pair again.")
 check("a dial not the reconnect's ends after 10 s, the reconnect's own 5 s left as it is", P.tapDialDeadline == 10)
 
+// MARK: A row keeps its TXT record while its name stays listed (Noah's iPad, 2026-10-27: with the USB
+// cable pulled, iPadOS listed the Mac on en2 and en0, then on en0 alone, with no TXT record at all, so
+// its row was taken by its name alone and read "Update Sill")
+
+typealias Rec = DiscoveryPolicy.RowRecord
+let r1 = Rec(tag: "TAG", door: .pairingRequired), rOpen = Rec(tag: "TAG", door: .open), rPlain = Rec(tag: "TAG", door: .plain)
+let rNew = Rec(tag: "NEW", door: .pairingRequired)
+/// The records after these looks of one browser, each look its names in order with their results' own records.
+func records(_ looks: [[(String, Rec?)]]) -> [String: Rec] {
+    looks.reduce([:]) { r, look in P.rowRecords(r, listed: look.map { (name: $0.0, record: $0.1) }) }
+}
+check("rowRecords: a result's own record is read as it is", records([[("Mac", r1)]]) == ["Mac": r1] && records([[("Mac", rPlain)]]) == ["Mac": rPlain])
+check("rowRecords: a result without one keeps the last its name carried, look after look",
+      records([[("Mac", r1)], [("Mac", nil)]]) == ["Mac": r1] && records([[("Mac", r1)], [("Mac", nil)], [("Mac", nil)], [("Mac", nil)]]) == ["Mac": r1])
+check("rowRecords: a record that comes replaces the kept one, whatever it says (a new tag, p=0, p gone)",
+      records([[("Mac", r1)], [("Mac", nil)], [("Mac", rNew)]]) == ["Mac": rNew] && records([[("Mac", r1)], [("Mac", rOpen)]]) == ["Mac": rOpen]
+      && records([[("Mac", r1)], [("Mac", nil)], [("Mac", rPlain)], [("Mac", nil)]]) == ["Mac": rPlain])
+check("rowRecords: a name that leaves the results is forgotten; listed afresh without a record, it has none",
+      records([[("Mac", r1)], []]) == [:] && records([[("Mac", r1)], [], [("Mac", nil)]]) == [:]
+      && records([[("Mac", r1)], [("Office", nil)], [("Mac", nil)]]) == [:])
+check("rowRecords: listed afresh with a record, that one", records([[("Mac", r1)], [], [("Mac", rOpen)]]) == ["Mac": rOpen])
+check("rowRecords: a name never listed with a record has none: a plain door, as before",
+      records([[("Mac", nil)]]) == [:] && records([[("Mac", nil)], [("Mac", nil)]]) == [:])
+check("rowRecords: one name's record is never another's", records([[("Mac", r1), ("Office", nil)]]) == ["Mac": r1]
+      && records([[("Mac", r1)], [("Office", nil)]]) == [:] && records([[("Mac", r1), ("Office", nil)], [("Office", nil), ("Mac", nil)]]) == ["Mac": r1])
+check("rowRecords: a name listed twice is read by its first result, as its row is",
+      P.rowRecords([:], listed: [("Mac", r1), ("Mac", rOpen)]) == ["Mac": r1] && P.rowRecords([:], listed: [("Mac", nil), ("Mac", rOpen)]) == [:]
+      && P.rowRecords(["Mac": r1], listed: [("Mac", nil), ("Mac", rOpen)]) == ["Mac": r1])
+
+// Every history of three looks at two names, each look a name absent, listed without a record, or
+// listed with one of three records, against an oracle that reads the history: the last record in
+// the name's present run of looks, none once it left.
+enum Look: Equatable { case absent, bare, carries(Rec) }
+let lookChoices: [Look] = [.absent, .bare, .carries(r1), .carries(rOpen), .carries(rPlain)]
+func lastRecord(_ history: [Look]) -> Rec? {
+    for look in history.reversed() {
+        switch look {
+        case .absent: return nil
+        case .bare: continue
+        case .carries(let r): return r
+        }
+    }
+    return nil
+}
+var histories = 0, historiesOK = 0, onlyGiven = true, neverPlainOverTLS = true
+let historyNames = ["A", "B"], historySteps = 3
+for n in 0..<Int(pow(Double(lookChoices.count * lookChoices.count), Double(historySteps))) {
+    var code = n, ok = true
+    var history: [String: [Look]] = ["A": [], "B": []], memory: [String: Rec] = [:]
+    for _ in 0..<historySteps {
+        var listed: [(name: String, record: Rec?)] = []
+        for name in historyNames {
+            let look = lookChoices[code % lookChoices.count]
+            code /= lookChoices.count
+            history[name]!.append(look)
+            switch look {
+            case .absent: break
+            case .bare: listed.append((name, nil))
+            case .carries(let r): listed.append((name, r))
+            }
+        }
+        memory = P.rowRecords(memory, listed: listed)
+        for name in historyNames {
+            if memory[name] != lastRecord(history[name]!) { ok = false }
+            // Never a door no record gave: a name is read with a record delivered for it since it was last listed afresh.
+            if let got = memory[name], !history[name]!.reversed().prefix(while: { $0 != .absent }).contains(.carries(got)) { onlyGiven = false }
+            // A saved Mac seen over TLS: whatever the history, a tap never dials it plain (DEBUG included).
+            let door = memory[name]?.door ?? .plain
+            if P.homeDial(door: door, saved: true, revoked: false, homeTLS: true, debug: true, tap: true) == .plain { neverPlainOverTLS = false }
+        }
+    }
+    histories += 1
+    if ok { historiesOK += 1 }
+}
+check("rowRecords: \(historiesOK) of \(histories) histories (two names, three looks each: absent, no record, or one of three) read as the oracle",
+      historiesOK == histories && histories == 15_625)
+check("rowRecords: a name is only ever read with a record delivered for it since it was last listed afresh", onlyGiven)
+check("rowRecords: a saved Mac seen over TLS is never dialed plain, whatever its records did", neverPlainOverTLS)
+
+// The console's three listings as recomputeMacs reads them: the Mac's record with the cable in (anpi0,
+// en2 and en0), then en2 and en0, then en0 alone, without one. "TAG" names the saved Mac "M", reached
+// as "Noah’s MacBook Pro" and seen over TLS.
+let savedNoah: [(macID: String, bonjourName: String?)] = [("M", noah)]
+func unplugRow(_ record: Rec?, _ interfaces: [I], debug: Bool = false, homeTLS: Bool = true) -> (word: W, tap: H, reconnect: H, byName: Bool) {
+    let tagged = record?.tag == "TAG" ? "M" : nil                  // SavedMacs.recognize, the saved record's tag
+    let carries = !(record?.tag ?? "").isEmpty
+    let named = P.rowMac(tagged: tagged, carriesTag: carries, name: noah, saved: savedNoah)
+    let door = P.rowDoor(record?.door ?? .plain, otherTagUnderSavedName: P.otherTagUnderSavedName(tagged: tagged, carriesTag: carries, name: noah, saved: savedNoah))
+    let method = P.method(direct: false, interfaces: interfaces)
+    let cable = P.dialInterface(direct: false, interfaces: interfaces).map { P.carriesOnlyLinkLocal($0, own: iPadOwn) } ?? false
+    return (P.rowWord(door: door, saved: named != nil, revoked: false, homeTLS: homeTLS, debug: debug, method: method, cable: cable),
+            P.homeDial(door: door, saved: named != nil, revoked: false, homeTLS: homeTLS, debug: debug, tap: true),
+            P.homeDial(door: door, saved: named != nil, revoked: false, homeTLS: homeTLS, debug: debug, tap: false),
+            named?.tagNamed == false)
+}
+var unplugMemory: [String: Rec] = [:]
+var unplugRows: [(word: W, tap: H, reconnect: H, byName: Bool)] = []
+for (record, interfaces) in [(r1, [anpi0, en2, en0]), (nil, [en2, en0]), (nil, [en0])] as [(Rec?, [I])] {
+    unplugMemory = P.rowRecords(unplugMemory, listed: [(noah, record)])
+    unplugRows.append(unplugRow(unplugMemory[noah], interfaces))
+}
+check("the cable pulled: Wired, Wired, then Wi‑Fi, its record kept (p=1, named by its tag, not by its name alone)",
+      unplugRows.map(\.word) == [.method(.wired), .method(.wired), .method(.wifi)] && unplugRows.allSatisfy { !$0.byName } && unplugMemory == [noah: r1])
+check("the cable pulled: a tap and the reconnect dial the saved Mac pinned at every step, never plain",
+      unplugRows.allSatisfy { $0.tap == .pinned && $0.reconnect == .pinned })
+check("before the fix (each listing's own record alone): Update Sill by its name alone, nothing dialed, in DEBUG too",
+      unplugRow(nil, [en2, en0]).word == .updateSill && unplugRow(nil, [en2, en0]).byName && unplugRow(nil, [en0]).word == .updateSill
+      && unplugRow(nil, [en0], debug: true).tap == .updateSill && unplugRow(nil, [en0], debug: true).reconnect == .updateSill)
+unplugMemory = P.rowRecords(unplugMemory, listed: [(noah, r1)])
+check("its record again on en0: Wi‑Fi, pinned", unplugMemory == [noah: r1] && unplugRow(unplugMemory[noah], [en0]).word == .method(.wifi)
+      && unplugRow(unplugMemory[noah], [en0]).tap == .pinned)
+unplugMemory = P.rowRecords(unplugMemory, listed: [(noah, nil)])
+unplugMemory = P.rowRecords(unplugMemory, listed: [(noah, nil)])
+unplugMemory = P.rowRecords(unplugMemory, listed: [(noah, r1)])
+check("the cable back in (anpi0, en2, en0 with its record): Wired, pinned", unplugRow(unplugMemory[noah], [anpi0, en2, en0]).word == .method(.wired)
+      && unplugRow(unplugMemory[noah], [anpi0, en2, en0]).tap == .pinned)
+unplugMemory = P.rowRecords(unplugMemory, listed: [(noah, nil)])
+unplugMemory = P.rowRecords(unplugMemory, listed: [(noah, rOpen)])
+check("Require pairing turned off while listed (a record with p=0 after one without): read; the saved Mac says Wi‑Fi, dialed pinned",
+      unplugMemory == [noah: rOpen] && unplugRow(unplugMemory[noah], [en0]).word == .method(.wifi) && unplugRow(unplugMemory[noah], [en0]).tap == .pinned)
+unplugMemory = P.rowRecords(unplugMemory, listed: [(noah, rPlain)])
+unplugMemory = P.rowRecords(unplugMemory, listed: [(noah, nil)])
+check("a record with its tag and no p, the Mac's own word, then none: Update Sill, nothing dialed, in DEBUG too",
+      unplugRow(unplugMemory[noah], [en0]).word == .updateSill && unplugRow(unplugMemory[noah], [en0], debug: true).tap == .updateSill)
+// A Mac that really went back to a plain door: its name leaves the results (the browser's removal, about a
+// second after its Sill's goodbye), then comes back without a record.
+var downgraded = P.rowRecords([:], listed: [(noah, r1)])
+downgraded = P.rowRecords(downgraded, listed: [])
+downgraded = P.rowRecords(downgraded, listed: [(noah, nil)])
+check("a Mac gone back to a plain door, listed afresh without a record: Update Sill, nothing dialed, in DEBUG too",
+      downgraded[noah] == nil && unplugRow(downgraded[noah], [en0]).word == .updateSill && unplugRow(downgraded[noah], [en0], debug: true).tap == .updateSill
+      && unplugRow(downgraded[noah], [en0], debug: true).reconnect == .updateSill)
+check("…and in DEBUG, a Mac never seen over TLS: its method, dialed plain, as before",
+      unplugRow(downgraded[noah], [en0], debug: true, homeTLS: false).word == .method(.wifi) && unplugRow(downgraded[noah], [en0], debug: true, homeTLS: false).tap == .plain)
+var away = P.rowRecords([:], listed: [(noah, r1), ("Office", nil)])
+away = P.rowRecords(away, listed: [("Office", nil)])
+away = P.rowRecords(away, listed: [("Office", nil), (noah, nil)])
+check("a name gone and back without a record, another name listed throughout: none for it, as a plain door (Update Sill)",
+      away[noah] == nil && unplugRow(away[noah], [en0]).word == .updateSill)
+
 print(fails == 0 ? "ALL PASS (\(passes))" : "\(fails) FAIL, \(passes) pass")
 if fails > 0 { exit(1) }
