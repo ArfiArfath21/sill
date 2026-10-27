@@ -69,9 +69,11 @@ Sill has layouts of its own.
   the window under its pointer. Chinese, Japanese, Korean and other languages
   whose input methods compose text are typed with the keyboards you set up on
   your device: you compose and choose there, and what you choose is typed on
-  your Mac. Dictation types on your Mac too. Three fingers swipe and pinch as
-  on a Mac's trackpad: Mission Control, App Exposé, the Spaces, Apps and Show
-  Desktop, through the keyboard shortcuts your Mac has for them.
+  your Mac. Dictation types on your Mac too. Reverse Scrolling, in the settings
+  panel, turns a finger's scroll and the on-screen trackpad's the other way.
+  Three fingers swipe and pinch as on a Mac's trackpad: Mission Control, App
+  Exposé, the Spaces, Apps and Show Desktop, through the keyboard shortcuts
+  your Mac has for them.
 - **On iPhone**, held upright, the picture is on top with buttons, keys and a
   trackpad below. Larger Picture, in the settings panel, gives a window's
   picture the room of the window thumbnails, down to where the keyboard comes
