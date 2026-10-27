@@ -3200,9 +3200,10 @@ final class StreamClient: ObservableObject {
     }
 
     /// The user chose to leave. No reconnect. With tiles on, a saved Mac's picture is the last thing
-    /// on screen: the Mac is asked for a keyframe first, and the session ends when it comes or after
-    /// 300 ms, whichever is first (ConnectionList.freshPicture); meanwhile the stream screen stays,
-    /// and a second tap does nothing.
+    /// on screen: the Mac is asked for a keyframe first, every Mac as the picture's recovery asks, and
+    /// the session ends when it comes or after 300 ms, whichever is first (ConnectionList.freshPicture);
+    /// meanwhile the stream screen stays, and a second tap does nothing. A Mac from before kind 44 skips
+    /// the ask: its picture is the keyframe kept, 300 ms later.
     func disconnect() {
         guard freshPictureWait == nil else { return }
         switch freshPictureOnLeaving() {
@@ -3239,29 +3240,15 @@ final class StreamClient: ObservableObject {
         let takes = ConnectionList.takesPreview(style: connectionStyle, sceneActive: inFront, saved: savedMac(macID) != nil)
         let now = ProcessInfo.processInfo.systemUptime
         let decision = ConnectionList.freshPicture(takesPreview: takes, streaming: active != .none,
-                                                   macTakesRequests: macTakesKeyframeRequests,
                                                    sinceLastAsk: keyframeRecovery.lastAsk.map { now - $0 },
                                                    askOut: keyframeRecovery.asked)
         #if DEBUG
         if takes, decision == .stored {
-            let why: String
-            if active == .none { why = "nothing streams" }
-            else if !macTakesKeyframeRequests { why = "the Mac (\(hostVersion.map { "Sill " + $0 } ?? "no version")) does not take a keyframe request" }
-            else { why = "the picture's recovery asked for one under 2 s ago, and it came" }
+            let why = active == .none ? "nothing streams" : "the picture's recovery asked for one under 2 s ago, and it came"
             print("tiles: no keyframe asked for the picture of \(macID): \(why)")
         }
         #endif
         return decision
-    }
-
-    /// Whether this session's Mac takes a keyframe request (kind 44), by the version it says
-    /// (ConnectionList.takesKeyframeRequests). DEBUG `-SillFreshKeyframe 1`: any Mac does (a test host
-    /// says no version, and main's Sill.app still says 0.5.1). Main thread.
-    private var macTakesKeyframeRequests: Bool {
-        #if DEBUG
-        if UserDefaults.standard.bool(forKey: "SillFreshKeyframe") { return true }
-        #endif
-        return ConnectionList.takesKeyframeRequests(hostVersion: hostVersion)
     }
 
     /// Asks the Mac for a keyframe (`asked`; else one the picture's recovery asked for is due) and

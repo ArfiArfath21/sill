@@ -1,9 +1,8 @@
 // ConnectionList (iOSClient): the connect screen's list vs. tiles style, when a session's end keeps a
 // picture for a tile, the picture's size and its black test, when a decoded picture lands, when
 // Disconnect asks the Mac for a fresh keyframe first, per-Mac groups and sections, preview JPEG
-// filenames and pruning, and tile column count. Compiled with iOSClient/ConnectionList.swift,
-// iOSClient/KeyframeRecovery.swift (its spacing) and Sources/StreamProtocol/Compatibility.swift
-// (SillVersion) (run.sh).
+// filenames and pruning, and tile column count. Compiled with iOSClient/ConnectionList.swift and
+// iOSClient/KeyframeRecovery.swift (its spacing) (run.sh).
 import Foundation
 import CoreGraphics
 
@@ -221,38 +220,29 @@ for style in C.Style.allCases {
 }
 check(C.decodeBound == 1, "a decode is given up after 1 s")
 
-// Which Macs take a keyframe request (kind 44): a version after 0.5.1. Sill for Mac 0.5.1 and every
-// older one skip it, main's builds still say 0.5.1, and SillHost says no version.
-for v in [nil, "", "beta", "0.5.1", "v0.5.1", "0.5.1 (535)", "0.5", "0.5.0", "0.4.0", "0.3.1", "0.1"] as [String?] {
-    check(!C.takesKeyframeRequests(hostVersion: v), "a Mac that says \(v.map { "\"\($0)\"" } ?? "no version") is not asked")
-}
-for v in ["0.5.2", "0.5.10", "0.6", "0.6.0", "v0.6.0", "1.0", "0.6.0 (600)"] {
-    check(C.takesKeyframeRequests(hostVersion: v), "a Mac that says \"\(v)\" takes a keyframe request")
-}
-
-// Disconnect's fresh keyframe: asked only when the session's end keeps a picture, something streams and
-// the Mac takes the request; within the picture's recovery's spacing (2 s) of its last ask, no other
-// ask: wait for its keyframe while that is due, else the keyframe kept is the one it brought.
+// Disconnect's fresh keyframe: asked of every Mac (Noah, 2026-10-27: one from main on answers within a
+// frame, one from before kind 44 skips it and costs the 300 ms wait), only when the session's end keeps
+// a picture and something streams; within the picture's recovery's spacing (2 s) of its last ask, no
+// other ask: wait for its keyframe while that is due, else the keyframe kept is the one it brought.
 typealias F = C.FreshPicture
 check(KeyframeRecovery.spacing == 2, "the recovery's spacing is 2 s")
 for takes in [false, true] {
     for streaming in [false, true] {
-        for requests in [false, true] {
-            for since in [nil, 0, 0.5, 1.5, 1.99, 2, 2.01, 30] as [TimeInterval?] {
-                for out in [false, true] {
-                    let got = C.freshPicture(takesPreview: takes, streaming: streaming, macTakesRequests: requests,
-                                             sinceLastAsk: since, askOut: out)
-                    let want: F
-                    if !(takes && streaming && requests) { want = .stored }
-                    else if let since, since < 2 { want = out ? .awaitAsked : .stored }
-                    else { want = .ask }
-                    check(got == want, "fresh keyframe: picture \(takes), streaming \(streaming), Mac takes it \(requests), "
-                          + "last ask \(since.map { "\($0) s ago" } ?? "never")\(out ? ", out" : "") → \(want)")
-                }
+        for since in [nil, 0, 0.5, 1.5, 1.99, 2, 2.01, 30] as [TimeInterval?] {
+            for out in [false, true] {
+                let got = C.freshPicture(takesPreview: takes, streaming: streaming, sinceLastAsk: since, askOut: out)
+                let want: F
+                if !(takes && streaming) { want = .stored }
+                else if let since, since < 2 { want = out ? .awaitAsked : .stored }
+                else { want = .ask }
+                check(got == want, "fresh keyframe: picture \(takes), streaming \(streaming), "
+                      + "last ask \(since.map { "\($0) s ago" } ?? "never")\(out ? ", out" : "") → \(want)")
             }
         }
     }
 }
+check(C.freshPicture(takesPreview: true, streaming: true, sinceLastAsk: nil, askOut: false) == .ask,
+      "every Mac is asked: a session's end that keeps a picture, something streaming, no recent ask")
 check(C.freshKeyframeWait == 0.3, "Disconnect waits 300 ms at most for the keyframe")
 
 print("\(checks) checks, \(failures) failed")

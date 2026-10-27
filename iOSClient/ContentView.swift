@@ -405,12 +405,9 @@ struct ContentView: View {
 ///   Sill.connectionStyle tiles`). With tiles, a saved Mac's session that ends keeps its picture in
 ///   Library/Caches/SillPreviews (none is taken while the list shows, which hides the kept ones and keeps
 ///   their files until tiles come back: ConnectionList.previewPlan, StreamClient.syncPreviews): the session's
-///   last keyframe, decoded (KeyframePicture), never a snapshot of the screen; the console's `tiles:`
+///   last keyframe, decoded (KeyframePicture), never a snapshot of the screen, and Disconnect asks the
+///   Mac for a fresh one first (kind 44, every Mac) and waits up to 300 ms for it; the console's `tiles:`
 ///   lines say what came of it.
-/// * `-SillFreshKeyframe 1` — in the normal app and under `-SillLive 1`: with tiles on, Disconnect asks
-///   any Mac for a keyframe first (kind 44) and waits up to 300 ms for it, whatever version its window
-///   list says. Without it only a Mac that says a version after 0.5.1 is asked
-///   (ConnectionList.takesKeyframeRequests): a test host says none, and main's Sill.app still says 0.5.1.
 /// * Versions, in the normal app too: `-SillHelloVersion <v>` is the version this device's hello
 ///   (kind 23) gives, for a host's device floor under test (`SILL_TEST_MIN_DEVICE_VERSION`);
 ///   `-SillAppStoreURL <https url>` is the App Store link's address while SillLinks has none.

@@ -256,20 +256,20 @@ the session ends, with a VideoToolbox session of its own, off the main thread,
 given up after a second (`iOSClient/KeyframePicture.swift`); the tile shows it
 once it lands. The Mac's cursor is never in the video and the device's pointer
 is a layer of its own, so the picture has neither (nor the `-SillHUD`
-readout). Disconnect first asks the Mac for a keyframe (kind 44, as the
-picture's recovery does) and ends the session when it comes or after 300 ms,
-so the picture is the last thing on screen: only a Mac whose window list says
-a version after 0.5.1 is asked, since 0.5.1 skips the request and nothing else
-says which Macs take it (main's Sill.app says 0.5.1 until the next release,
-and SillHost says no version; `-SillFreshKeyframe 1` asks any Mac in a Debug
-build). A session lost or ended by the Mac gives the keyframe kept. A decode
-that fails, or a picture black throughout, writes nothing, and the old picture
-stays. Every tile of one Mac shows its one picture, whichever way the tile
-reaches it: a network or Direct row whose tag names the saved Mac, one with no
-tag taken for it by its Bonjour name (as a tap dials it), and its Remote row,
-which stays listed beside a row taken by name; another Mac's tiles show its
-own, and a row of no saved Mac the placeholder (`ConnectionList.tileMac`,
-which also lists each row under its Mac's group).
+readout). Disconnect first asks the Mac for a keyframe (kind 44, every Mac, as
+the picture's recovery does) and ends the session when it comes or after 300
+ms, so the picture is the last thing on screen, another window brought forward
+on the Mac included: a Mac from main on answers within a frame, and one that
+skips the request (Sill for Mac 0.5.1) costs that 300 ms pause before the
+connect screen, its picture the keyframe kept. A session lost or ended by the
+Mac gives the keyframe kept. A decode that fails, or a picture black
+throughout, writes nothing, and the old picture stays. Every tile of one Mac
+shows its one picture, whichever way the tile reaches it: a network or Direct
+row whose tag names the saved Mac, one with no tag taken for it by its Bonjour
+name (as a tap dials it), and its Remote row, which stays listed beside a row
+taken by name; another Mac's tiles show its own, and a row of no saved Mac the
+placeholder (`ConnectionList.tileMac`, which also lists each row under its
+Mac's group).
 
 A saved Mac's menu also puts it in a group, Home, Work, Personal or a name of
 your own (New Group…): grouped Macs are listed under their group's name, the
@@ -1241,13 +1241,13 @@ simulator:
   `xcrun simctl spawn <udid> defaults write me.saffer.sill
   Sill.connectionStyle tiles`.
 - `-SillHUD 1`: fps, frame age, round trip and frame size over the stream.
-- `-SillFreshKeyframe 1` (the normal app and `-SillLive 1`): with tiles on,
-  Disconnect asks any Mac for a keyframe before the session ends, whatever
-  version it says (a test host says none). The console's `tiles:` lines say
-  whether it was asked, when it came, and how the picture was decoded or why
+- With tiles on, the console's `tiles:` lines say whether Disconnect asked the
+  Mac for a keyframe, when it came, and how the picture was decoded or why
   none was kept. In a live session to a synthetic host on this Mac's
   loopback, `-SillSettingsScript '8 disconnect'` takes the panel's Disconnect
-  8 s after the first window list.
+  8 s after the first window list; `SILL_TEST_KEYFRAME_IGNORE=1` on the host
+  stands in for a Mac that skips the request (the picture is the keyframe
+  kept, 300 ms later).
 - `-SillLayerFail <s>[,<s>…]` (the normal app and `-SillLive 1`): at each of
   these seconds after the launch's first picture a frame that cannot decode
   goes onto the display layer, so the picture's recovery runs for real (the
