@@ -3271,7 +3271,13 @@ final class StreamClient: ObservableObject {
         freshPictureWait = token
         freshPictureAskedAt = ProcessInfo.processInfo.systemUptime
         queue.async { self.keyframeWanted = token }
-        if asked { send(.keyframeRequest, payload: Data()) }
+        if asked {
+            send(.keyframeRequest, payload: Data())
+            // The picture's recovery asks nothing more: the session ends within the wait, and its own
+            // ask, due meanwhile while an interruption's keyframe is overdue, would come within the
+            // Mac's second of this one and be refused (KeyframeRecovery keeps asks 2 s apart for that).
+            keyframeAskWork?.cancel(); keyframeAskWork = nil
+        }
         #if DEBUG
         print("tiles: \(asked ? "asked the Mac for a keyframe" : "waiting for the keyframe the picture's recovery asked for") "
               + "before the session ends, for the picture of \(session?.macID ?? "?"); at most \(Int(ConnectionList.freshKeyframeWait * 1000)) ms")
