@@ -96,11 +96,11 @@ These texts are only true once these are:
   Low · Standard, the link's callout, the move home), the USB cable on an
   iPhone (verified on the iPad mini only; if it fails, write "a USB cable
   (iPad)"), sound from the Mac, a beta (docs/audio-plan.md's P1 to P16:
-  heard on the device in step with the picture, the Sound button, headphones
-  and AirPods, the silent switch; until they pass, leave its bullet and its
-  What's New paragraph out, but delete "Sill doesn’t play sound from your
-  Mac." all the same from any version whose build carries the sound: a device
-  plays it once the Mac turns on Send Audio), Apple Pencil hover, and 120
+  heard on the device in step with the picture, the Send Audio and Mute
+  switches, headphones and AirPods, the silent switch; until they pass, leave
+  its bullet and its What's New paragraph out, but delete "Sill doesn’t play
+  sound from your Mac." all the same from any version whose build carries the
+  sound: a device plays it once Send Audio is on), Apple Pencil hover, and 120
   frames per second, which no device has shown yet (the iPad mini is 60 Hz).
   For that one, stream a moving window, then the whole desktop, to a
   ProMotion iPhone or iPad. Sill.app's log should say
@@ -258,7 +258,8 @@ developer can't reach:
   answer stays the same; the app reads the clipboard only through the
   system's Paste control, never by itself.
 - The sound (from the version after 0.5.1, a beta; docs/audio-plan.md), while
-  Send Audio is on in Sill for Mac, which only the Mac turns on: the Mac sends
+  Send Audio is on (Sill for Mac's switch, or a device's Settings panel's, which
+  turns it on for every device): the Mac sends
   the sound of what streams (the window's app, or every app for the Desktop),
   which the device plays as it arrives and never records or saves, and the
   device's once-a-second report also says how far the sound trails the
@@ -362,13 +363,13 @@ touch", after the one that starts "Type with":
 **For the next version, with the sound** (PR #94, a beta feature; docs/audio-plan.md: it ships with
 the next submission of both apps, and needs Sill for Mac from the same release): delete "Sill
 doesn’t play sound from your Mac." from "Good to know" in every version whose build carries the
-sound, with or without this bullet, since a device plays it once the Mac turns on Send Audio; and
+sound, with or without this bullet, since a device plays it once Send Audio is on; and
 once the sound's device tests pass (Before you submit), add this bullet to "Smooth and sharp",
 after the one that starts "Set quality". "Beta" goes on the feature, never on the app: guideline
 2.2 keeps betas and trials of an app off the App Store (TestFlight is for those).
 
 ```text
-• Hear sound from your Mac in step with the picture, a beta feature that is off until you turn on Send Audio in Sill for Mac. Mute it on any device with the Sound button.
+• Hear sound from your Mac in step with the picture, a beta feature that is off until you turn on Send Audio in Sill’s settings, on your Mac or your iPhone or iPad. Mute it on any device in Sill’s settings.
 ```
 
 The source is public under the Apache License 2.0 (since 2026-09-26), so the
@@ -452,7 +453,7 @@ Fixed: after Sill sat in the background for hours, it could stop finding your Ma
 
 Type in Chinese, Japanese, Korean and other languages that compose their text, and dictate: you compose and choose on your iPhone or iPad, with the keyboards and dictation languages you set up in Settings, and what you choose is typed on your Mac.
 
-Sound from your Mac, a beta feature: turn on Send Audio in the Sill menu on your Mac, and your iPhone or iPad plays the sound of the window you’re using, or of every app for the Desktop, a moment behind the picture. Tap the Sound button to mute it on one device. It needs Sill for Mac from this release.
+Sound from your Mac, a beta feature: turn on Send Audio in Sill’s settings on your iPhone or iPad, or in the Sill menu on your Mac, and your iPhone or iPad plays the sound of the window you’re using, or of every app for the Desktop, a moment behind the picture. Turn on Mute in Sill’s settings to silence it on one device. It needs Sill for Mac from this release.
 ```
 
 The sound's paragraph (PR #94) is "a beta feature", never a beta of the app (guideline 2.2), and waits,
@@ -830,6 +831,11 @@ Safe:
   draft 1,266 characters; the rest unchanged. With the sound's paragraph too
   (main at 74d099c, #94, merged into PR #147's branch, 2026-10-27), the
   draft 1,571 characters, the languages' paragraph before the sound's.
+- With the sound's two switches in the device's Settings panel (Noah, 2026-10-27: Send Audio set
+  from a device for every device, Mute for each device, no Sound button), the sound's bullet 206
+  characters and the description with it 3,210 (without the line "Sill doesn’t play sound from
+  your Mac."); the next What's New's sound paragraph 363, the draft 1,631; the review notes
+  unchanged (their WHAT TO TRY line names the Sill menu, which still turns it on).
 - The encryption key, now in `iOSClient/Info.plist`: Release builds of this
   branch for the simulator and for a device each have
   `"ITSAppUsesNonExemptEncryption" => false` in the built Sill.app's

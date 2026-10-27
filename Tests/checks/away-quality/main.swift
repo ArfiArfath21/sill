@@ -161,24 +161,35 @@ do {
 }
 
 do {
-    // Send Audio is the Mac's alone (docs/audio-plan.md, Q8, the beta's default), as Share Clipboard is:
-    // a device's change of it is refused on or off, at home and away, and named for the log, while the
-    // rest of the same change applies; a device still sees it, whichever pair its connection controls.
+    // Send Audio is a device's to set too, as Quality is (Noah, 2026-10-27: docs/audio-plan.md, Q8 as
+    // revised; the beta's hosts refused it): a device's change of it is applied on or off, at home and
+    // away, with the rest of the same change and nothing refused; it lands on the one shared value from
+    // either route (`applying`, `applyingAway`), never on a quality pair; the log names it both ways;
+    // and a device sees it, whichever pair its connection controls.
     for remote in [false, true] {
         for on in [false, true] {
             let change = HostSettingsChange(token: 4, maxFPS: 60, prioritizeSpeed: true, sendAudio: on)
             let (ok, refused) = DeviceSettings.accepted(change, virtualDisplayAvailable: true, fromRemote: remote)
-            check(ok.sendAudio == nil && ok.maxFPS == 60 && ok.prioritizeSpeed == true,
-                  "accepted: Send Audio \(on ? "on" : "off") from \(remote ? "afar" : "home") refused, the rest of the change applied")
-            eq(refused, ["send audio (set on this Mac only)"], "accepted: …and named once")
+            check(ok.sendAudio == on && ok.maxFPS == 60 && ok.prioritizeSpeed == true,
+                  "accepted: Send Audio \(on ? "on" : "off") from \(remote ? "afar" : "home") applied, with the rest of the change")
+            check(refused.isEmpty, "accepted: …and nothing refused (\(refused))")
+            var from = standard
+            from.sendAudio = !on
+            let landed = remote ? from.applyingAway(ok) : from.applying(ok)
+            check(landed.sendAudio == on && landed.bitrate == from.bitrate && landed.captureScale == from.captureScale
+                  && landed.awayBitrate == from.awayBitrate && landed.awayCaptureScale == from.awayCaptureScale,
+                  "\(remote ? "applyingAway" : "applying"): Send Audio \(on ? "on" : "off") lands on the shared value, neither quality pair")
         }
     }
-    let (alone, _) = DeviceSettings.accepted(HostSettingsChange(token: 5, sendAudio: true), virtualDisplayAvailable: true)
-    check(alone.isEmpty, "accepted: a change of Send Audio alone applies nothing")
+    let (alone, none) = DeviceSettings.accepted(HostSettingsChange(token: 5, sendAudio: true), virtualDisplayAvailable: false, fromRemote: true)
+    check(alone == HostSettingsChange(sendAudio: true) && none.isEmpty, "accepted: a change of Send Audio alone is that change, without the token, from afar too")
     var on = standard
     on.sendAudio = true
     check(!standard.sendAudio, "standard: Send Audio off")
-    eq(standard.changes(to: on), "send audio off → on", "changes: Send Audio's switch, the Mac's own")
+    eq(standard.changes(to: on), "send audio off → on", "changes: Send Audio's switch, as the log names it")
+    eq(on.changes(to: standard), "send audio on → off", "changes: …and off again")
+    check(standard.applying(HostSettingsChange(sendAudio: true)) == on && on.applyingAway(HostSettingsChange(sendAudio: false)) == standard,
+          "a device's Send Audio alone moves nothing else, at home or away")
     check(on.streamSettings(away: true).sendAudio == true && on.streamSettings(away: false).sendAudio == true
           && standard.streamSettings(away: true).sendAudio == false && standard.streamSettings(away: false).sendAudio == false,
           "a device sees the Mac's Send Audio, at home and away")
