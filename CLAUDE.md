@@ -20,10 +20,10 @@ this a separate PR after #117 merges." No wire change.
   `connectionStyle` already did. So a picture of each saved Mac's screen is kept by default
   (`takesPreview`, unchanged: only with tiles), and Disconnect asks for its fresh keyframe by default
   (300 ms at most before the connect screen with Sill for Mac 0.5.1, which skips kind 44). The switch
-  beside the title shows once a saved Mac is listed, whichever style is on: #117 also showed it while
-  tiles were on, which with tiles the default showed it on a fresh install and took it away under the
-  finger of someone with no saved Mac who chose the list, with no way back until they paired a Mac;
-  the list's rule is #117's as it was. DEBUG: `-SillStyleToggleAt <s>[,<s>…]` toggles the style as
+  beside the title always shows, whichever style is on and whether or not a Mac is listed (Noah,
+  2026-10-27: "The list/tiles switch should always show"; #117 showed it for tiles alone, which with
+  tiles the default took it away under the finger of someone with no saved Mac who chose the list).
+  DEBUG: `-SillStyleToggleAt <s>[,<s>…]` toggles the style as
   the switch does (`toggleStyle`); the console's `connect:` lines.
 - The Mac: Sill.app registers `HostConfig.app` (HostSettings), the CLI's `standard` with the virtual
   display on. Registered, never written: a `virtualDisplay` key set from the menu, Settings ›

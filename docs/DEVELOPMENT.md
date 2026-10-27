@@ -263,10 +263,10 @@ beside "Connect to a Mac" (or Show as List in a saved Mac's menu: touch and
 hold), as rows. Tiles are the default since 2026-10-27
 (`ConnectionList.defaultStyle`; the rows were until then): an install whose
 person never chose shows tiles, and a choice, stored as `Sill.connectionStyle`
-(`list` or `tiles`), always wins. The button shows once a saved Mac is listed,
-whichever style is on: with tiles the default, a button shown while tiles are
-on went under the finger of someone with no saved Mac who chose the list. With
-tiles on, a saved Mac's tile shows
+(`list` or `tiles`), always wins. The button always shows, whichever style is on and
+whether or not a Mac is listed (Noah, 2026-10-27; #117 showed it for tiles
+alone, which with tiles the default took it away from someone with no saved Mac
+who chose the list). With tiles on, a saved Mac's tile shows
 its screen as the last session with it ended, a 320 pt JPEG in
 Library/Caches/SillPreviews (never in a backup, unreadable while the device is
 locked), taken only for a session that ended in a window in front while tiles

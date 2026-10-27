@@ -1206,13 +1206,14 @@ struct ConnectScreen: View {
                 .accessibilityFocused($titleFocused)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 // The switch between rows and tiles: a 44 pt target over the title's line, which it
-                // overhangs above and below (an overlay, so the column is laid out as before it). Once a
-                // saved Mac is listed (the tiles' pictures are saved Macs'), whichever style is on: with
-                // tiles the default (2026-10-27), a switch shown for tiles alone, as #117 had it while the
-                // list was the default, went under the finger of someone with no saved Mac who chose the
-                // list, and left no way back until they paired one.
+                // overhangs above and below (an overlay, so the column is laid out as before it). Always
+                // (Noah, 2026-10-27: "The list/tiles switch should always show"), whichever style is on
+                // and whether or not a Mac is listed; only the card, which takes the title's place, and a
+                // link's confirmation leave it out. #117 showed it for tiles alone while the list was the
+                // default, which with tiles the default left someone with no Mac who chose the list no way
+                // back.
                 .overlay(alignment: .trailing) {
-                    if !carded, client.pendingLink == nil, client.macs.contains(where: { $0.macID != nil }) {
+                    if !carded, client.pendingLink == nil {
                         Button {
                             toggleStyle()
                         } label: {
