@@ -34,6 +34,58 @@ enum ConnectionList {
         style == .tiles && sceneActive && saved
     }
 
+    // MARK: The tile's picture: the stream's last keyframe, decoded
+
+    // The picture is never taken from the screen. On a device the display layer's video is composited
+    // outside the app's own drawing, so a snapshot of the view (`drawHierarchy`) drew black in its
+    // place; the simulator composites it in software, which is why its photos looked right. The client
+    // keeps the session's last keyframe with the parameter sets it came with (one frame, replaced at
+    // each keyframe, dropped with the session) and decodes it at the session's end (KeyframePicture).
+
+    /// The picture's width at most, in points, and its scale: 640 pixels at most, as the tile shows it.
+    static let previewPoints: CGFloat = 320
+    static let previewScale: CGFloat = 2
+
+    /// The picture's size in pixels for a video of `video` pixels: at most `previewPoints` ×
+    /// `previewScale` wide, never wider than the video, in its shape, the height rounded down (at least
+    /// a pixel). Nil for no video.
+    static func previewPixels(video: CGSize) -> (width: Int, height: Int)? {
+        guard video.width.isFinite, video.height.isFinite, video.width >= 1, video.height >= 1 else { return nil }
+        let width = min((previewPoints * previewScale).rounded(.down), video.width.rounded(.down))
+        let height = max(1, (video.height * width / video.width).rounded(.down))
+        return (Int(width), Int(height))
+    }
+
+    /// How long a decode may take before its picture is given up: the old file stays.
+    static let decodeBound: TimeInterval = 1
+
+    /// The brightest a colour channel may be in a picture that counts as black.
+    static let blackLevel: UInt8 = 24
+
+    /// Whether a decoded picture is black: no pixel with a colour channel brighter than `blackLevel`.
+    /// A Mac's screen always has something brighter (the menu bar, a window's text); a decode that came
+    /// out black has nothing, and it must never replace a good picture. `pixels`: `height` rows of
+    /// `bytesPerRow` bytes, each pixel 4 bytes whose first three are its colour (BGRX or RGBX: the
+    /// fourth, alpha or padding, is not looked at), the bytes after `width` pixels in a row padding.
+    static func looksBlack(_ pixels: UnsafeRawBufferPointer, width: Int, height: Int, bytesPerRow: Int) -> Bool {
+        guard width > 0, height > 0, bytesPerRow >= width * 4, pixels.count >= bytesPerRow * (height - 1) + width * 4 else { return true }
+        for row in 0..<height {
+            let start = row * bytesPerRow
+            for x in 0..<width {
+                let p = start + x * 4
+                if pixels[p] > blackLevel || pixels[p + 1] > blackLevel || pixels[p + 2] > blackLevel { return false }
+            }
+        }
+        return true
+    }
+
+    /// Whether a picture decoded after its session ended is kept when it lands: only while tiles are
+    /// still on (switching to the list deleted every picture meanwhile) and the Mac is still saved
+    /// (Forget deleted its picture).
+    static func keepsDecodedPicture(style: Style, saved: Bool) -> Bool {
+        style == .tiles && saved
+    }
+
     /// Cleans a group name: whitespace and newlines collapsed to single spaces, at most
     /// `maxGroupLength` characters; a preset's name in any case is the preset ("work" is Work); nil when
     /// blank or Other in any case (where the Macs with no group already are).

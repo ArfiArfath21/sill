@@ -865,6 +865,11 @@ final class StreamClient: ObservableObject {
     private let link = SessionLink()
     let queue = DispatchQueue(label: "sill.net", qos: .userInteractive)
     private var lastParameterSets: ParameterSets?
+    /// The session's last keyframe with the parameter sets it came with (the Mac sends them before
+    /// every keyframe): a saved Mac's tile picture, decoded when the session ends (KeyframePicture),
+    /// since no snapshot of the screen can take the display layer's video on a device. One frame,
+    /// replaced at each keyframe, dropped with the session (`tearDown`). On `queue`.
+    private var lastKeyframe: (frame: Data, parameterSets: ParameterSets)?
 
     // Liveness, on `queue` (docs/remote-access-plan.md §7.6). The host answers every ping, so a
     // live connection never goes quiet for long; a dead path used to keep a frozen picture.
@@ -3170,6 +3175,53 @@ final class StreamClient: ObservableObject {
         updateDiscovery()
     }
 
+    /// The tile's picture of `macID`: the keyframe kept (`lastKeyframe`), decoded off the main thread
+    /// within ConnectionList.decodeBound (KeyframePicture), and kept when it lands while tiles are still
+    /// on and the Mac still saved (ConnectionList.keepsDecodedPicture): `savePreview` puts it on the tile
+    /// at once (the connect screen may be showing by then) and writes its JPEG. Nothing, and the old
+    /// file stays, when no keyframe came, the decode fails or gives no answer in time, or the picture is
+    /// black. From `tearDown`, whose next block on `queue` drops the keyframe. Main thread.
+    private func takePreview(of macID: String) {
+        queue.async { [weak self] in
+            guard let kept = self?.lastKeyframe else {
+                #if DEBUG
+                print("tiles: no picture of \(macID) kept: no keyframe came in this session")
+                #endif
+                return
+            }
+            #if DEBUG
+            let started = CACurrentMediaTime()
+            #endif
+            KeyframePicture.make(frame: kept.frame, parameterSets: kept.parameterSets, bound: ConnectionList.decodeBound) { result in
+                DispatchQueue.main.async { [weak self] in
+                    guard let self else { return }
+                    #if DEBUG
+                    let ms = Int(((CACurrentMediaTime() - started) * 1000).rounded())
+                    #endif
+                    switch result {
+                    case .success(let picture):
+                        guard ConnectionList.keepsDecodedPicture(style: self.connectionStyle, saved: self.savedMac(macID) != nil) else {
+                            #if DEBUG
+                            print("tiles: no picture of \(macID) kept: decoded in \(ms) ms, but the list is on or the Mac is no longer saved")
+                            #endif
+                            return
+                        }
+                        #if DEBUG
+                        print("tiles: decoded the picture of \(macID) from its \(kept.frame.count / 1024) KB keyframe in \(ms) ms, \(picture.width)×\(picture.height)")
+                        #endif
+                        self.savePreview(UIImage(cgImage: picture, scale: ConnectionList.previewScale, orientation: .up), for: macID)
+                    case .failure(let why):
+                        #if DEBUG
+                        print("tiles: no picture of \(macID) kept: \(why) (\(ms) ms); the old one stays")
+                        #else
+                        _ = why
+                        #endif
+                    }
+                }
+            }
+        }
+    }
+
     /// The connection ended: the Mac went away (host quit, Wi-Fi dropped, connection reset, a
     /// goodbye), or a remote dial's winner failed before its window list. `end` overrides what the
     /// error says (a message no Sill sends). A session at home whose connection ran over the cable
@@ -3234,25 +3286,25 @@ final class StreamClient: ObservableObject {
         resetHomeMove()
         // A saved Mac's tile shows its screen as the last session ended, kept only while tiles are on and
         // only from this session's own window in front (ConnectionList.takesPreview): the window's
-        // scene, not the app, since one of two Sill windows can be behind while the app is active, and
-        // a window behind draws nothing. The snapshot is nil while the picture is black or interrupted.
+        // scene, not the app, since one of two Sill windows can be behind while the app is active. The
+        // picture is the session's last keyframe, decoded (KeyframePicture): never a snapshot of the
+        // screen, where a device draws the video black.
         if connected, videoSize != .zero, let macID = session?.macID {
             let inFront = displayView.window?.windowScene?.activationState == .foregroundActive
             if ConnectionList.takesPreview(style: connectionStyle, sceneActive: inFront, saved: savedMac(macID) != nil) {
-                if let preview = displayView.snapshot(maxWidth: 320, includePointer: false) {
-                    savePreview(preview, for: macID)
-                } else {
-                    #if DEBUG
-                    print("tiles: no picture of \(macID) kept: the layer had none to give (black or interrupted)")
-                    #endif
-                }
+                takePreview(of: macID)
             } else {
                 #if DEBUG
                 print("tiles: no picture of \(macID) kept: \(connectionStyle), window in front \(inFront), saved \(savedMac(macID) != nil)")
                 #endif
             }
         }
-        queue.async { self.lastParameterSets = nil; self.pendingMove = nil; self.stopMeasuring() }
+        // After the picture's keyframe was taken (the block above queued first): nothing of this
+        // session's stream outlives it.
+        queue.async {
+            self.lastParameterSets = nil; self.lastKeyframe = nil
+            self.pendingMove = nil; self.stopMeasuring()
+        }
         firstListDeadline?.cancel()
         firstListDeadline = nil
         session = nil
@@ -3767,6 +3819,9 @@ final class StreamClient: ObservableObject {
             let age = (Date().timeIntervalSince1970 - header.timestamp) * 1000
             if age.isFinite { frameAgeSamples.append(min(max(age, 0), Self.sampleCeilingMs)) }
             frameCounter += 1
+            if header.isKeyframe, let ps = lastParameterSets {
+                lastKeyframe = (data, ps)       // the tile's picture (ConnectionList); its payload, not a copy
+            }
             onFrame?(data, header.isKeyframe)
         case .windowList:
             guard let list = Wire.decode(WindowList.self, from: data) else { return }

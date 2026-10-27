@@ -244,9 +244,11 @@ extension StreamClient {
         pruneSavedPreviews()
     }
 
-    /// A session's end with tiles on (`tearDown`). The file has complete protection: unreadable while
-    /// the device is locked. Sill reads it only at launch and writes it only from a window in front, so
-    /// both happen while the device is unlocked.
+    /// A session's end with tiles on, once its last keyframe is decoded (`tearDown`, `takePreview`): the
+    /// tile shows it at once (`macPreviews`, published, so a connect screen already showing picks it
+    /// up) and its JPEG is written. The file has complete protection: unreadable while the device is
+    /// locked. Sill reads it only at launch and writes it only for a session that ended in a window in
+    /// front, a second at most later, so both happen while the device is unlocked.
     func savePreview(_ image: UIImage, for macID: String) {
         guard let name = ConnectionList.previewFileName(for: macID) else { return }
         macPreviews[macID] = image

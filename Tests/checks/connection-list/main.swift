@@ -1,6 +1,7 @@
 // ConnectionList (iOSClient): the connect screen's list vs. tiles style, when a session's end keeps a
-// picture for a tile, per-Mac groups and sections, preview JPEG filenames and pruning, and tile column
-// count. Compiled with iOSClient/ConnectionList.swift alone (run.sh).
+// picture for a tile, the picture's size and its black test, when a decoded picture lands, per-Mac
+// groups and sections, preview JPEG filenames and pruning, and tile column count. Compiled with
+// iOSClient/ConnectionList.swift alone (run.sh).
 import Foundation
 import CoreGraphics
 
@@ -108,6 +109,62 @@ check(C.columns(forWidth: 380, accessibleText: false) == 2 && C.columns(forWidth
       "340 pt and wider: 2 tile columns")
 check(C.columns(forWidth: 339, accessibleText: false) == 1 && C.columns(forWidth: 380, accessibleText: true) == 1,
       "narrower than 340 pt or accessibility text size: 1 tile column")
+
+// The picture's size: the stream's last keyframe decoded at most 320 pt wide at 2x (640 pixels), in
+// the video's shape, never wider than the video, the height rounded down and at least a pixel.
+func pixels(_ w: CGFloat, _ h: CGFloat) -> String {
+    C.previewPixels(video: CGSize(width: w, height: h)).map { "\($0.width)x\($0.height)" } ?? "nil"
+}
+check(pixels(3024, 1964) == "640x415", "a Retina Desktop's keyframe makes a 640×415 picture (415.66 rounded down)")
+check(pixels(1920, 1080) == "640x360" && pixels(6016, 3384) == "640x360", "16:9 at any size: 640×360")
+check(pixels(1512, 982) == "640x415", "a Standard Desktop's: 640×415")
+check(pixels(640, 400) == "640x400" && pixels(641, 401) == "640x400", "640 wide is kept; 641×401 is 640×400")
+check(pixels(500, 300) == "500x300" && pixels(1, 1) == "1x1", "a video narrower than 640 pixels keeps its own size")
+check(pixels(1080, 1920) == "640x1137", "a display turned upright: 640 wide, as tall as its shape makes it")
+check(pixels(7680, 1) == "640x1", "a picture is at least a pixel tall")
+check(C.previewPoints * C.previewScale == 640, "320 pt at 2x")
+check(pixels(0, 100) == "nil" && pixels(100, 0) == "nil" && pixels(-5, 10) == "nil" && pixels(0.5, 10) == "nil"
+      && pixels(.infinity, 10) == "nil" && pixels(10, .nan) == "nil", "no video, no picture")
+
+// The black test: no colour channel brighter than 24 anywhere is black; the fourth byte (alpha or
+// padding) and the row's padding are never looked at.
+func buffer(_ w: Int, _ h: Int, rowBytes: Int? = nil, fill: UInt8 = 0, alpha: UInt8 = 0, padding: UInt8 = 0,
+            set: [(x: Int, y: Int, channel: Int, value: UInt8)] = []) -> (bytes: [UInt8], rowBytes: Int) {
+    let row = rowBytes ?? w * 4
+    var bytes = [UInt8](repeating: padding, count: row * h)
+    for y in 0..<h { for x in 0..<w { for c in 0..<4 { bytes[y * row + x * 4 + c] = c == 3 ? alpha : fill } } }
+    for p in set { bytes[p.y * row + p.x * 4 + p.channel] = p.value }
+    return (bytes, row)
+}
+func black(_ b: (bytes: [UInt8], rowBytes: Int), _ w: Int, _ h: Int) -> Bool {
+    b.bytes.withUnsafeBytes { C.looksBlack($0, width: w, height: h, bytesPerRow: b.rowBytes) }
+}
+check(black(buffer(8, 5), 8, 5), "every pixel 0: black")
+check(!black(buffer(8, 5, fill: 96), 8, 5), "the test pattern's grey 96: not black")
+check(black(buffer(8, 5, fill: 24), 8, 5) && !black(buffer(8, 5, fill: 25), 8, 5), "24 is black, 25 is not")
+check(!black(buffer(8, 5, set: [(7, 4, 0, 200)]), 8, 5), "one bright pixel, the last of the last row: not black")
+check(!black(buffer(8, 5, set: [(0, 0, 1, 200)]), 8, 5) && !black(buffer(8, 5, set: [(3, 2, 2, 200)]), 8, 5),
+      "a bright second or third colour channel: not black")
+check(black(buffer(8, 5, alpha: 255), 8, 5), "the fourth byte (alpha or padding) bright: still black")
+check(black(buffer(8, 5, rowBytes: 48, padding: 255), 8, 5), "rows padded with bright bytes: the padding is not the picture")
+check(!black(buffer(8, 5, rowBytes: 48, padding: 255, set: [(7, 4, 2, 90)]), 8, 5), "a padded picture's last pixel bright: not black")
+let tiny = buffer(8, 5, fill: 96)
+check(tiny.bytes.withUnsafeBytes { C.looksBlack($0, width: 0, height: 5, bytesPerRow: 32) }
+      && tiny.bytes.withUnsafeBytes { C.looksBlack($0, width: 8, height: 0, bytesPerRow: 32) }
+      && tiny.bytes.withUnsafeBytes { C.looksBlack($0, width: 8, height: 5, bytesPerRow: 16) }
+      && tiny.bytes.withUnsafeBytes { C.looksBlack($0, width: 8, height: 6, bytesPerRow: 32) },
+      "no pixels, rows shorter than their pixels, or fewer bytes than the rows: no picture, black")
+check(!tiny.bytes.withUnsafeBytes { C.looksBlack($0, width: 8, height: 5, bytesPerRow: 32) },
+      "the same bytes read whole: a picture")
+
+// A picture decoded after its session ended lands only while tiles are still on and the Mac still saved.
+for style in C.Style.allCases {
+    for saved in [false, true] {
+        let want = style == .tiles && saved
+        check(C.keepsDecodedPicture(style: style, saved: saved) == want, "a decoded picture kept: \(style), saved \(saved) → \(want)")
+    }
+}
+check(C.decodeBound == 1, "a decode is given up after 1 s")
 
 print("\(checks) checks, \(failures) failed")
 exit(failures == 0 ? 0 : 1)

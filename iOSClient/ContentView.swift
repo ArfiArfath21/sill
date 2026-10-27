@@ -144,8 +144,7 @@ struct ContentView: View {
 ///   simulator can connect to a Mac over Bonjour at a Duo size. Not connected yet shows the normal
 ///   connect screen inside the frame. Without it nothing touches the network, exactly as before.
 /// * `-SillHUD 1` — not a harness argument, but it combines with these: the fps / frame age / RTT
-///   readout on the display view (see `DiagnosticsHUDView`). It works with or without the harness. It
-///   is a subview of the display view, so with tiles on a session's end keeps it in the Mac's picture.
+///   readout on the display view (see `DiagnosticsHUDView`). It works with or without the harness.
 /// * `-SillConnect 127.0.0.1:PORT` — connect straight to that address, in the normal app and under
 ///   `-SillLive 1`. The synthetic test hosts (`SillHost --synthetic`, the bare `SillMenuBar
 ///   --synthetic`) stay off Bonjour, so this is how the simulator reaches them.
@@ -395,7 +394,9 @@ struct ContentView: View {
 ///   `-Sill.connectionStyle` the switch beside the title changes nothing until the next run: to try
 ///   the switch, write the default instead (`xcrun simctl spawn <udid> defaults write me.saffer.sill
 ///   Sill.connectionStyle tiles`). With tiles, a saved Mac's session that ends keeps its picture in
-///   Library/Caches/SillPreviews (the list keeps none, and turning tiles off deletes them).
+///   Library/Caches/SillPreviews (the list keeps none, and turning tiles off deletes them): the session's
+///   last keyframe, decoded (KeyframePicture), never a snapshot of the screen; the console's `tiles:`
+///   lines say what came of it.
 /// * Versions, in the normal app too: `-SillHelloVersion <v>` is the version this device's hello
 ///   (kind 23) gives, for a host's device floor under test (`SILL_TEST_MIN_DEVICE_VERSION`);
 ///   `-SillAppStoreURL <https url>` is the App Store link's address while SillLinks has none.
