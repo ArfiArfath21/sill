@@ -141,7 +141,7 @@ serves the root or `/docs`, never `/site`. So:
   `<!-- Reverse Scrolling` and `<!-- /Reverse Scrolling -->`, support.html's item on the
   pairing window and screen sharing (PR #157, Sill for Mac's Show the pairing window to screen
   sharing) between `<!-- Pairing window` and `<!-- /Pairing window -->`, and support.html's
-  paragraph that Virtual Display is on unless you turn it off (PR #000, Sill for Mac's default
+  paragraph that Virtual Display is on unless you turn it off (PR #236, Sill for Mac's default
   since 2026-10-27) between `<!-- Virtual Display` and `<!-- /Virtual Display -->`. A republish before those
   releases (for words that hold for the builds already out, such as support.html's on a Mac asleep
   or restarted, or on a black picture) deletes the blocks of each release not out yet in the

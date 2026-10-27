@@ -9,7 +9,7 @@ Formerly winstream; the folder still carries the old name.
 ## Current step
 
 **Tiles and Virtual Display on by default (2026-10-27, branch `defaults-tiles-vd` from main at
-3c257485, fast-forwarded to 3b546374 (#234) before its first commit; PR #NNN).** Noah, 2026-10-27:
+3c257485, fast-forwarded to 3b546374 (#234) before its first commit; PR #236).** Noah, 2026-10-27:
 "make tiles not list the default behavior of the app. Also have Virtual Desktop on by default. Of
 course, if a user changes a setting remember their choice for future sessions as you do now. Make
 this a separate PR after #117 merges." No wire change.
