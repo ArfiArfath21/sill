@@ -616,13 +616,15 @@ There is no setting for it in Sill: the input view follows the keyboards and
 dictation languages set up in the device's Settings › General › Keyboard
 (Keyboards, and Dictation Languages under Dictation). With keyboards in two
 languages or more there, Control-Space switches between them on the device, as
-in any text field there and as on a Mac with several input sources, and while a
-hardware keyboard holds the keyboard the new one's name shows over the picture
-for a second. With keyboards in one language (Emoji and dictation aside),
-Control-Space goes to the Mac as before: Xcode's completions, VS Code's
-suggestions, the Mac's own input source switch. Control-Shift-Space,
-Control-Option-Space and Control-Command-Space always go to the Mac. The Globe
-key switches the device's keyboard too.
+in any text field there and as on a Mac with several input sources. With
+keyboards in one language (Emoji and dictation aside), Control-Space goes to the
+Mac as before: Xcode's completions, VS Code's suggestions, the Mac's own input
+source switch. Control-Shift-Space, Control-Option-Space and
+Control-Command-Space always go to the Mac. The Globe key switches the device's
+keyboard too. Whenever the keyboard switches while the input view holds it, with
+a hardware keyboard or the on-screen one, the new keyboard's name shows over the
+picture for a second (not Emoji's or dictation's, and not while something is
+being composed).
 
 A correction needs what is just before the Mac's caret, so the device remembers
 what was typed since the caret last moved some other way, and forgets it at
