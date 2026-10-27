@@ -5601,8 +5601,9 @@ only one. Protections now in the host:
   session hung after 1.5 s and calls `onHung`. A stream whose session settles
   in the hardware's slow state gets a new session in place
   (`EncoderSlowState`; Current step, "A new session for the slow state").
-- The coordinator then restarts the source on the software encoder at half
-  scale (slow, ~10 fps under load, but live) and says so in the log; three
+- The coordinator then restarts the source on the software encoder, capturing
+  at 1x (half scale on a Retina display, the display's own on a 1x one; slow,
+  ~10 fps under load, but live) and says so in the log; three
   software hangs stop the stream instead of looping. Since 2026-09-25 that
   lasts only until a re-check finds the hardware keeping up (Current step,
   "The hardware encoder: busy, not stuck"); before, it lasted until the host
