@@ -404,13 +404,13 @@ final class StreamClient: ObservableObject {
     var lastViewport: Viewport?
 
     // The Mac's sound (kind 43; docs/audio-plan.md §7.5, StreamClient+Audio.swift, AudioOutput).
-    /// This device's mute, the Sound button's and switch's: local, remembered (`Sill.soundMuted`; the
-    /// controls save it through `setSoundMuted`), never sent to the Mac. Main thread.
+    /// This device's mute, the Settings panel's Mute switch (right under Send Audio; off by default): local, remembered
+    /// (`Sill.soundMuted`; the switch saves it through `setSoundMuted`), never sent to the Mac. Main thread.
     @Published var soundMuted = UserDefaults.standard.bool(forKey: StreamClient.soundMutedKey) {
         didSet { if soundMuted != oldValue { sound.setMuted(soundMuted) } }
     }
-    /// Whether the Mac sent its sound when a move handed the session over: the Sound button and switch
-    /// stay until the new connection's first kind 16 says (the same Mac). Nil outside a move. Main.
+    /// Whether the Mac had sound (`macHasSound`) when a move handed the session over: the panel's Mute
+    /// switch stays until the new connection's first kind 16 says (the same Mac). Nil outside a move. Main.
     var soundAcrossMove: Bool?
     /// The sound's output: its queue, the playout, the decoder and the engine. The panel's refresh is
     /// this device's screen's, as the viewport reads it (`screenMaximumFPS`: the scene's screen, not
@@ -2551,7 +2551,7 @@ final class StreamClient: ObservableObject {
         lastPongAt = ProcessInfo.processInfo.systemUptime
         setRoute(from: c.currentPath, fresh: true)   // the new connection's, which carries the session now
         status = "Connected to \(hostName)"
-        soundAcrossMove = soundAvailable
+        soundAcrossMove = macHasSound
         settings.reset()
         settingsProblem = nil
         settingsExpiry?.cancel()
