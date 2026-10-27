@@ -8,7 +8,7 @@ Formerly winstream; the folder still carries the old name.
 
 ## Current step
 
-**Capture scale follow-ups (2026-10-27, branch `capture-scale-followups` from main at b4caa910).**
+**Capture scale follow-ups (2026-10-27, branch `capture-scale-followups` from main at b4caa910; PR #234).**
 The post-merge verification of #233 (sill-handoff's
 `triage/2026-10-20-reports/verdicts-2026-10-26/pr233-verdict.md`) left small follow-ups, all taken here.
 Host only: no wire change, no device file.
@@ -76,7 +76,7 @@ Dock. Host only: no wire change, no device file, VirtualStage and VirtualDisplay
   captured (`pointPixelScale`, the capture line's "scale"; not CGDisplayMode's pixel width ÷ point
   width: only the filter's is the scale it draws that content at, a window across two displays
   held to the one it picks, so no rule of Sill's can disagree). On a 1x display Retina and Standard
-  both capture at 1x (2560×1440, that window 1116×610 at the merge, 1118×610 since its follow-ups above:
+  both capture at 1x (2560×1440, that window 1116×610 at the merge, 1118×610 since its follow-ups (#234):
   an odd side rounded up, drawn whole); a 2x display as before; the test pattern
   1512×949 × the knob; a window staged on Sill's 2x virtual display at the knob. The same scale
   sizes a window's restart on a resize, each catalog poll restarts a window that moved onto a
