@@ -103,16 +103,20 @@ do {
 }
 
 // Sill.app's defaults (HostConfig.app, which its HostSettings registers): the CLI's with the virtual
-// display on (Noah, 2026-10-27); the CLI keeps it off unless --virtual-display.
+// display and Send Audio on (Noah, 2026-10-27); the CLI keeps both off unless --virtual-display and
+// --audio.
 do {
     let app = HostConfig.app
     check(!standard.virtualDisplay, "standard (the CLI): the virtual display off")
+    check(!standard.sendAudio, "standard (the CLI): Send Audio off")
     check(app.virtualDisplay, "app (Sill.app): the virtual display on")
-    var sameButVirtualDisplay = app
-    sameButVirtualDisplay.virtualDisplay = standard.virtualDisplay
-    check(sameButVirtualDisplay == standard, "app is standard but for the virtual display")
+    check(app.sendAudio, "app (Sill.app): Send Audio on")
+    var sameButTheTwo = app
+    sameButTheTwo.virtualDisplay = standard.virtualDisplay
+    sameButTheTwo.sendAudio = standard.sendAudio
+    check(sameButTheTwo == standard, "app is standard but for the virtual display and Send Audio")
     check(app.validated() == app, "app is valid as it is")
-    eq(standard.changes(to: app), "virtual display off → on", "changes: the one knob that differs")
+    eq(standard.changes(to: app), "virtual display off → on, send audio off → on", "changes: the two knobs that differ")
 }
 
 // MARK: DeviceSettings

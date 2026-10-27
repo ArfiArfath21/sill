@@ -39,6 +39,8 @@ MUTANTS = [
      "prioritizeSpeed: false, virtualDisplay: false, directWireless: false,", "prioritizeSpeed: false, virtualDisplay: true, directWireless: false,"),
     ("AQ27 Sill.app's defaults another knob off the CLI's too", H + "HostConfig.swift",
      "        c.virtualDisplay = true\n", "        c.virtualDisplay = true\n        c.directWireless = true\n"),
+    ("AQ28 Sill.app's Send Audio off (the default before 2026-10-27)", H + "HostConfig.swift",
+     "        c.sendAudio = true\n", "        c.sendAudio = false\n"),
 ]
 caught = 0
 for name, rel, old, new in MUTANTS:
