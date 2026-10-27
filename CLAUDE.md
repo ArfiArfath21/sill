@@ -85,35 +85,48 @@ set up in the device's Settings decide.
   generation, goes whole, and makes what was sent up to just after its last Return or Tab final; a
   correction whose first change falls before it sends nothing (`refusal`'s `.final`), wherever its
   range starts, so an utterance sent again whole from its start that only adds words after the Return
-  goes; a selection wholly before it is not kept (the next edit goes at the end); an edit's
-  backspaces stop at it (the difference looked for after it, so a CR and an LF typed later cost no
-  backspace over the CR); the person's own backspace (text, from the on-screen keyboard and from a
-  hardware one without ⌘, ⌃ or ⌥) goes back across it and takes it back to what is left, which stays
-  final; a second Return moves it to just after itself; a forget puts it at 0 and a trim moves it with
-  the text it keeps (to 0 when the cut passes it); a composition follows what was sent, after it; the
-  4,000-character cap stays, reached across Returns now. `TextInputRules.movesCaret` is false for all
-  text again (`endOfReturnOrTab` says where the fence goes); clicks, keys (⇧Return and ⇧Tab among them),
-  picks, gestures and menu items keep the full forget. Decided here: the fence goes just after the last
-  Return or Tab, not at the end of the text that brought it (the verifier's variant), as what follows
-  the Return went where the caret went: the verifier's own text with only "deploy it " corrected after
-  is sent, and a hypothesis that revises a word after the Return as it adds more keeps its new words
-  (the harness's S13: the variant lost " it"). Known: one correction that both changes the line before
-  a Return and adds words after it sends nothing, its new words with it (no model in the harness does
-  that; the testers' "new line" step would show it). Docs: DEVELOPMENT.md's "Other languages and
-  dictation" (the fence, and plainly: after a click, a key or a pick a correction through a range built
-  again from offsets kept, starting where what was typed began, is typed again at the caret, as before;
-  after a Return or a Tab it sends nothing), the checks README. Found live and fixed in a commit of its
-  own: Korean's 2-Set rebuilds the character before its syllable together with it, so right after a
-  Return it selected "\nㅎ", deleted it and typed "\n" and "하" again, and with that selection refused
-  (the verifier's variant did the same: its harness's S18) the Mac got a second Return at each of the
-  first syllable's letters. A selection that reaches back across the fence from after it is now kept:
-  its deletion deletes only what follows the fence and leaves the rest in place as `retype`, which the
-  text typed next does not type again (in pieces too; text that starts otherwise would change what is
-  final, and sends nothing; a new selection, or any other edit, ends it); text typed over it goes only
-  while it keeps what is final; a composition over it deletes only after the fence, nothing held back;
-  one wholly before the fence is still not kept (the text system selects the character a backspace
-  deletes, so the person's backspace right after a Return deletes that Return). Telling the text
-  system at a Return (an experiment) did not change what the input method selects.
+  goes; a selection wholly before it is not kept, so the next edit goes at the end ("send the bill⏎ok"
+  typed, "bill" selected, then "build": "okbuild" on the new line; select, backspace and "build", as
+  Korean rebuilds: "obuild", the backspace deleting the last character; acceptable, as no input method
+  has been seen selecting wholly before a Return: Korean's selections cross it, the person's backspace
+  selects one character); an edit's backspaces stop at it (the difference looked for after it, so a CR
+  and an LF typed later cost no backspace over the CR); the person's own backspace (text, from the
+  on-screen keyboard and from a hardware one without ⌘, ⌃ or ⌥) goes back across it and takes it back to
+  what is left, which stays final; a second Return moves it to just after itself; a forget puts it at 0
+  and a trim moves it with the text it keeps (to 0 when the cut passes it); a composition follows what
+  was sent, after it; the 4,000-character cap stays, reached across Returns now.
+  `TextInputRules.movesCaret` is false for all text again (`endOfReturnOrTab` says where the fence
+  goes); clicks, keys (⇧Return and ⇧Tab among them), picks, gestures and menu items keep the full
+  forget. Decided here: the fence goes just after the last Return or Tab, not at the end of the text
+  that brought it (the verifier's variant), as what follows the Return went where the caret went: the
+  verifier's own text with only "deploy it " corrected after is sent, and a hypothesis that revises a
+  word after the Return as it adds more keeps its new words (the harness's S13: the variant lost " it").
+  Known (the third verification, 2026-10-27: `pr147-verdict-3.md` beside it): a correction that changes
+  the line before a Return sends nothing, the words it adds after the Return with it, and dictation that
+  sends its whole utterance again with each update carries a word revised there into every later update,
+  each sending nothing too, so the rest of the utterance never reaches the Mac (the verifier's harness:
+  "send the bill", "send the bill⏎deploy", "send the build⏎deploy it", "send the build⏎deploy it now",
+  "Send the build.⏎Deploy it now." leave it "send the bill⏎deploy", " it now" never arriving, in an
+  editor too). Nothing is sent twice, and where new words come at the caret and each revision is a
+  replace of its own, every word arrives (the revision left out). The testers' "new line" step would
+  show which way iPadOS goes; a possible follow-up applies such an update's text after its k-th Return
+  or Tab (k: the Returns and Tabs in what is final) instead of refusing it whole. Docs: DEVELOPMENT.md's
+  "Other languages and dictation" (the fence, and plainly: after a click, a key or a pick a correction
+  through a range built again from offsets kept, starting where what was typed began, is typed again at
+  the caret, as before; after a Return or a Tab it sends nothing), the checks README. Found live and
+  fixed in a commit of its own: Korean's 2-Set rebuilds the character before its syllable together with
+  it, so right after a Return it selected "\nㅎ", deleted it and typed "\n" and "하" again, and with that
+  selection refused (the verifier's variant did the same: its harness's S18) the Mac got a second Return
+  at each of the first syllable's letters. A selection that reaches back across the fence from after it
+  is now kept: its deletion deletes only what follows the fence and leaves the rest in place as
+  `retype`, which the text typed next does not type again (in pieces too; text that starts otherwise
+  would change what is final, and sends nothing, so "\nㅎ" selected and deleted, then "하" typed alone,
+  loses the syllable: check J4, a nit of the third verification's, which Korean did not do live; a new
+  selection, or any other edit, ends it); text typed over it goes only while it keeps what is final; a
+  composition over it deletes only after the fence, nothing held back; one wholly before the fence is
+  still not kept (the text system selects the character a backspace deletes, so the person's backspace
+  right after a Return deletes that Return). Telling the text system at a Return (an experiment) did not
+  change what the input method selects.
 - Verified after the second verification's fix (2026-10-27, on 3187d56, the tree with main at c215514 in
   it): text-composition 178 checks and 87 of 87 mutants (F1–F14 the fence's, J1–J8 the crossing
   selection's; in CI's matrix); the verifier's harness, S1–S12, against its fence variant: the same output
@@ -140,6 +153,8 @@ set up in the device's Settings decide.
   arrives once, nothing is sent twice), ⌃Space with one keyboard and
   with two, the Globe key, Caps Lock's switch to and from ABC, a tap mid-composition, a shortcut
   mid-composition, an Apple Pencil over the picture (no handwriting), VoiceOver.
+  If dictation corrects a word before the "new line" while you keep talking, the words after it may not
+  reach the Mac; nothing is sent twice either way. Say which words were missing and in which app.
 
 **The pairing window to screen sharing (2026-10-19, PR #157 by scripsweave, branch
 `fix/remote-desktop-qr-code` on their fork, from main at 5c323e6; issue #108, #137 closed as its

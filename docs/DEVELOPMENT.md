@@ -702,15 +702,29 @@ sent twice, the command run twice, backspaces into the next field), whether
 the text system hands back the range it took or builds it again from offsets it
 kept; what follows the Return or the Tab, in the same text or typed after it,
 is corrected as any typing is. So dictation that hears "new line" in the middle
-of a sentence types every word once and goes on typing the words after it; only
-a late touch to the line before the Return (its capital, its full stop) is left
-out, in an editor too, where that line keeps the words it had. The person's own
-backspace still goes back across a Return (in an editor it joins the lines; in
-a chat that sent the line it deletes nothing), and what was before the deleted
-Return stays final. Korean's keyboard rebuilds the character before the
-syllable it is building together with it, so right after a Return it deletes
-the Return with the syllable and types both again: only the syllable goes from
-the Mac and back, and the Return goes once.
+of a sentence types no word twice (in every way of sending its updates the
+verifications modelled), and a late touch to the line before the Return (its
+capital, its full stop) is left out, in an editor too, where that line keeps
+the words it had. Such a correction also takes with it whatever it adds after
+the Return, and dictation that sends its whole utterance again with each update
+carries a word it revised before the Return into every update after, each of
+which then sends nothing too, so the words said after that never reach the Mac.
+Heard as "send the bill", "send the bill⏎deploy", "send the build⏎deploy it",
+"send the build⏎deploy it now" and "Send the build.⏎Deploy it now." (⏎ the
+Return), such updates leave the Mac with "send the bill⏎deploy", in an editor
+too: " it now" never arrives (the third verification's harness). Nothing is
+sent twice either way, and where dictation types new words at the caret and
+makes each revision a replacement of its own, every word arrives and only the
+revision is left out; which way iPadOS's dictation goes is for the testers'
+"new line" step on a device to show (below). A later change could apply such an
+update's text from after its k-th Return or Tab, k being the Returns and Tabs
+in what is final, instead of refusing all of it. The person's own backspace
+still goes back across a Return (in an editor it joins the lines; in a chat
+that sent the line it deletes nothing), and what was before the deleted Return
+stays final. Korean's keyboard rebuilds the character before the syllable it is
+building together with it, so right after a Return it deletes the Return with
+the syllable and types both again: only the syllable goes from the Mac and
+back, and the Return goes once.
 
 After a click, a key or a pick, a correction of what was forgotten sends
 nothing when the text system hands back the range it took before (dictation's
