@@ -134,11 +134,13 @@ serves the root or `/docs`, never `/site`. So:
   sleeping display) between `<!-- Display wake` and `<!-- /Display wake -->`, the sound's (PR #94,
   Send Audio, a beta) between `<!-- Sound` and `<!-- /Sound -->`, the connect screen's tiles'
   (PR #117, privacy.html's items on the tiles' pictures and group names and on the request for the
-  picture once more as you disconnect) between `<!-- Tiles` and `<!-- /Tiles -->`, and Reverse
+  picture once more as you disconnect) between `<!-- Tiles` and `<!-- /Tiles -->`, Reverse
   Scrolling's (PR #159: privacy.html's item and support.html's section) between
-  `<!-- Reverse Scrolling` and `<!-- /Reverse Scrolling -->`. A republish before
-  those releases (for words that hold for the builds already out, such as support.html's on a Mac
-  asleep or restarted, or on a black picture) deletes the blocks of each release not out yet in the
+  `<!-- Reverse Scrolling` and `<!-- /Reverse Scrolling -->`, and support.html's item on the
+  pairing window and screen sharing (PR #157, Sill for Mac's Show the pairing window to screen
+  sharing) between `<!-- Pairing window` and `<!-- /Pairing window -->`. A republish before those
+  releases (for words that hold for the builds already out, such as support.html's on a Mac asleep
+  or restarted, or on a black picture) deletes the blocks of each release not out yet in the
   sill-site copy after the rsync below (the perl lines, one per marker) and puts privacy.html's
   date back to the one last published; then `grep -n -i clipboard ../sill-site/*.html` prints only
   privacy.html's log line ("which devices share the clipboard", true of the builds out too, as
@@ -146,8 +148,9 @@ serves the root or `/docs`, never `/site`. So:
   `grep -n -i keyframe ../sill-site/*.html`,
   `grep -n "wakes your Mac’s display" ../sill-site/*.html`,
   `grep -n -i -E 'sound|send audio' ../sill-site/*.html`,
-  `grep -n -i -E 'tiles|group name' ../sill-site/*.html` and
-  `grep -n -i 'reverse scrolling' ../sill-site/*.html` print nothing. The release that ships each
+  `grep -n -i -E 'tiles|group name' ../sill-site/*.html`,
+  `grep -n -i 'reverse scrolling' ../sill-site/*.html` and
+  `grep -n -i 'screen sharing' ../sill-site/*.html` print nothing. The release that ships each
   deletes its markers in `site/` and keeps the words.
 - Once sill is public, it can serve the site itself: `git subtree push --prefix site origin gh-pages`,
   then Settings › Pages › gh-pages, / (root). Retire sill-site then.
@@ -161,6 +164,7 @@ perl -0pi -e 's/[ \t]*<!-- Display wake:.*?<!-- \/Display wake -->\n//gs' ../sil
 perl -0pi -e 's/[ \t]*<!-- Sound:.*?<!-- \/Sound -->\n//gs' ../sill-site/*.html   # only before the sound's release
 perl -0pi -e 's/[ \t]*<!-- Tiles:.*?<!-- \/Tiles -->\n//gs' ../sill-site/*.html           # only before the tiles' release
 perl -0pi -e 's/[ \t]*<!-- Reverse Scrolling:.*?<!-- \/Reverse Scrolling -->\n//gs' ../sill-site/*.html   # only before Reverse Scrolling's release
+perl -0pi -e 's/[ \t]*<!-- Pairing window:.*?<!-- \/Pairing window -->\n//gs' ../sill-site/*.html   # only before the release with PR #157
 git -C ../sill-site add -A && git -C ../sill-site commit -m "Update the site" && git -C ../sill-site push
 ```
 
