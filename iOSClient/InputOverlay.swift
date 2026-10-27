@@ -669,13 +669,16 @@ final class InputOverlayView: UIView, UITextInput, UIGestureRecognizerDelegate {
     }
 
     /// What the text system's edit leaves for the Mac: text, and a backspace for each character to
-    /// delete (as the keyboard's own backspace goes); the composition label follows. A tail grown past
-    /// `TextComposition.limit` is trimmed at the next turn, outside the text system's call.
+    /// delete (as the keyboard's own backspace goes); the composition label follows. A Return or a Tab
+    /// among the text has made what came before it final (`TextComposition.fence`): what was typed is
+    /// kept, as are the text system's positions, and no later edit reaches back across it. A tail grown
+    /// past `TextComposition.limit` is trimmed at the next turn, outside the text system's call.
     private func typed(_ outputs: [TextComposition.Output]) {
         for output in outputs {
             switch output {
             case .text(let text):
-                Self.textinput("sent \(text.debugDescription)")
+                Self.textinput("sent \(text.debugDescription)" + (TextInputRules.carriesReturnOrTab(text)
+                    ? "; what was typed up to its last Return or Tab is final: \(composition.fence) of \(composition.sent.utf16.count) units" : ""))
                 send(.text(text))
             case .backspaces(let count):
                 Self.textinput("sent \(count) backspace" + (count == 1 ? "" : "s"))
@@ -697,12 +700,13 @@ final class InputOverlayView: UIView, UITextInput, UIGestureRecognizerDelegate {
 
     /// The Mac's caret is about to move some other way than typing (a click, an arrow, a shortcut, a pick,
     /// from this view or from anywhere else: `InputOverlayProxy.caretMayHaveMoved`, called before what
-    /// moves it goes out), or this view has just typed a Return or a Tab (`TextInputRules.movesCaret`: a
-    /// chat sent the line, a terminal ran it): what an input method is still composing goes to the Mac
-    /// first, as it stands, where the caret still is (`TextComposition.forget`), as a tap in a text field
-    /// keeps a composition; then what was typed, which can no longer be revised there, is forgotten, and
-    /// the text system is told. A composition kept on the device across it was lost: the input method,
-    /// told the document changed, dropped it at the next key (Zhuyin in the simulator, 2026-10-20).
+    /// moves it goes out): what an input method is still composing goes to the Mac first, as it stands,
+    /// where the caret still is (`TextComposition.forget`), as a tap in a text field keeps a composition;
+    /// then what was typed, which can no longer be revised there, is forgotten, and the text system is
+    /// told. A composition kept on the device across it was lost: the input method, told the document
+    /// changed, dropped it at the next key (Zhuyin in the simulator, 2026-10-20). A Return or a Tab this
+    /// view types is no such move: what was typed is kept, what came before it final
+    /// (`TextComposition.fence`), so dictation's "new line" said mid-utterance loses none of its words.
     func forgetTyped() {
         guard !composition.sent.isEmpty || composition.isComposing else { return }
         if let marked = composition.marked {
@@ -1028,7 +1032,7 @@ extension InputOverlayView {
     func replace(_ range: UITextRange, withText text: String) {
         guard let (range, taken) = offsets(range) else { return }
         Self.textinput("replace (\(range.location),\(range.length)) with \(text.debugDescription)"
-                       + (taken == composition.generation ? "" : ", a range taken before a forget: nothing sent"))
+                       + (composition.refusal(range, with: text, taken: taken).map { ", \($0.rawValue): nothing sent" } ?? ""))
         setOwnPointer(nil, .none)
         typed(composition.replace(range, with: text, taken: taken))
     }
@@ -1048,7 +1052,10 @@ extension InputOverlayView {
             composition.select(asked)
             if asked != composition.selectedRange {
                 Self.textinput("selectedTextRange (\(asked.location),\(asked.length)) asked for, not taken: "
-                               + (composition.isComposing ? "the input method composes" : "the caret stays at the end"))
+                               + (composition.isComposing ? "the input method composes"
+                                  : asked.length > 0 && asked.location < composition.fence
+                                    ? "it starts before a Return or a Tab typed, the caret stays at the end"
+                                    : "the caret stays at the end"))
             } else if composition.selection != nil {
                 Self.textinput("selected (\(asked.location),\(asked.length)) of what was typed, for the next edit")
             }
@@ -1210,10 +1217,10 @@ final class InputOverlayProxy {
     }
     /// Something that may move the Mac's caret is going to the Mac, from anywhere on the stream screen
     /// (StreamClient.onCaretMayMove, before it goes out: the portrait trackpad's clicks, the key row's
-    /// keys, a pick, a menu item, a gesture, and the input view's own clicks and keys and a Return or a
-    /// Tab it types), or the streamed source changed: what an input method is still composing goes to the
-    /// Mac first, as it stands, and the input view forgets what it remembers of what was typed (#138,
-    /// `forgetTyped`), so a correction dictation makes later never backspaces where the caret is now.
+    /// keys, a pick, a menu item, a gesture, and the input view's own clicks and keys), or the streamed
+    /// source changed: what an input method is still composing goes to the Mac first, as it stands, and
+    /// the input view forgets what it remembers of what was typed (#138, `forgetTyped`), so a correction
+    /// dictation makes later never backspaces where the caret is now.
     func caretMayHaveMoved() { view?.forgetTyped() }
 
     // From the view (only the current one counts)

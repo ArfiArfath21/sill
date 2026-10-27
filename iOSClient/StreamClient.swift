@@ -328,13 +328,13 @@ final class StreamClient: ObservableObject {
     /// Where the sprite's tip goes, a fraction of the video frame, or nil to hide it: the display
     /// view's `setPointer`, set by `StreamView.wirePointer`. Up to 120 times a second. Main thread.
     var onPointerChange: ((CGPoint?) -> Void)?
-    /// Something that may move the Mac's caret is about to go to the Mac: a click or a key going down, or
-    /// a Return or a Tab typed as text (TextInputRules.movesCaret), whichever view sent it, a pick, a
-    /// launch, a window's button, a menu item or a gesture. Called before it is queued, so what the stream
-    /// screen's input view sends of a composition still in progress goes out first, where the caret still
-    /// is; the view then forgets what it remembers of what was typed (InputOverlayProxy.caretMayHaveMoved,
-    /// #138). A typed Return or Tab comes from the input view's own edit, which has ended any composition:
-    /// the forget then sends nothing ahead of it, and the text goes whole. Set by StreamScreen. Main thread.
+    /// Something that may move the Mac's caret is about to go to the Mac: a click or a key going down
+    /// (TextInputRules.movesCaret), whichever view sent it, a pick, a launch, a window's button, a menu
+    /// item or a gesture. Called before it is queued, so what the stream screen's input view sends of a
+    /// composition still in progress goes out first, where the caret still is; the view then forgets what
+    /// it remembers of what was typed (InputOverlayProxy.caretMayHaveMoved, #138). Typed text never calls
+    /// it, a Return or a Tab among it neither: the input view keeps what was typed, and what came before
+    /// the Return final (TextComposition.fence). Set by StreamScreen. Main thread.
     var onCaretMayMove: (() -> Void)?
     /// Q1's flip only (`PointerPresence.trackpadLinger`): the one timer that re-renders when the
     /// trackpad's pointer is due to go. Idle while the linger is nil, as it is by default.
@@ -3383,8 +3383,7 @@ final class StreamClient: ObservableObject {
         // Every input passes here, a hover and a flick's coast included: the tour's rule counts it
         // as something happening (StreamScreen.considerTour).
         lastInputAt = ProcessInfo.processInfo.systemUptime
-        // A click or a key from any view, or a Return or a Tab typed: what the input view remembers of
-        // what was typed goes (#138).
+        // A click or a key from any view: what the input view remembers of what was typed goes (#138).
         if TextInputRules.movesCaret(event) { onCaretMayMove?() }
         #if DEBUG
         // The tour takes every touch and the keyboard while it shows, and holds back the pointer's
