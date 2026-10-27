@@ -366,8 +366,8 @@ check("kinds 18–22 parse as macInfo, pairRequest, pairResult, pairingWanted, g
 check("kind 23 is hello (update-notice); 24, 25 and 27 the Mac's menus; 26 the Mac's pointer",
       header(23)?.kind == .hello && header(24)?.kind == .macMenu && header(25)?.kind == .pressMenuItem
       && header(27)?.kind == .fetchMenu && header(26)?.kind == .macPointer)
-check("kind 28 is gesture (trackpad gestures), 29 unknown (#66's, skipped), 43 audio (the Mac's sound), 44 unknown (skipped)",
-      header(28)?.kind == .gesture && header(29)?.kind == .unknown && header(43)?.kind == .audio && header(44)?.kind == .unknown)
+check("kind 28 is gesture (trackpad gestures), 29 unknown (#66's, skipped), 43 audio (the Mac's sound), 44 the keyframe request",
+      header(28)?.kind == .gesture && header(29)?.kind == .unknown && header(43)?.kind == .audio && header(44)?.kind == .keyframeRequest)
 check("kind 32 is the clipboard; 29, 30, 31 and 33 unknown (skipped)",
       header(32)?.kind == .clipboard && [29, 30, 31, 33].allSatisfy { header(UInt8($0))?.kind == .unknown })
 check("kinds 16 and 17 unchanged", header(16)?.kind == .hostSettings && header(17)?.kind == .changeSettings)
