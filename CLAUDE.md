@@ -5885,10 +5885,11 @@ good.
   `keyboardHeight(for:)`, only while a window streams: `largerPicture(switchOn:
   streaming:)` and `Streaming`, and only where it is larger: `largerPictureGains`,
   `offersLargerPicture(screen:)`) no strip, the room over the keyboard, Menus in
-  row 1 (`buttonsBesideMenus`), and Menus and Sound there from 384 pt
-  (`row1Beside`), the drawer above row 1, the pane at the
-  picture's shape (`pane(video:)`) and its span (`trackpadSpan(video:)`); pure,
-  `Tests/checks/phone-portrait`), `DuoPosture`
+  row 1 (`buttonsBesideMenus`) and no Sound button (the Settings panel's switch
+  alone, docs/audio-plan.md's Q10: `sound` and `stripBesideBoth` are the strip's
+  empty place, `menusBesideSound` is `menus`), the drawer above row 1, the pane
+  at the picture's shape (`pane(video:)`) and its span (`trackpadSpan(video:)`);
+  pure, `Tests/checks/phone-portrait`), `DuoPosture`
   (the iPhone Duo's posture and the rules that follow from it, docs/iphone-duo-plan.md:
   `FoldInfo`, inferred before iOS 27.1 or the fold's band; the laptop pose's
   split at the real fold and open flat's at the picture's shape, the book

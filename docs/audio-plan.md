@@ -288,14 +288,20 @@ the device's own delays.
     call (Q1).
   - The Mac's sound leaving the Mac is something the Mac's settings should show.
   - A device can turn it on from its Settings panel, like the other stream settings, and Sill.app
-    saves it (Q8).
+    saves it (Q8). **Since the beta (2026-10-20), the Mac's alone** (Q8's alternative, taken as
+    the beta's default): only Sill.app's menu and Settings, and the CLI's `--audio`, set it; the
+    Mac refuses a device's change of it, on or off, from either door, naming it in the log, and
+    the device's panel shows the Mac's value, read-only (§4.1, §7.7).
 - **Sound: a button in the device's bars,** only while the Mac sends sound: in every bar that holds
   it, and on a phone held upright at the end of the thumbnails' row, row 1's approved five kept
   (§7.6; with Larger Picture, which has no thumbnails' row, row 1 before Settings from 384 pt:
   "Merged with main at 5c323e6"); and a switch for the same thing in the Settings panel's group for this device, on every
   layout, the only one where no bar holds the button (a Slide Over). It mutes this device alone, at
   once, without asking the Mac. The Mac keeps sending (16 KB/s), so unmuting is quick too (about
-  0.1 s, while the device's audio engine starts). The device remembers it.
+  0.1 s, while the device's audio engine starts). The device remembers it. **Since the beta
+  (2026-10-20):** no Sound button in Larger Picture's row 1, which stays main's (Apps, Menus while
+  the Mac sent its menus, Aa, Keyboard, Desktop, Settings); there, as in a Slide Over, the panel's
+  switch is the only Sound control (Q10, as the beta took it; §7.6).
 
 ### Not in this step
 
@@ -778,7 +784,9 @@ PR #37 the loopback one is among TestHooks' door hooks too, which a test host al
   more: `Audio on for this run: devices that play sound get the streamed app's sound, or the whole
   Mac's for the Desktop.`
 - **`--synthetic --audio`:** the test tone (§4.2).
-- **A device's change** lasts until SillHost quits, as every setting does.
+- **A device's change** lasts until SillHost quits, as every setting does. **Since the beta
+  (2026-10-20):** there is none to keep; the host refuses it (Q8, §4.1), so only `--audio` turns
+  it on.
 - **Whichever door** (the plain home door by default; PR #37's `--pairing` puts it behind TLS; the
   remote door with `--remote`): the sound goes to every device whose hello plays it.
 - **Without `--audio`: stdout byte for byte** (H2), idle and streaming, whatever the devices'
@@ -1339,7 +1347,9 @@ Commit messages end with the session's attribution lines.
 - **Row 1 of the phone's arrangement stays as Noah approved it** (five buttons), and the Menus
   button never gives way to Sound: a bar with room for one of them shows Menus (§7.6). Larger
   Picture (#79), which has no row 2, is the exception: Menus and, from 384 pt, Sound join its row 1
-  ("Merged with main at 5c323e6"; for Noah, Q10).
+  ("Merged with main at 5c323e6"; for Noah, Q10). **Since the beta (2026-10-20), Menus alone:**
+  Sound never joins Larger Picture's row 1, which stays main's, and the Settings panel's switch is
+  the sound's only control there (Q10, as the beta took it; "The beta").
 - **Apple frameworks only** (AudioToolbox, AVFAudio, ScreenCaptureKit). New iOS files need their
   four pbxproj entries by hand. Swift 5 language mode.
 
@@ -2068,7 +2078,7 @@ the sound:
   is the Settings panel's switch alone. The standard arrangement is unchanged: Sound ends row 2.
   Checked by `phone-portrait`'s cases and mutants A1–A4 and `tour`'s case for the Sound button in
   Larger Picture's row 1. This departs from §13's hard rule and Q10's default, and is left to Noah
-  (Q10).
+  (Q10; the beta took it out again, `row1Beside` with it: "The beta").
 
 Verified (2026-10-18): `swift build -c release`; the iOS app from a scratch copy with the iOS 27.1
 SDK's names stubbed (Xcode 27.0 here), Debug and Release for the generic simulator, only the known

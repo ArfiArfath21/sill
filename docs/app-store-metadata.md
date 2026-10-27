@@ -98,9 +98,12 @@ These texts are only true once these are:
   (iPad)"), sound from the Mac, a beta (docs/audio-plan.md's P1 to P16:
   heard on the device in step with the picture, the Sound button, headphones
   and AirPods, the silent switch; until they pass, leave its bullet and its
-  What's New paragraph out), Apple Pencil hover, and 120 frames per second, which no device
-  has shown yet (the iPad mini is 60 Hz). For that one, stream a moving window, then the whole
-  desktop, to a ProMotion iPhone or iPad. Sill.app's log should say
+  What's New paragraph out, but delete "Sill doesn’t play sound from your
+  Mac." all the same from any version whose build carries the sound: a device
+  plays it once the Mac turns on Send Audio), Apple Pencil hover, and 120
+  frames per second, which no device has shown yet (the iPad mini is 60 Hz).
+  For that one, stream a moving window, then the whole desktop, to a
+  ProMotion iPhone or iPad. Sill.app's log should say
   "Streaming … 120 fps", and its `client …` lines for the device, or the
   device's row in the Sill menu, should stay near 120 fps. If they don't,
   delete the bullet "Up to 120 frames per second…". If 120 holds only for
@@ -298,8 +301,9 @@ The App Store shows another description with 0.5.1 (3,302 characters,
 beginning "Sill shows a window from your Mac, or its whole desktop…"), which
 this file doesn't hold. Paste this block at the next version: it has what that
 one leaves out, the Mac requirement, iPhone Duo and away from home among them.
-Its "no sound" line is for a version without the sound: the next one, which
-carries it as a beta, swaps it for the sound's bullet (below).
+Its "no sound" line is for a version without the sound: delete it from any
+version whose build carries the sound (the next one, as a beta), whether or
+not the sound's bullet (below) is in yet.
 
 ```text
 Sill puts your Mac on your iPhone and iPad. Pick any window, or the whole desktop, and use it with touch, a trackpad, a keyboard or Apple Pencil. Your apps keep running on your Mac. Sill shows them and sends back what you do.
@@ -356,10 +360,12 @@ touch", after the one that starts "Type with":
 ```
 
 **For the next version, with the sound** (PR #94, a beta feature; docs/audio-plan.md: it ships with
-the next submission of both apps, and needs Sill for Mac from the same release): add this bullet to
-"Smooth and sharp", after the one that starts "Set quality", and delete "Sill doesn’t play sound from
-your Mac." from "Good to know". "Beta" goes on the feature, never on the app: guideline 2.2 keeps
-betas and trials of an app off the App Store (TestFlight is for those).
+the next submission of both apps, and needs Sill for Mac from the same release): delete "Sill
+doesn’t play sound from your Mac." from "Good to know" in every version whose build carries the
+sound, with or without this bullet, since a device plays it once the Mac turns on Send Audio; and
+once the sound's device tests pass (Before you submit), add this bullet to "Smooth and sharp",
+after the one that starts "Set quality". "Beta" goes on the feature, never on the app: guideline
+2.2 keeps betas and trials of an app off the App Store (TestFlight is for those).
 
 ```text
 • Hear sound from your Mac in step with the picture, a beta feature that is off until you turn on Send Audio in Sill for Mac. Mute it on any device with the Sound button.
@@ -799,11 +805,11 @@ Safe:
   3,044 characters; its keyboard paragraph of the next What's New 247.
 - With the sound (PR #94, a beta feature, 2026-10-20), the blocks as the next version would have
   them: the description with its sound bullet and without "Sill doesn’t play sound from your Mac."
-  3,174 characters (3,044 now, each without the block's last newline); the next What's New's sound
-  paragraph 303 characters (the draft 1,101); the review notes with their WHAT TO TRY line and
-  without "It lets people use their Mac from their iPhone or iPad." 3,995 bytes with the block's
-  last newline, 3,994 without (local-only 3,752), of 4,000, all ASCII. "Beta" is on the feature,
-  never on the app (guideline 2.2).
+  3,174 characters (3,044 now, and 3,003 without that line while the bullet waits, each without
+  the block's last newline); the next What's New's sound paragraph 303 characters (the draft
+  1,101); the review notes with their WHAT TO TRY line and without "It lets people use their Mac
+  from their iPhone or iPad." 3,995 bytes with the block's last newline, 3,994 without (local-only
+  3,752), of 4,000, all ASCII. "Beta" is on the feature, never on the app (guideline 2.2).
 - The encryption key, now in `iOSClient/Info.plist`: Release builds of this
   branch for the simulator and for a device each have
   `"ITSAppUsesNonExemptEncryption" => false` in the built Sill.app's

@@ -177,13 +177,13 @@ a permission, a device or the network, and never anything that links VideoToolbo
 
 - `audio` (kind 43, the Mac's sound; docs/audio-plan.md): `protocol`, `pointer-control` and
   `compatibility` expect 28 to be the trackpad gesture, 32 the clipboard (#78, merged), 43 the
-  sound, and the rest of 29 to 42 (PR #66's) and 44 and up to read as `.unknown` (`menus`: 28 and
-  43, and 29 and 44 unknown). The audio mutants that renumber a kind do so onto numbers no plan will
-  take, 250 to 254 (`menus`' "the fetch at 250", `pointer-control`'s "kind 26 numbered 251" and "…
-  252", `compatibility`'s "kind 28 as 250" and "kind 43 as 253", `protocol`'s "kind 43 as 254"),
-  since a kind renumbered onto a taken one no longer compiles: the next kind moves none of them. The
-  clipboard's renumber kind 32 onto 31 (`compatibility`), 30 (`protocol`) and 33 (`clipboard`),
-  which move if #66 takes those.
+  sound, 44 the keyframe request (#93, merged), and the rest of 29 to 42 (PR #66's) and 45 and up
+  to read as `.unknown` (`menus`: 28, 43 and 44, and 29 unknown). The audio mutants that renumber
+  a kind do so onto numbers no plan will take, 250 to 254 (`menus`' "the fetch at 250",
+  `pointer-control`'s "kind 26 numbered 251" and "… 252", `compatibility`'s "kind 28 as 250" and
+  "kind 43 as 253", `protocol`'s "kind 43 as 254"), since a kind renumbered onto a taken one no
+  longer compiles: the next kind moves none of them. The clipboard's renumber kind 32 onto 31
+  (`compatibility`), 30 (`protocol`) and 33 (`clipboard`), which move if #66 takes those.
 
 `remote-bundle`'s pacing (item 1) and the link's judgement (item 3), which merged with PR #39, are
 also measured on the host's side by the pacing harness (`Scripts/pacing/run.sh`), which needs no
