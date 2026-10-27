@@ -93,7 +93,8 @@ package final class StreamCoordinator {
     private var encoder: HEVCEncoder? { didSet { encoderBox.current = encoder } }
     /// The display's own pixel scale under the running pipeline (CaptureScale): ScreenCaptureKit's for
     /// its filter (`pointPixelScale`), Sill's virtual display's (2) for a staged window, nil for the
-    /// test pattern. Set with `active` as a pipeline starts (`startPipeline`).
+    /// test pattern. Set with `active` as a pipeline starts (`startPipeline`); the injector lands
+    /// input on that display's last pixel row and column at most (InputLanding).
     private var streamDisplayScale: CGFloat?
     /// Hardware HEVC normally. When a hardware session stops returning frames, or the launch probe
     /// gets no answer, the stream runs on the software encoder at half the capture scale and up to
@@ -1590,7 +1591,7 @@ package final class StreamCoordinator {
     /// `active`. Throws with `active` untouched if either refuses; the caller decides what to do.
     /// `title` and `kind` describe the stream in the app's menu. `displayScale`: the source's display's
     /// own pixel scale (nil for the test pattern), which `width` and `height` were held to
-    /// (CaptureScale).
+    /// (CaptureScale) and the injector lands input by (InputLanding).
     private func startPipeline(source: StreamSource, filter: SCContentFilter?, sourceRect: CGRect?, displayScale: CGFloat?,
                                width: Int, height: Int, describe: String,
                                title: String, kind: HostStatusSnapshot.Stream.Kind) async throws {
@@ -1625,6 +1626,7 @@ package final class StreamCoordinator {
         encoder = enc
         active = source
         streamDisplayScale = displayScale
+        injector.displayScale = displayScale
         print("Streaming \(describe) at \(width)×\(height), \(fps) fps, \(streamBitrate / 1_000_000) Mbps")
         status.update {
             $0.stream = HostStatusSnapshot.Stream(kind: kind, title: title, width: width, height: height, fps: fps,
@@ -1822,7 +1824,7 @@ package final class StreamCoordinator {
         let now = CFAbsoluteTimeGetCurrent()
         guard now - lastClickLog > 1 else { return }
         lastClickLog = now
-        let p = CGPoint(x: rect.minX + rect.width * x, y: rect.minY + rect.height * y)
+        let p = InputLanding.point(x: x, y: y, in: rect, displayScale: streamDisplayScale)
         let top = Self.topmostWindow(at: p)
         let verdict = top?.id == id ? "the streamed window" : "window \(top.map { String($0.id) } ?? "none"), not the streamed \(id)"
         print("Click at (\(Int(p.x)),\(Int(p.y))) in (\(Int(rect.minX)),\(Int(rect.minY)),\(Int(rect.width))×\(Int(rect.height))) → \(verdict)")
@@ -1833,7 +1835,7 @@ package final class StreamCoordinator {
         guard let rect = currentSourceRect() else { return nil }
         switch event {
         case .pointer(_, let x, let y), .scroll(let x, let y, _, _), .scrollGesture(_, let x, let y):
-            return CGPoint(x: rect.minX + rect.width * x, y: rect.minY + rect.height * y)
+            return InputLanding.point(x: x, y: y, in: rect, displayScale: streamDisplayScale)
         default: return nil
         }
     }

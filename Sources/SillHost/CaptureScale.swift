@@ -48,6 +48,12 @@ enum CaptureScale {
         usable(CGFloat(pointPixelScale))
     }
 
+    /// One pixel of a display of scale `displayScale`, in points: half a point at 2x, a point at 1x,
+    /// and a point when there is no scale (InputLanding's last row and column).
+    static func pixel(displayScale: CGFloat?) -> CGFloat {
+        1 / (usable(displayScale) ?? 1)
+    }
+
     private static func usable(_ s: CGFloat?) -> CGFloat? {
         guard let s, s.isFinite, s > 0 else { return nil }
         return s
@@ -65,5 +71,41 @@ enum CaptureScale {
     /// 1 → "1x", 2 → "2x", 1.5 → "1.5x".
     static func times(_ s: CGFloat) -> String {
         s.isFinite && s == s.rounded() && abs(s) < 1_000 ? "\(Int(s))x" : "\(Double(s))x"
+    }
+}
+
+/// Where a device's position lands on the Mac: its fraction of the streamed source's rectangle, at
+/// most on the rectangle's last row and column of pixels.
+///
+/// A device sends positions as fractions of the picture, 0 to 1 with both ends in: the portrait
+/// trackpad's cursor stops at 1 (PadCursor.clamped), and the iPad's own pointer, a Pencil or a drag
+/// past the picture's edge is held to it (InputOverlay.normalized). Mapped as `minY + y × height`,
+/// the bottom edge is `rect.maxY`, the row past the last: no row of the source (CGRect's
+/// containment and PointerControl.fraction's inside test both leave it out) but the next display's
+/// first, or what lies below a window. A drag to the bottom of the Desktop's picture of a 2560×1440
+/// display was posted at y = 1440.0, one row past the last (1439): where the window server puts the
+/// cursor then is its choice (onto a display arranged below, if there is one), never the last row
+/// for certain, and an auto-hidden Dock shows only for a pointer at the display's bottom edge
+/// (Noah, 2026-10-27: it never came up). So each fraction is held to 0…1 and lands no further than
+/// `maxX - 1/scale` and `maxY - 1/scale`, the top-left of the last pixel column and row at the
+/// display's own scale (`displayScale`, as CaptureScale has it; one point when there is none): on a
+/// 1x display 1439 of 1440, on a 2x one 981.5 of 982, Sill's virtual display 2x.
+///
+/// Pure: Foundation and CoreGraphics, checked with CaptureScale (Tests/checks/capture-scale).
+enum InputLanding {
+    /// `x` and `y` as fractions of `rect` (top-left global points, InputInjector's), held to 0…1 (a
+    /// NaN to 0) and to the last pixel column and row, never left of or above the rectangle (one
+    /// narrower than a pixel keeps its origin).
+    static func point(x: Double, y: Double, in rect: CGRect, displayScale: CGFloat?) -> CGPoint {
+        let pixel = CaptureScale.pixel(displayScale: displayScale)
+        let px = rect.minX + CGFloat(unit(x)) * rect.width
+        let py = rect.minY + CGFloat(unit(y)) * rect.height
+        return CGPoint(x: max(rect.minX, min(px, rect.maxX - pixel)),
+                       y: max(rect.minY, min(py, rect.maxY - pixel)))
+    }
+
+    /// A fraction held to 0…1; NaN (which no JSON carries) to 0.
+    static func unit(_ v: Double) -> Double {
+        v.isNaN ? 0 : min(max(v, 0), 1)
     }
 }
