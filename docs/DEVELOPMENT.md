@@ -202,7 +202,10 @@ First run: macOS asks for Screen Recording for Terminal
 Knobs live in `Sources/SillHost/HostConfig.swift` (`HostConfig.standard`):
 maxFPS, captureScale, bitrate, prioritizeSpeed. The CLI uses them as they are;
 Sill.app starts from them and changes them from its menu and Settings. Start
-at the defaults, change one at a time.
+at the defaults, change one at a time. captureScale (Resolution: 2 Retina, 1
+Standard) is pixels per point at most: a capture runs at the lesser of it and
+its display's own scale, so on a 1x display both are 1x (a window captured
+there at 2x showed in the top-left quarter of the picture before 2026-10-27).
 The stream rate is the device's own: each client reports its panel's ceiling
 (120 on ProMotion iPads and iPhones, 60 on the iPad mini) and 60 while Low
 Power Mode is on; the host runs capture, encoder and the virtual display at
@@ -1570,8 +1573,14 @@ AirDrop, Sidecar and Universal Control can hold AWDL on too.
   ms each …; a new session takes 9 ms …"); if a new session is no faster
   (another app sharing the encoder, say), the log says that and the stream
   keeps it.
-- Resolution: Standard (`captureScale: 1`, four times fewer pixels to encode;
-  it never hit the slow state).
+- Resolution: Standard (`captureScale: 1`, four times fewer pixels to encode
+  on a Retina display; it never hit the slow state). On a display that is not
+  Retina (1x: an external 2560×1440 display at its own resolution, say) the
+  two capture alike: a capture never runs above its display's own pixel scale
+  (CaptureScale, from ScreenCaptureKit's `pointPixelScale`), so Retina there
+  is 1x already and Standard changes nothing. The capture line says which
+  ("Capture started: 2560×1440 … filter (2560.0, 1440.0) scale 1.0, capturing
+  at 1x, the display's own (2x asked)").
 - Prioritize encoding speed (`prioritizeSpeed: true`).
 - Lower bitrate, or wire the phone to the Mac and repeat to isolate Wi-Fi.
 - Check the Mac's Console for "dropped" from the capture; raise `queueDepth`.
