@@ -121,6 +121,10 @@ func rowRecordsPolicy() {
     let withTest = P.rowRecords([k(mac): paired], listed: [(k(mac), nil), (k(mac, 0), testRow)])
     check("records: a test row of a result's name never lends the result its record",
           P.rowRecords([:], listed: [(k(mac), nil), (k(mac, 0), testRow)])[k(mac)] == nil && withTest[k(mac)] == paired && withTest[k(mac, 0)] == testRow)
+    // Two test rows of one name (a move test's and a path test's, say) share their key, browser 0: the row,
+    // built from the first, is read with the first's record, as the rule reads a key listed twice.
+    check("records: two test rows of one name, one key: read with the first's record",
+          P.rowRecords([:], listed: [(k(mac, 0), testRow), (k(mac, 0), Rec(tag: nil, door: .plain))]) == [k(mac, 0): testRow])
     let twoDomains = P.rowRecords(P.rowRecords([:], listed: [(k(mac, 1, "local."), paired)]),
                                   listed: [(k(mac, 1, "example.com."), nil), (k(mac, 1, "local."), nil)])
     check("records: a name in two domains, two results: the one with no record of its own never reads the other's",
