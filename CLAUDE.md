@@ -6456,9 +6456,9 @@ plays through the Mac's speakers, never in a gate) with `-SillSoundVolume 0`,
 console's "audio: …" lines say what happened (the format, the engine and its
 latencies, a line a second, each jump with its size and cause, and in manual
 rendering where each click of a synthetic host's test tone was heard),
-`-SillSettingsScript '<t> set K=V[,K=V] | suggestion; …'` (a live session to a
-synthetic host on loopback: the panel's controls and the link callout's button,
-t seconds after the first window list), `-SillMoveHomeTest to:HOST:PORT|refused|
+`-SillSettingsScript '<t> set K=V[,K=V] | suggestion | disconnect; …'` (a live
+session to a synthetic host on loopback: the panel's controls, the link
+callout's button and Disconnect, t seconds after the first window list), `-SillMoveHomeTest to:HOST:PORT|refused|
 other:PORT` (with `-SillDialSaved 1`: the saved Mac listed as a network row a
 second into the remote session at a door that speaks TLS, so the move home
 runs against a synthetic `--remote --pairing` host with SILL_TEST_REMOTE_ORIGIN

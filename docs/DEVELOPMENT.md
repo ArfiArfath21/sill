@@ -1210,7 +1210,9 @@ simulator:
   Disconnect asks any Mac for a keyframe before the session ends, whatever
   version it says (a test host says none). The console's `tiles:` lines say
   whether it was asked, when it came, and how the picture was decoded or why
-  none was kept.
+  none was kept. In a live session to a synthetic host on this Mac's
+  loopback, `-SillSettingsScript '8 disconnect'` takes the panel's Disconnect
+  8 s after the first window list.
 - `-SillLayerFail <s>[,<s>…]` (the normal app and `-SillLive 1`): at each of
   these seconds after the launch's first picture a frame that cannot decode
   goes onto the display layer, so the picture's recovery runs for real (the

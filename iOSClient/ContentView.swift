@@ -303,8 +303,9 @@ struct ContentView: View {
 ///   …" and nothing is sent. Point it only at `--synthetic` hosts.
 /// * `-SillSettingsScript '<t> <step>; …'` — the Settings panel's controls for the simulator gates,
 ///   in the normal app too: `set K=V[,K=V]` (a control's change), `suggestion` (the link
-///   callout's button) or `paste TEXT` (the clipboard's Paste with TEXT, as the system's Paste control
-///   hands it over), `t` seconds after the session's first window list, under `-SillInputScript`'s
+///   callout's button), `paste TEXT` (the clipboard's Paste with TEXT, as the system's Paste control
+///   hands it over) or `disconnect` (the panel's Disconnect: with tiles on, the fresh keyframe first),
+///   `t` seconds after the session's first window list, under `-SillInputScript`'s
 ///   guard (a session dialled to a loopback address whose host sends no version: never Sill.app).
 ///   The console says "settings script: …" (`SettingsScript`).
 /// * `-SillMoveHomeTest to:HOST:PORT|refused|other:PORT` — with `-SillDialSaved 1`: a second after the
@@ -895,9 +896,10 @@ enum InputScript {
 /// have no finger (docs/remote-bundle-plan.md S3): `t` is seconds since the session's first window
 /// list; a step is `set K=V[,K=V]` (maxFPS, bitrate, captureScale, prioritizeSpeed, virtualDisplay:
 /// a control's change, through `changeSettings` as the panel sends it), `suggestion` (the link
-/// callout's button: the Mac's suggestion as the panel offers it, or nothing when it offers none) or
+/// callout's button: the Mac's suggestion as the panel offers it, or nothing when it offers none),
 /// `paste TEXT` (the clipboard's Paste, as the system's Paste control hands TEXT over, through
-/// `sendClipboard`, the receipt and its note included: docs/clipboard-plan.md). The
+/// `sendClipboard`, the receipt and its note included: docs/clipboard-plan.md) or `disconnect` (the
+/// panel's Disconnect, through `disconnect`: with tiles on, the tile's fresh keyframe first). The
 /// console says "settings script: …" at each. It runs in the normal app too, under InputScript's
 /// guard: only a session dialled to a loopback address (a remote dial's winner through a relay
 /// counts) whose host's first window list has no version, so never Sill.app's settings.
@@ -932,6 +934,11 @@ enum SettingsScript {
             }
             print(when + "suggestion: the callout's button, “\(button.title)”")
             client.changeSettings(button.change)
+        case "disconnect":
+            // The panel's Disconnect, as its button calls it: with tiles on, the fresh keyframe first
+            // (ConnectionList.freshPicture), then the session's end and the tile's picture.
+            print(when + "disconnect")
+            client.disconnect()
         case "paste" where words.count >= 2:
             // The Settings group's Paste (or the chip's), as the system's Paste control hands over
             // what it read: the rest of the step is the text (docs/clipboard-plan.md, the receipt).
