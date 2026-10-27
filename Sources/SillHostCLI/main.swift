@@ -119,10 +119,10 @@ if let app = MenuSelfTest.requested(in: CommandLine.arguments) {
 // Otherwise SCStream aborts with "Assertion failed: (did_initialize), CGS_REQUIRE_INIT".
 _ = CGMainDisplayID()
 
-// `SillHost --virtual-display-selftest`: creates one 1000×700 pt @2× virtual display, reports
-// whether this process, CoreGraphics and ScreenCaptureKit see it, destroys it and exits. Needs
-// no permission for the display itself (SCShareableContent needs Screen Recording; it says so).
-// Runs under the AppKit loop like the real thing.
+// `SillHost --virtual-display-selftest [Hz] [WxH]`: creates one 1000×700 pt @2× virtual display (or
+// W×H points), reports whether this process, CoreGraphics and ScreenCaptureKit see it and the mode it
+// came up at, destroys it and exits. Needs no permission for the display itself (SCShareableContent
+// needs Screen Recording; it says so). Runs under the AppKit loop like the real thing.
 if CommandLine.arguments.contains("--virtual-display-selftest") {
     VirtualDisplaySelfTest.run()
 }
