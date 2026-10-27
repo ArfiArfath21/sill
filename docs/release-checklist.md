@@ -131,11 +131,13 @@ serves the root or `/docs`, never `/site`. So:
   `<!-- Clipboard` and `<!-- /Clipboard -->`, privacy.html's item on the device's request for the
   picture again after it was interrupted (PR #93, kind 44) between `<!-- Keyframe` and
   `<!-- /Keyframe -->`, the display wake's (PR #151, support.html's paragraph on Sill waking a
-  sleeping display) between `<!-- Display wake` and `<!-- /Display wake -->`, the sound's (PR #94,
-  Send Audio, a beta) between `<!-- Sound` and `<!-- /Sound -->`, the connect screen's tiles'
-  (PR #117, privacy.html's items on the tiles' pictures and group names and on the request for the
-  picture once more as you disconnect) between `<!-- Tiles` and `<!-- /Tiles -->`, Reverse
-  Scrolling's (PR #159: privacy.html's item and support.html's section) between
+  sleeping display) between `<!-- Display wake` and `<!-- /Display wake -->`,
+  support.html's paragraph on other languages and dictation (PR #147, issue #138) between
+  `<!-- Other languages` and `<!-- /Other languages -->`, the sound's (PR #94, Send
+  Audio, a beta) between `<!-- Sound` and `<!-- /Sound -->`, the connect screen's tiles'
+  (PR #117, privacy.html's items on the tiles' pictures and group names and on the request
+  for the picture once more as you disconnect) between `<!-- Tiles` and `<!-- /Tiles -->`,
+  Reverse Scrolling's (PR #159: privacy.html's item and support.html's section) between
   `<!-- Reverse Scrolling` and `<!-- /Reverse Scrolling -->`, and support.html's item on the
   pairing window and screen sharing (PR #157, Sill for Mac's Show the pairing window to screen
   sharing) between `<!-- Pairing window` and `<!-- /Pairing window -->`. A republish before those
@@ -147,6 +149,7 @@ serves the root or `/docs`, never `/site`. So:
   "what you copy" in its lede and "never what you copy" in both log lines are), and
   `grep -n -i keyframe ../sill-site/*.html`,
   `grep -n "wakes your Mac’s display" ../sill-site/*.html`,
+  `grep -n -i -E 'dictation|Control-Space' ../sill-site/*.html`,
   `grep -n -i -E 'sound|send audio' ../sill-site/*.html`,
   `grep -n -i -E 'tiles|group name' ../sill-site/*.html`,
   `grep -n -i 'reverse scrolling' ../sill-site/*.html` and
@@ -161,6 +164,7 @@ rsync -a --delete --exclude .git --exclude .github --exclude .nojekyll site/ ../
 perl -0pi -e 's/[ \t]*<!-- Clipboard:.*?<!-- \/Clipboard -->\n//gs' ../sill-site/*.html   # only before the clipboard's release
 perl -0pi -e 's/[ \t]*<!-- Keyframe:.*?<!-- \/Keyframe -->\n//gs' ../sill-site/*.html   # only before the keyframe request's release (PR #93)
 perl -0pi -e 's/[ \t]*<!-- Display wake:.*?<!-- \/Display wake -->\n//gs' ../sill-site/*.html   # only before the display wake's release
+perl -0pi -e 's/[ \t]*<!-- Other languages:.*?<!-- \/Other languages -->\n//gs' ../sill-site/*.html   # only before the release of other languages and dictation
 perl -0pi -e 's/[ \t]*<!-- Sound:.*?<!-- \/Sound -->\n//gs' ../sill-site/*.html   # only before the sound's release
 perl -0pi -e 's/[ \t]*<!-- Tiles:.*?<!-- \/Tiles -->\n//gs' ../sill-site/*.html           # only before the tiles' release
 perl -0pi -e 's/[ \t]*<!-- Reverse Scrolling:.*?<!-- \/Reverse Scrolling -->\n//gs' ../sill-site/*.html   # only before Reverse Scrolling's release
