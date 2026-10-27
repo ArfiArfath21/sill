@@ -773,6 +773,9 @@ Safe:
   3,044 characters; its keyboard paragraph of the next What's New 247.
 - With Reverse Scrolling (PR #159, 2026-10-20), a paragraph of 219 characters
   in the next What's New: the draft 1,017 characters; the rest unchanged.
+- With other languages and dictation (PR #147, merged with main after #159,
+  2026-10-26), its paragraph of 247 characters in the next What's New: the
+  draft 1,266 characters; the rest unchanged.
 - The encryption key, now in `iOSClient/Info.plist`: Release builds of this
   branch for the simulator and for a device each have
   `"ITSAppUsesNonExemptEncryption" => false` in the built Sill.app's

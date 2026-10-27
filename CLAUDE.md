@@ -5701,7 +5701,8 @@ good.
   declined, what is composed sent first and what was typed forgotten when the
   Mac's caret may move (`forgetTyped`, from `StreamClient.onCaretMayMove`, before
   it goes out: a pick, a launch, a window's button and a menu item follow the
-  queued input, `sendAfterInput`); `InputOverlayProxy`, who holds
+  queued input, `sendAfterInput`) and right after a Return or a Tab it types;
+  `InputOverlayProxy`, who holds
   the keyboard, carrying out `HardwareKeyboardPolicy`; `HardwareKeyboardMonitor`,
   GameController's keyboard), `TextComposition` (what the input view holds for
   iPadOS's text system: the composition, what was typed since the Mac's caret
@@ -5709,7 +5710,8 @@ good.
   a forget or a trim (`generation`), what the text system selects of it
   replaced by its next edit (`selection`: Korean's syllables built again);
   `TextInputRules`, which input
-  moves the Mac's caret and whose ⌃Space it is; pure,
+  moves the Mac's caret (a Return or a Tab typed as text among it:
+  `carriesReturnOrTab`) and whose ⌃Space it is; pure,
   `Tests/checks/text-composition`; pbxproj AC0138/FC0138), `HardwareKeyboardPolicy` (when the stream's input
   view holds the keyboard for a hardware keyboard and when it is the person's
   own; pure, `Tests/checks/hardware-keyboard`; pbxproj AC01/FC01), `KeyChords`
