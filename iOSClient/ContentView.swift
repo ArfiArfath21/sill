@@ -398,11 +398,18 @@ struct ContentView: View {
 ///   run learns is still saved.
 /// * `-Sill.connectionStyle tiles|list` and `-Sill.macGroups '{"HOMEPAIRING6":"Home"}'` — not harness
 ///   arguments either: the connect screen's arrangement and the saved Macs' groups (ConnectionList),
-///   by Mac ID, for one run, in the mock, under `-SillLive 1` and in the normal app. `-Sill.macGroups`
-///   writes nothing back (`'{}'` empties). A launch argument outranks what the app saves, so under
-///   `-Sill.connectionStyle` the switch beside the title changes nothing until the next run: to try
-///   the switch, write the default instead (`xcrun simctl spawn <udid> defaults write me.saffer.sill
-///   Sill.connectionStyle tiles`). With tiles, a saved Mac's session that ends keeps its picture in
+///   by Mac ID, for one run, in the mock, under `-SillLive 1` and in the normal app. Without either, and
+///   with nothing stored, the arrangement is tiles, the default since 2026-10-27
+///   (ConnectionList.defaultStyle); `-Sill.connectionStyle list` shows the list as main did by default.
+///   `-Sill.macGroups` writes nothing back (`'{}'` empties). A launch argument outranks what the app
+///   saves, so under `-Sill.connectionStyle` the switch beside the title changes nothing until the next
+///   run: to try the switch, write the default instead (with Sill not running, `plutil -replace
+///   Sill.connectionStyle -string list "$(xcrun simctl get_app_container <udid> me.saffer.sill
+///   data)/Library/Preferences/me.saffer.sill.plist"`; a `simctl spawn … defaults write` never reaches
+///   the app), or let `-SillStyleToggleAt <s>[,<s>…]` toggle it at
+///   those seconds after the connect screen shows, as the switch does (it stores the choice; the
+///   console says "connect: tiles → list at 4.0 s, …", and "connect: tiles (Sill.connectionStyle unset)"
+///   as each connect screen shows). With tiles, a saved Mac's session that ends keeps its picture in
 ///   Library/Caches/SillPreviews (none is taken while the list shows, which hides the kept ones and keeps
 ///   their files until tiles come back: ConnectionList.previewPlan, StreamClient.syncPreviews): the session's
 ///   last keyframe, decoded (KeyframePicture), never a snapshot of the screen, and Disconnect asks the
@@ -1002,8 +1009,10 @@ struct ConnectScreen: View {
     @Environment(\.dynamicTypeSize) private var typeSize
     /// The Duo's hinge (iOS 27.1): with the fold, where the column goes (ConnectLayout).
     @Environment(\.duoEnvironment) private var duoEnvironment
-    /// Rows or tiles on the connect screen (ConnectionList).
-    @AppStorage(ConnectionList.styleKey) private var styleRaw = ConnectionList.Style.list.rawValue
+    /// Rows or tiles on the connect screen (ConnectionList): what the switch beside the title or a saved
+    /// Mac's menu stored, nil while nothing is, which `ConnectionList.storedStyle` reads as the default
+    /// (tiles). Written only by `toggleStyle`.
+    @AppStorage(ConnectionList.styleKey) private var styleRaw: String?
     /// The saved Mac whose New Group… alert is up, and the name typed there.
     @State private var newGroupFor: String?
     @State private var newGroupName = ""
@@ -1147,6 +1156,10 @@ struct ConnectScreen: View {
             announce(client.status)
             // The style changed in another Sill window while this one streamed: its pictures follow it.
             client.syncPreviews(to: ConnectionList.storedStyle(styleRaw))
+            #if DEBUG
+            print("connect: \(style.rawValue) (Sill.connectionStyle \(styleRaw ?? "unset"))")
+            scheduleStyleToggles()
+            #endif
         }
         .onChange(of: client.status) { _, line in announce(line) }
     }
@@ -1156,6 +1169,32 @@ struct ConnectScreen: View {
         guard !line.isEmpty, line != StreamClient.lookingOnNetwork, line != StreamClient.lookingNearby else { return }
         AccessibilityNotification.Announcement(line).post()
     }
+
+    /// The switch beside the title, and Show as List/Tiles in a saved Mac's menu: stores the other style,
+    /// the person's choice from then on (ConnectionList.storedStyle), in every Sill window.
+    private func toggleStyle() {
+        styleRaw = style.toggled.rawValue
+    }
+
+    #if DEBUG
+    /// `-SillStyleToggleAt <s>[,<s>…]`: at each of these seconds after the connect screen shows, the
+    /// style is toggled as the switch beside the title toggles it (`toggleStyle`), so the gates, which
+    /// have no finger, store a choice and see it across a relaunch. Once per run.
+    private static var styleTogglesScheduled = false
+
+    private func scheduleStyleToggles() {
+        guard !Self.styleTogglesScheduled, let spec = UserDefaults.standard.string(forKey: "SillStyleToggleAt") else { return }
+        Self.styleTogglesScheduled = true
+        let times = spec.split(separator: ",").compactMap { Double($0.trimmingCharacters(in: .whitespaces)) }
+        for at in times {
+            DispatchQueue.main.asyncAfter(deadline: .now() + at) { [self] in
+                let from = style
+                toggleStyle()
+                print("connect: \(from.rawValue) → \(from.toggled.rawValue) at \(at) s, as the switch beside the title does (Sill.connectionStyle \(UserDefaults.standard.string(forKey: ConnectionList.styleKey) ?? "unset"))")
+            }
+        }
+    }
+    #endif
 
     private func column(_ layout: ConnectLayout) -> some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -1172,11 +1211,16 @@ struct ConnectScreen: View {
                 .accessibilityFocused($titleFocused)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 // The switch between rows and tiles: a 44 pt target over the title's line, which it
-                // overhangs above and below (an overlay, so the column is laid out as before it).
+                // overhangs above and below (an overlay, so the column is laid out as before it). Always
+                // (Noah, 2026-10-27: "The list/tiles switch should always show"), whichever style is on
+                // and whether or not a Mac is listed; only the card, which takes the title's place, and a
+                // link's confirmation leave it out. #117 showed it for tiles alone while the list was the
+                // default, which with tiles the default left someone with no Mac who chose the list no way
+                // back.
                 .overlay(alignment: .trailing) {
-                    if !carded, client.pendingLink == nil, style == .tiles || client.macs.contains(where: { $0.macID != nil }) {
+                    if !carded, client.pendingLink == nil {
                         Button {
-                            styleRaw = style.toggled.rawValue
+                            toggleStyle()
                         } label: {
                             Image(systemName: style == .tiles ? "list.bullet" : "square.grid.2x2")
                                 .font(.system(size: 15, weight: .medium))
@@ -1349,7 +1393,7 @@ struct ConnectScreen: View {
                 Label(currentGroup.map { "Group: \($0)" } ?? "Group", systemImage: "folder")
             }
             Button {
-                styleRaw = style.toggled.rawValue
+                toggleStyle()
             } label: {
                 Label(style == .tiles ? "Show as List" : "Show as Tiles",
                       systemImage: style == .tiles ? "list.bullet" : "square.grid.2x2")

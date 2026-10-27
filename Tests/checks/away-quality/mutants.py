@@ -37,6 +37,15 @@ MUTANTS = [
     ("AQ25 a device's Send Audio laid over nothing", H + "DeviceSettings.swift", "        if let v = change.sendAudio { c.sendAudio = v }\n", ""),
     ("AQ26 a device's Send Audio dropped away from home", H + "DeviceSettings.swift", "        rest.captureScale = nil\n",
      "        rest.captureScale = nil\n        rest.sendAudio = nil\n"),
+    # Sill.app's defaults: the CLI's with the virtual display on (Noah, 2026-10-27).
+    ("AQ27 Sill.app's virtual display off (the default before 2026-10-27)", H + "HostConfig.swift",
+     "        c.virtualDisplay = true\n", "        c.virtualDisplay = false\n"),
+    ("AQ28 the CLI's virtual display on by default", H + "HostConfig.swift",
+     "prioritizeSpeed: false, virtualDisplay: false, directWireless: false,", "prioritizeSpeed: false, virtualDisplay: true, directWireless: false,"),
+    ("AQ29 Sill.app's defaults another knob off the CLI's too", H + "HostConfig.swift",
+     "        c.virtualDisplay = true\n", "        c.virtualDisplay = true\n        c.directWireless = true\n"),
+    ("AQ30 Sill.app's Send Audio off (the default before 2026-10-27)", H + "HostConfig.swift",
+     "        c.sendAudio = true\n", "        c.sendAudio = false\n"),
 ]
 caught = 0
 for name, rel, old, new in MUTANTS:

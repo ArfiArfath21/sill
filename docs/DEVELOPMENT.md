@@ -107,6 +107,16 @@ the menu climbs), step down. Any other value from 1 to 200 Mbps can be set by
 hand (quit Sill, `defaults write me.saffer.sill.mac bitrate -int 60000000`,
 open it again) and shows as Custom; a device can pick only the presets.
 
+Virtual Display is on by default (2026-10-27): on a Mac whose `virtualDisplay`
+key was never set, a window a device picks moves onto Sill's virtual display
+while it streams (The command-line host, below, says how) and comes back where
+it was when it stops. The default is registered, never written
+(`HostConfig.app` in `HostSettings`), so a key set from the menu, Settings ›
+Virtual Display or a device always wins: a Mac that turned it off keeps it
+off. To go back to the default, quit Sill, run `defaults delete
+me.saffer.sill.mac virtualDisplay` and open it again. The command-line host
+keeps it off unless it runs with `--virtual-display`.
+
 The log: `tail -F ~/Library/Logs/Sill/Sill.log` (`-F`, not `-f`: at 10 MB the
 file moves to Sill.1.log and a new one starts), or Show Log… in the menu.
 Settings: `defaults read me.saffer.sill.mac`.
@@ -151,7 +161,7 @@ swift run -c release SillHost --print-reachability   # the addresses a device wo
 swift run -c release SillHost --pairing              # the home door speaks TLS with pairing required, as Sill.app's does
 swift run -c release SillHost --print-cable          # what the USB cable rule reads on this Mac, then exit
 swift run -c release SillHost --encoder-selftest     # is the hardware encoder alive? 5 s, then it exits
-swift run -c release SillHost --virtual-display-selftest   # create and destroy one display, report what sees it
+swift run -c release SillHost --virtual-display-selftest   # create and destroy one display, report what sees it ([Hz] [WxH] after it)
 swift run -c release SillHost --menu-selftest=TextEdit     # the menus a device would get for an app (a pid, or its name), read once
 ```
 
@@ -177,9 +187,10 @@ test tone. The
 clipboard is shared as in Sill.app (The clipboard, below); `--no-clipboard`
 turns it off for the run.
 
-`--virtual-display` (off by default, 2026-09-22) moves the picked window onto a
-virtual HiDPI display created with a private CoreGraphics API and captures that
-display, so the window keeps repainting whatever covers its old spot on the Mac.
+`--virtual-display` (off by default here since 2026-09-22; Sill.app has it on
+since 2026-10-27) moves the picked window onto a virtual HiDPI display created
+with a private CoreGraphics API and captures that display, so the window keeps
+repainting whatever covers its old spot on the Mac.
 It needs Screen Recording and Accessibility for the terminal that runs it. Every
 failure (API missing, display never listed, Accessibility refused, window would
 not move) falls back to today's real-window capture with a line in the log, and
@@ -187,7 +198,13 @@ deselecting, switching, the last client leaving, Ctrl-C, `kill` or a hangup put
 the window back where it was and remove the display. Private API means the Mac
 companion is Developer ID distribution, never the Mac App Store.
 `swift run -c release SillHost --virtual-display-selftest` creates and destroys
-one display and reports what CoreGraphics, AppKit and ScreenCaptureKit see of it.
+one display and reports what CoreGraphics, AppKit and ScreenCaptureKit see of it
+and the mode it came up at; a refresh rate (`120`) and a size in points
+(`800x830`) after the flag ask for those. It moves the pointer onto the display
+and back. Every side of the display Sill makes is 800 points or more
+(`VirtualDisplaySize`, in Sources/SillHost/CaptureScale.swift): an iPhone held
+upright asked 754×784, and macOS ran that at 800×832 at 1x, five times in one
+Mac's log, where every display with a side of 800 or more came up at 2x.
 Before anything else it checks each private class and selector the display needs,
 with its type encoding, against `VirtualDisplay.privateAPISurface`; one missing or
 changed fails it, and makes the host stream real windows ("Virtual display
@@ -241,10 +258,16 @@ with the rate (the knob is per 60 fps, 1–200 Mbps).
    the cable. A session from away (Remote access, below) keeps its way in until
    it ends.
 
-The connect screen lists the Macs as rows, or, with the button beside "Connect
-to a Mac" (or Show as Tiles in a saved Mac's menu: touch and hold), as tiles:
-two columns from 340 pt wide, one on a narrower screen or at the accessibility
-text sizes. The rows are the default. With tiles on, a saved Mac's tile shows
+The connect screen shows the Macs as tiles, two columns from 340 pt wide, one
+on a narrower screen or at the accessibility text sizes, or, with the button
+beside "Connect to a Mac" (or Show as List in a saved Mac's menu: touch and
+hold), as rows. Tiles are the default since 2026-10-27
+(`ConnectionList.defaultStyle`; the rows were until then): an install whose
+person never chose shows tiles, and a choice, stored as `Sill.connectionStyle`
+(`list` or `tiles`), always wins. The button always shows, whichever style is on and
+whether or not a Mac is listed (Noah, 2026-10-27; #117 showed it for tiles
+alone, which with tiles the default took it away from someone with no saved Mac
+who chose the list). With tiles on, a saved Mac's tile shows
 its screen as the last session with it ended, a 320 pt JPEG in
 Library/Caches/SillPreviews (never in a backup, unreadable while the device is
 locked), taken only for a session that ended in a window in front while tiles
@@ -252,9 +275,9 @@ show. Switching to the list hides the pictures and keeps their files, so
 switching back to tiles shows them again at once; only Remove Preview Picture,
 Forget and the Mac's record going delete one (a launch and a change of style
 also delete the files of Macs no longer saved), and a session that ends while
-the list shows leaves the kept picture as it was: the list is the default, and
-a Mac's screen is kept on the device only by someone who chose tiles
-(`ConnectionList.takesPreview`, `previewPlan`). The picture is never a
+the list shows leaves the kept picture as it was: a Mac's screen is kept on the
+device unless its person chose the list (`ConnectionList.takesPreview`,
+`previewPlan`). The picture is never a
 snapshot of the screen: on a device the video is composited outside the app's
 own drawing, so a snapshot of the stream drew black where it was (the
 simulator composites it in software, so its photos looked right). The device
@@ -432,7 +455,8 @@ me.saffer.sill.mac <key>` (`bitrate`, `maxFPS`, `captureScale`, `awayBitrate`,
 ## The Mac's sound (beta)
 
 Send Audio is a beta (2026-10-20; docs/audio-plan.md's header says what ends
-it), off by default: Sill.app's status menu ("Send Audio (Beta)") and
+it), on by default in Sill.app since 2026-10-27 (`HostConfig.app`; the CLI's
+`--audio` opts in): Sill.app's status menu ("Send Audio (Beta)") and
 Settings › Streaming ("Send audio (beta)"), the CLI's `--audio`, whose line
 says "(beta)", or a device's Settings panel, whose Send Audio switch has a
 "Beta" tag: a device's change applies to every connected device and Sill.app
@@ -468,7 +492,8 @@ the console says where each click of a synthetic host's test tone was heard.
 
 ## Windows sized for a device
 
-Without the virtual display, Aa (text size) on the device resizes the window
+Without the virtual display (the command-line host's default; Sill.app's once
+it is turned off), Aa (text size) on the device resizes the window
 it streams on the Mac itself, through Accessibility, to the device's panel at
 that scale (nothing happens until Aa is first touched; a window in full screen
 is not resized: "Window sizing: ‹app› — ‹title› is full screen; not
@@ -1415,13 +1440,21 @@ simulator:
   Other: the Mac mini twice, its Wired row taken for it by its name and its
   Remote row, with its one picture; two more saved Macs with a picture each;
   the Office iMac, not saved, and the Mac mini (2), no picture kept, with the
-  placeholder); `-SillVideoSize 1920x1080` gives the pictures that shape. `-Sill.connectionStyle tiles` (or `list`) and
+  placeholder); `-SillVideoSize 1920x1080` gives the pictures that shape. `-Sill.connectionStyle list` (or `tiles`) and
   `-Sill.macGroups '{"HOMEPAIRING6":"Home"}'` set the arrangement and the
   saved Macs' groups, by Mac ID, for one run, in the mock and in the normal
-  app; the groups are never written back. A launch argument outranks the
-  switch beside the title, so to try the switch write the default instead:
-  `xcrun simctl spawn <udid> defaults write me.saffer.sill
-  Sill.connectionStyle tiles`.
+  app; the groups are never written back. With neither the argument nor a
+  stored choice the arrangement is tiles, the default since 2026-10-27, so
+  every connect case shows tiles unless `-Sill.connectionStyle list` gives
+  the list main showed by default before. A launch argument outranks the
+  switch beside the title, so to try the switch write the default instead
+  (with Sill not running, `plutil -replace Sill.connectionStyle -string list
+  "$(xcrun simctl get_app_container <udid> me.saffer.sill data)/Library/Preferences/me.saffer.sill.plist"`;
+  a `simctl spawn … defaults write` never reaches the app), or let `-SillStyleToggleAt <s>[,<s>…]` toggle
+  it at those seconds after the connect screen shows, as the switch does (the
+  choice is stored); the console says `connect: tiles (Sill.connectionStyle
+  unset)` as each connect screen shows, and `connect: tiles → list at 4.0 s`
+  at each toggle.
 - `-SillHUD 1`: fps, frame age, round trip and frame size over the stream.
 - With tiles on, the console's `tiles:` lines say whether Disconnect asked the
   Mac for a keyframe, when it came, and how the picture was decoded or why

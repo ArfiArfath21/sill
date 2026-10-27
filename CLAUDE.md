@@ -8,6 +8,99 @@ Formerly winstream; the folder still carries the old name.
 
 ## Current step
 
+**Tiles, Virtual Display and Send Audio on by default (2026-10-27, branch `defaults-tiles-vd` from main at
+3c257485, fast-forwarded to 3b546374 (#234) before its first commit; PR #236).** Noah, 2026-10-27:
+"make tiles not list the default behavior of the app. Also have Virtual Desktop on by default. Of
+course, if a user changes a setting remember their choice for future sessions as you do now. Make
+this a separate PR after #117 merges." Later that morning, testing #235: "Send Audio should be on
+by default, and mute should be off by default." No wire change.
+- Sill.app's Send Audio is on by default too (`HostConfig.app.sendAudio`; the CLI's `--audio` still
+  opts in; a saved `sendAudio` wins, so a Mac whose user turned it off stays off): the menu's
+  checkmark and Settings › Streaming's switch start on; README's Good to know, support.html's Sound
+  section and privacy.html say so. Mute on the device was off by default already (#235).
+- The device: the connect screen shows tiles unless its person chose the list
+  (`ConnectionList.defaultStyle`, `storedStyle`: a stored `Sill.connectionStyle`, "list" or "tiles",
+  always wins; nothing stored, or a value no build writes, reads as tiles). ConnectScreen keeps the
+  key optional (`@AppStorage … String?`), so the rule alone decides, as StreamClient's
+  `connectionStyle` already did. So a picture of each saved Mac's screen is kept by default
+  (`takesPreview`, unchanged: only with tiles), and Disconnect asks for its fresh keyframe by default
+  (300 ms at most before the connect screen with Sill for Mac 0.5.1, which skips kind 44). The switch
+  beside the title always shows, whichever style is on and whether or not a Mac is listed (Noah,
+  2026-10-27: "The list/tiles switch should always show"; #117 showed it for tiles alone, which with
+  tiles the default took it away under the finger of someone with no saved Mac who chose the list).
+  DEBUG: `-SillStyleToggleAt <s>[,<s>…]` toggles the style as
+  the switch does (`toggleStyle`); the console's `connect:` lines.
+- The Mac: Sill.app registers `HostConfig.app` (HostSettings), the CLI's `standard` with the virtual
+  display on. Registered, never written: a `virtualDisplay` key set from the menu, Settings ›
+  Virtual Display or a device always wins (a Mac that turned it off stays off; this Mac's own keys read 1 for
+  both on 2026-10-27, set by hand, so nothing changes here), and `-virtualDisplay 0` turns it off for one run. The CLI keeps `standard`: `--virtual-display`
+  opt-in, its stdout byte for byte. The menu's checkmark and the pane's switch follow `config`; no
+  pane names the default.
+- The virtual display at 1x, the caveat of that decision: not in the session of 2026-10-26/27.
+  Beside the 2560×1440 display at 1x every staged capture that night read "scale 2.0" (`filter
+  (1456.0, 1486.0)`, `(2560.0, 1486.0)`, `(2560.0, 2264.0)`); its "scale 1.0" captures were real
+  windows and the Desktop on that display (#233's case). Sill.log's 1x displays were five earlier
+  ones (2026-09-26, 09-28, 10-08 twice, 10-15), each asked with both sides under 800 points, 754×784
+  or 762×792: an iPhone held upright (its 377- or 381-point picture doubled for Aa's smallest step)
+  and the menu bar, beside the Mac's own Retina display too, so the main display's scale played no
+  part. macOS listed the 2x mode asked for, `selectRequestedMode` asked for it every half second,
+  and the display stayed at 800×832 points at 1x until the stage's 3 s wait ran out ("online 3312
+  ms"): the pick waited 3 s more, and the staged window was captured at 2x from a 1x display (eleven
+  captures `filter (800.0, 832.0) scale 1.0`). Every display with a side of 800 points or more came
+  up at 2x (754×979, 838×792, 900×800, 1000×784, 848×878 and larger). The fix, `VirtualDisplaySize`
+  (pure, in CaptureScale.swift, checked by `Tests/checks/capture-scale`): every side 800 to 4096
+  points, so an iPhone upright gets 800×830; VirtualStage's `envelope` and `ensureDisplay` use it.
+  The creation line prints the mode the display came up at (`VirtualDisplay.currentScale`; it said
+  "@2×" whatever came up), and `--virtual-display-selftest [Hz] [WxH]` makes another size.
+- Words: README (How it works: the connect screen's tiles, On iPhone, Text size and the virtual
+  display with it on by default; Good to know), site/support.html (a section, "A window left your
+  Mac’s screen", whose sentence on the default is marked `<!-- Virtual Display` for its release; "It
+  says Not paired"), site/privacy.html (the tiles' items: kept unless the list is chosen; "touch and
+  hold it"; dated October 27, 2026; the virtual display needs no word there, Accessibility "so Sill
+  can move and size the window it shows" says it already), docs/release-checklist.md (the marker,
+  its perl line and grep), docs/app-store-metadata.md (the description's "Your Mac shows up.", 3,032
+  characters; the next What's New's tiles paragraph, 232, the draft 1,805), docs/DEVELOPMENT.md, the
+  checks README.
+- Verified: `swift build -c release`, only the CaptureProbe warning; `Tests/checks/run-all.sh`, all
+  55 (562 s); mutants: connection-list 162 checks and 76 of 76, capture-scale 148 and 39 of 39,
+  away-quality 96 and 30 of 30 (after #235's merge: its acceptance mutants and the app defaults'), virtual-display-api (VirtualDisplay.swift changed) 17 of 17; H2
+  against main at 3b546374 from `git archive`, `--synthetic` on loopback (software encoder, no
+  router, no screen): idle 35 s identical masked and sorted (8 lines), with `sillclient.py PORT 8
+  desktop` identical (23 lines; a first pair differed only in which counters three stats lines
+  listed, `cursor.shape` among them); the bare SillMenuBar `--synthetic` (domain deleted before and
+  after): no key, "Virtual display: private CGVirtualDisplay API present…" and "✓ Virtual Display";
+  `-SillSetAfter '2 virtualDisplay=0'`, one "Settings: virtual display on → off" and the key 0; a
+  relaunch, off; `-virtualDisplay 1`, on for the run, the key still 0; main's binary with no key,
+  off; previews from both bare binaries at one path, 146 files each, only `menu.txt` (the
+  update-available sample's ✓ Virtual Display and ✓ Send Audio (Beta)), `pane-virtualDisplay-light.png`,
+  `-dark.png`, `pane-streaming-light.png` and `-dark.png` differ, each pane only in its switch; the iOS app
+  with Xcode 27.1 (27A9275), Debug for the generic simulator as CI builds it, Release for the
+  simulator, Debug for a device, only the known StreamClient capture warning
+  (StreamClient.swift:4110); on a private iPhone Duo simulator on iOS 27.1 (its cover display), the
+  29 connect cases at 466×678 and 951×669 against main's Debug build: this build with nothing stored
+  and main's with tiles stored, 57 of 58 pixel for pixel (the 58th the pairing case's spinner, which
+  differs from itself); this build with the list stored and main's with nothing stored, 44 of 58, the
+  rest the switch beside the title, which this build always shows (the verifier's photos of 04c9f226;
+  the author's, before 70423d1a, had the switch only with a saved Mac listed); the normal app, a fresh install against a synthetic host
+  registered as `_silltest._tcp`: tiles, toggled to the list (stored "list"), a relaunch the list,
+  toggled back (stored "tiles"), a relaunch tiles, the key read from the app's container plist
+  (`simctl spawn … defaults read <container>/Library/Preferences/me.saffer.sill.plist`; the domain by
+  name reads elsewhere); `SillHost --virtual-display-selftest 60 800x830` once, at 05:05 with this
+  Mac idle 601 s and no device connected: online at the requested mode in 446 ms, 1600×1660 px @2×,
+  a 30-point menu bar, gone 158 ms after (its HID move reset the idle time). Not run: Sill.app,
+  anything with a device, a staged window on 800×830.
+- **Untested, for Noah:** on the iPad with this build, a fresh install (Sill deleted first) shows
+  tiles; once a Mac is paired the switch beside the title shows; to the list, quit Sill from the app
+  switcher and reopen: the list; back to tiles, reopen: tiles; an install that chose the list keeps it.
+  On a Mac whose `virtualDisplay` was never set (another Mac or user account, or, with Sill quit,
+  `defaults delete me.saffer.sill.mac virtualDisplay sendAudio`; this Mac's read 1, set by hand, so it
+  is on here already): the menu shows ✓ Virtual Display and ✓ Send Audio (Beta), a device hears the
+  Mac's sound at once (beside the Mac it doubles every sound a moment late until Mute), a window
+  picked moves onto the virtual display (Sill.log "Virtual
+  display … @2× id …: created", "Moved …", "Capturing … of virtual display") and comes back at
+  Disconnect; the switch turned off stays off after a relaunch. With the iPhone 15 Pro upright and
+  the virtual display on, a pick's display is "Virtual display 800×830 pt @2×" with no "online but not
+  at" line, and the window's text crisp.
 **Send Audio and Mute in the device's Settings panel (2026-10-27, branch `sound-toggle` from main at
 b4caa91, main at 3b54637 (#117, #234) merged in, not rebased; PR #235; the bullet "Two switches" in the
 sound's entry below and docs/audio-plan.md's last section have the details).** Noah: "I've decided the
@@ -725,8 +818,8 @@ fixed (5126215 to 8bbbe52, below) and verified in the simulator
 - **Untested, for Noah:** everything on the devices, the plan's P1–P16, which end the beta with H12
   met or accepted (P13, Sill.app's CPU with sound on and off), P5 answered (Virtual Display, a
   minimized app) and P6 measured (the sync, filmed). Sill.app's menu and Settings rows can be looked
-  at (previews), and `defaults read me.saffer.sill.mac sendAudio` is absent (off) until it is first
-  set.
+  at (previews), and `defaults read me.saffer.sill.mac sendAudio` is absent until it is first
+  set, which reads as on in Sill.app since 2026-10-27 (#236).
 
 **The Close timeout and the interrupted picture (2026-10-19 and 20, PR #93 from addhumal, finished on
 its branch `audit-fixes`, which has main at 4d990e9 in it; issue #101).** The triage of 2026-10-16 and
@@ -5437,7 +5530,9 @@ and apply live: `StreamCoordinator.setTarget` hands a new `HostConfig` to the ne
 `select`, which takes it between pipelines; a change restarts the stream once,
 or not at all when nothing running depends on it (the virtual display toggle
 restarts only a window stream, and sends a staged window home first). Virtual
-display off by default in both the CLI and the app.
+display off by default in the CLI; in the app off until 2026-10-27 and on since
+(`HostConfig.app`, registered, so a saved key still wins; Current step, "Tiles and
+Virtual Display on by default").
 - Rules. Host code is the `SillHostCore` library (folder `Sources/SillHost`),
   reached with `package` access; make it `public` only if an Xcode target ever
   needs it (M5 CloudKit). Never `MainActor.assumeIsolated` in core code: under
@@ -5514,7 +5609,8 @@ Milestone 3, scaling and the virtual display. Two paths exist; adopt the second.
   (`WindowRestore`; Current step, "A window Sill sized goes back"). Harness:
   `-SillScaleOpen 1` photographs the unfolded state.
 - **Virtual display (implemented 2026-09-22 behind `--virtual-display`, off by
-  default; Noah flips the default after trying it).** With the flag, SillHost
+  default; on by default in Sill.app since 2026-10-27, Noah's call, the CLI's
+  flag still opt-in).** With the flag, SillHost
   runs `NSApplication.run()` (activation policy `.prohibited`: no Dock icon,
   never activatable) instead of `dispatchMain()`, because only under the AppKit
   loop does the creating process see the display's modes. `select(.window)`
@@ -5909,8 +6005,8 @@ good.
   `HostConfig` (the knobs: maxFPS, captureScale, bitrate per 60 fps, the
   away pair awayBitrate and awayCaptureScale, prioritizeSpeed, virtualDisplay,
   directWireless, remoteAccess, remotePort, internetAccess, requirePairing,
-  sendAudio, shareClipboard; `standard` is the CLI's values and the app's defaults;
-  `effective(away:)`), `HostClipboard` (the clipboard's host side: who
+  sendAudio, shareClipboard; `standard` is the CLI's values, `app` Sill.app's
+  defaults, the same with the virtual display and Send Audio on (2026-10-27); `effective(away:)`), `HostClipboard` (the clipboard's host side: who
   subscribed, the look at the pasteboard's change count four times a second
   while one has and macOS allows every read, a device's text written
   `.currentHostOnly` with this launch's marker and passed to the others, one
@@ -5938,7 +6034,9 @@ good.
   the display's own, ScreenCaptureKit's `pointPixelScale` for the filter, so a
   window on a 1x display fills its picture and nothing is upscaled; and
   `InputLanding`, where a device's position lands on the Mac: at most the
-  source's last pixel row and column at its display's scale; pure,
+  source's last pixel row and column at its display's scale; and
+  `VirtualDisplaySize`, the size of Sill's virtual display, no side under 800
+  points, which macOS kept at 2x (an iPhone's 754×784 came up at 1x); pure,
   `Tests/checks/capture-scale`), `SyntheticCapture` (test pattern for
   `--synthetic`; SILL_TEST_PATTERN=noise adds a square of noise,
   SILL_TEST_PATTERN=picture:<path> shows a still picture instead,
@@ -6526,7 +6624,8 @@ good.
   (targets, the rule's inputs, the layer above the layouts and under the
   pairing overlay, Take the Tour from the Settings panel's last row). The
   connect screen's tiles and groups (issue #116, PR #117): `ConnectionList`
-  (rows or tiles, `Sill.connectionStyle`, the rows by default; when a session's
+  (rows or tiles, `Sill.connectionStyle`, tiles by default since 2026-10-27
+  (`defaultStyle`; a stored choice always wins); when a session's
   end keeps a picture, `takesPreview`: only with tiles, from the session's own
   window in front, for a saved Mac; the saved Mac a row stands for, `tileMac`:
   its tag's or record's, else the one it is taken for by name, so every row
@@ -6700,8 +6799,8 @@ swift run -c release SillHost              # nothing streams until the iOS app p
 swift run -c release SillHost Safari       # optional: preselect a matching window
 swift run -c release SillHost --synthetic  # Desktop streams a test pattern; no Screen Recording needed
 swift run -c release SillHost --encoder-selftest   # is the hardware encoder alive? 5 s, exits
-swift run -c release SillHost --virtual-display   # picked windows stream from their own HiDPI display (off by default)
-swift run -c release SillHost --virtual-display-selftest   # create/destroy one display, report what sees it
+swift run -c release SillHost --virtual-display   # picked windows stream from their own HiDPI display (off by default in the CLI; on in Sill.app)
+swift run -c release SillHost --virtual-display-selftest   # create/destroy one display, report what sees it ([Hz] [WxH] after it: `60 800x830`)
 swift run -c release SillHost --direct-wireless   # also over peer-to-peer Wi-Fi (AWDL): devices without a shared network (off by default)
 swift run -c release SillHost --audio       # Send Audio (a beta) for this run: the streamed app's sound to devices that play it (with --synthetic, a test tone; off by default; a device's Settings panel turns it on or off too)
 SILL_TEST_LOOPBACK=1 SILL_TEST_SOFTWARE_ENCODER=1 .build/release/SillHost --synthetic --audio   # the test tone on loopback; sillclient.py PORT 8 desktop --hello=0.6 --audio counts it
