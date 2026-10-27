@@ -232,23 +232,27 @@ final class InputOverlayView: UIView, UITextInput, UIGestureRecognizerDelegate {
         tap(at: gesture.location(in: self))
     }
 
-    /// A finger's tap at `point`, in this view: the pointer goes there, then clicks.
+    /// A finger's tap at `point`, in this view: the pointer goes there, then clicks. What is being
+    /// composed goes to the Mac between the two, and what was typed is forgotten (`forgetTyped`), only
+    /// once the tap is one: a tap on the letterbox, or before the first frame, sends nothing and keeps the
+    /// composition on the device, as `touchesBegan` does.
     private func tap(at point: CGPoint) {
         setOwnPointer(nil, .none)
-        forgetTyped()
         guard sendPointer(.move, at: point, clamped: false) != nil else { return }
+        forgetTyped()
         sendPointer(.leftDown, at: point, clamped: false)
         sendPointer(.leftUp, at: point, clamped: false)
     }
 
-    /// Long press: the right button, since there is no second finger to spare for it.
+    /// Long press: the right button, since there is no second finger to spare for it. What is composed
+    /// goes, and what was typed is forgotten, only past the letterbox's guard, as for a tap.
     @objc private func handleLongPress(_ gesture: UILongPressGestureRecognizer) {
         guard !strokes.silent else { return }
         guard gesture.state == .began else { return }
         setOwnPointer(nil, .none)
-        forgetTyped()
         let point = gesture.location(in: self)
         guard sendPointer(.move, at: point, clamped: false) != nil else { return }
+        forgetTyped()
         sendPointer(.rightDown, at: point, clamped: false)
         sendPointer(.rightUp, at: point, clamped: false)
     }

@@ -46,7 +46,9 @@ set up in the device's Settings decide.
   (`TextInputRules.movesCaret`, `carriesReturnOrTab`): it goes whole, then all of what was typed is
   forgotten (`onCaretMayMove`, `forgetTyped`, the text system told), what follows the Return in the same
   text too, so a correction dictation makes later of the phrase before it, taken before it, sends
-  nothing (it sent 15 backspaces and "Send the build.\n": the message sent twice, the command run twice).
+  nothing (it sent 15 backspaces and "Send the build.\n": the message sent twice, the command run twice);
+  a finger's tap or long press on the letterbox mid-composition sends nothing (its forget after the guard
+  that drops it, as touchesBegan's, where it sent the composition as it stood with no click).
 - Verified (2026-10-26, on the tree merged with main at 36e7212): `Tests/checks/text-composition` 99
   checks and 60 of 60 mutants (in CI's matrix; 119 and 65 of 65 since the verification's fix, above);
   key-strokes 353; `swift build -c release`; the iOS app

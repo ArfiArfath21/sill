@@ -600,8 +600,9 @@ still composed when the input view stops taking the keyboard (Settings, the Apps
 list or the tour opens, the device turns) goes to the Mac as it stands, as a
 text field on the device keeps it, and so does what is still
 composed when a click, a key or a pick is about to move the Mac's caret (a tap on
-the picture, say): it goes first, where the caret was, as a tap elsewhere in a
-text field keeps a composition. Dictation types what is said, and the
+the picture, say, though not one on the black bars beside it, which clicks
+nothing and sends nothing): it goes first, where the caret was, as a tap elsewhere
+in a text field keeps a composition. Dictation types what is said, and the
 corrections it makes a moment later go to the Mac as backspaces back to the first
 change, then the rest typed again. Korean builds each syllable in the text
 itself, not in a composition: as each letter comes, its keyboard selects the
