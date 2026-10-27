@@ -133,9 +133,10 @@ serves the root or `/docs`, never `/site`. So:
   `<!-- /Keyframe -->`, the display wake's (PR #151, support.html's paragraph on Sill waking a
   sleeping display) between `<!-- Display wake` and `<!-- /Display wake -->`, the sound's (PR #94,
   Send Audio, a beta) between `<!-- Sound` and `<!-- /Sound -->`, the connect screen's tiles'
-  (PR #117, privacy.html's item on the tiles' pictures and group names) between `<!-- Tiles` and
-  `<!-- /Tiles -->`, and Reverse Scrolling's (PR #159: privacy.html's item and support.html's
-  section) between `<!-- Reverse Scrolling` and `<!-- /Reverse Scrolling -->`. A republish before
+  (PR #117, privacy.html's items on the tiles' pictures and group names and on the request for the
+  picture once more as you disconnect) between `<!-- Tiles` and `<!-- /Tiles -->`, and Reverse
+  Scrolling's (PR #159: privacy.html's item and support.html's section) between
+  `<!-- Reverse Scrolling` and `<!-- /Reverse Scrolling -->`. A republish before
   those releases (for words that hold for the builds already out, such as support.html's on a Mac
   asleep or restarted, or on a black picture) deletes the blocks of each release not out yet in the
   sill-site copy after the rsync below (the perl lines, one per marker) and puts privacy.html's

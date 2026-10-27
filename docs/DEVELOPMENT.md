@@ -238,12 +238,31 @@ two columns from 340 pt wide, one on a narrower screen or at the accessibility
 text sizes. The rows are the default. With tiles on, a saved Mac's tile shows
 its screen as the last session with it ended, a 320 pt JPEG in
 Library/Caches/SillPreviews (never in a backup, unreadable while the device is
-locked), taken only from a window in front; Remove Preview Picture, Forget,
-the Mac's record going and switching back to the list delete it, and the list
-keeps none. A saved Mac's menu also puts it in a group, Home, Work, Personal
-or a name of your own (New Group…): grouped Macs are listed under their
-group's name, the three first, then the others alphabetically, then Other for
-the rest; with no group set the screen is the plain list it always was.
+locked), taken only for a session that ended in a window in front; Remove
+Preview Picture, Forget, the Mac's record going and switching back to the list
+delete it, and the list keeps none. The picture is never a snapshot of the
+screen: on a device the video is composited outside the app's own drawing, so
+a snapshot of the stream drew black where it was (the simulator composites it
+in software, so its photos looked right). The device keeps the session's last
+keyframe with the parameter sets it came with (one frame, replaced at each
+keyframe, dropped with the session) and decodes it as the session ends, with a
+VideoToolbox session of its own, off the main thread, given up after a second
+(`iOSClient/KeyframePicture.swift`); the tile shows it once it lands. The
+Mac's cursor is never in the video and the device's pointer is a layer of its
+own, so the picture has neither (nor the `-SillHUD` readout). Disconnect first
+asks the Mac for a keyframe (kind 44, as the picture's recovery does) and ends
+the session when it comes or after 300 ms, so the picture is the last thing on
+screen: only a Mac whose window list says a version after 0.5.1 is asked,
+since 0.5.1 skips the request and nothing else says which Macs take it (main's
+Sill.app says 0.5.1 until the next release, and SillHost says no version;
+`-SillFreshKeyframe 1` asks any Mac in a Debug build). A session lost or ended
+by the Mac gives the keyframe kept. A decode that fails, or a picture black
+throughout, writes nothing, and the old picture stays.
+
+A saved Mac's menu also puts it in a group, Home, Work, Personal or a name of
+your own (New Group…): grouped Macs are listed under their group's name, the
+three first, then the others alphabetically, then Other for the rest; with no
+group set the screen is the plain list it always was.
 `iOSClient/ConnectionList.swift` has the rules, checked in
 `Tests/checks/connection-list`.
 
@@ -1186,8 +1205,12 @@ simulator:
   switch beside the title, so to try the switch write the default instead:
   `xcrun simctl spawn <udid> defaults write me.saffer.sill
   Sill.connectionStyle tiles`.
-- `-SillHUD 1`: fps, frame age, round trip and frame size over the stream
-  (with tiles on, in the picture a session's end keeps for the Mac's tile).
+- `-SillHUD 1`: fps, frame age, round trip and frame size over the stream.
+- `-SillFreshKeyframe 1` (the normal app and `-SillLive 1`): with tiles on,
+  Disconnect asks any Mac for a keyframe before the session ends, whatever
+  version it says (a test host says none). The console's `tiles:` lines say
+  whether it was asked, when it came, and how the picture was decoded or why
+  none was kept.
 - `-SillLayerFail <s>[,<s>…]` (the normal app and `-SillLive 1`): at each of
   these seconds after the launch's first picture a frame that cannot decode
   goes onto the display layer, so the picture's recovery runs for real (the

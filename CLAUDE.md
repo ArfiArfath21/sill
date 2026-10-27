@@ -6025,14 +6025,23 @@ good.
   connect screen's tiles and groups (issue #116, PR #117): `ConnectionList`
   (rows or tiles, `Sill.connectionStyle`, the rows by default; when a session's
   end keeps a picture, `takesPreview`: only with tiles, from the session's own
-  window in front, for a saved Mac; group names, `Sill.macGroups`, and the
-  sections' order; a superseded record's group; the pictures' file names; pure,
+  window in front, for a saved Mac; the picture's size, `previewPixels`, 640
+  pixels wide at most, and `looksBlack`; `keepsDecodedPicture`; whether
+  Disconnect asks the Mac for a keyframe first, `freshPicture`, only a Mac
+  that says a version after 0.5.1, `takesKeyframeRequests`; group names,
+  `Sill.macGroups`, and the sections' order; a superseded record's group; the
+  pictures' file names; pure, with SillVersion and KeyframeRecovery's spacing,
   `Tests/checks/connection-list`; pbxproj AF01/FF01). ConnectScreen draws them
   (the switch beside the title, the tiles, a saved Mac's Group menu and New
   Group…), StreamClient+Remote keeps them (`savePreview` with complete file
   protection in Library/Caches/SillPreviews, `removeAllPreviews` when tiles go),
-  and `tearDown` takes the picture with HEVCDisplayView's `snapshot`, nil while
-  the layer has no picture.
+  and StreamClient takes the picture: the session's last keyframe with its
+  parameter sets (`lastKeyframe`, on the network queue, one frame, dropped at
+  `tearDown`), decoded at the session's end by `KeyframePicture` (a
+  VTDecompressionSession of its own, off the main thread, 1 s at most;
+  pbxproj AF02/FF02), never a snapshot of the screen, which a device draws
+  black where the video is; Disconnect waits up to 300 ms for a fresh keyframe
+  first (kind 44; DEBUG `-SillFreshKeyframe 1` asks any Mac).
   `AudioDecoder` (AAC-ELD to a buffer per channel, one packet at a time;
   AudioToolbox only), `AudioPlayout` (the sound's timing; pure,
   `Tests/checks/audio-playout`), `AudioOutput` (its queue, the decoder and the
