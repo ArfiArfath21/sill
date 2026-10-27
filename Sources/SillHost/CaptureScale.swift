@@ -30,9 +30,10 @@ import Foundation
 /// Pure: Foundation and CoreGraphics, checked on its own with swiftc (Tests/checks/capture-scale).
 enum CaptureScale {
     /// The scale of Sill's own virtual display, which VirtualStage makes at 2x (HiDPI): what a staged
-    /// window's capture is held to, decided before the display exists. VirtualStage keeps the
-    /// display only at that mode; one that came up at another (it says "online but not at … @2×")
-    /// still captures at the knob, as it always has.
+    /// window's capture is held to, decided before the display exists. VirtualStage keeps a display
+    /// that came up at another mode ("online but not at … @2×": five times in Sill.log, each an
+    /// 800×832-point display at 1x), and a window staged on it still captures at the knob, scaled up,
+    /// as it always has.
     static let virtualDisplay: CGFloat = 2
 
     /// The pixels a point that a capture of a source on a display of scale `displayScale` runs at:

@@ -8,6 +8,63 @@ Formerly winstream; the folder still carries the old name.
 
 ## Current step
 
+**Capture at the display's own pixel scale (2026-10-27, branch `capture-scale` from main at
+74d099c2, main at 76bc100 (#157) merged in; PR #PRNUM).** Noah, tonight, Sill.app from 74d099c2 on
+this Mac with its lid closed, an external 2560×1440 display at 1x as the main one and a 1920×1080 at
+1x to its left (CGDisplayBounds (-1920, 214); read, nothing captured): a window picked showed in the
+top-left quarter of the iPad's picture, black around it, Aa changing nothing, while the Desktop
+looked right; and a drag to the bottom of the Desktop's picture never brought up the auto-hidden
+Dock. Host only: no wire change, no device file, VirtualStage and VirtualDisplay untouched.
+- The cause (Sill.log): `Capture started: 5120×2880 … filter (2560.0, 1440.0) scale 1.0` for the
+  Desktop, `2234×1220 … filter (1117.0, 610.0) scale 1.0` for the window (and 4468×2440, 3024×1898,
+  2912×2140, 1960×1200 of others since 2026-10-26): the points times the Resolution knob
+  (`captureScale` 2), while ScreenCaptureKit draws a window at its display's own scale into the
+  top-left of a larger buffer, never scaling it up, and scales a display up to fill one (four times
+  the pixels: the encoder's 1–2 fps there).
+- The rule (`CaptureScale.effective(knob:displayScale:)`, pure, `Sources/SillHost/CaptureScale.swift`):
+  the lesser of the knob and the display's own scale, ScreenCaptureKit's for the filter being
+  captured (`pointPixelScale`, the capture line's "scale"; not CGDisplayMode's pixel width ÷ point
+  width: only the filter's is the scale it draws that content at, a window across two displays
+  held to the one it picks, so no rule of Sill's can disagree). On a 1x display Retina and Standard
+  both capture at 1x (2560×1440, that window 1116×610); a 2x display as before; the test pattern
+  1512×949 × the knob; a window staged on Sill's 2x virtual display at the knob. The same scale
+  sizes a window's restart on a resize, each catalog poll restarts a window that moved onto a
+  display of another scale (`catalogPolled`: the list never changes for it), the away pair goes
+  through it, and the link's suggestion and the re-check's test size follow it; `restartNeeded`
+  still compares the knob (a Resolution change on a 1x display restarts once, to the same size).
+  The line: "Capture started: 2560×1440 @60 fps, cursor out, filter (2560.0, 1440.0) scale 1.0,
+  capturing at 1x, the display's own (2x asked)".
+- The Dock (`InputLanding.point`, the same file): a device's bottom edge is y = 1 (PadCursor clamps
+  to 0…1 with 1 in; the iPad's pointer, a Pencil and a drag past the picture are held to it), which
+  InputInjector posted at `minY + 1 × height`: 1440.0 on a 1440-point display, not short of the last
+  row but the row past it (1439 is the last), off the display by CGRect's containment and by
+  PointerControl's own inside test. Where the window server puts that move, and whether the Dock's
+  trigger takes it, is not known here. Now a fraction is held to 0…1 and lands at most at
+  `maxX − 1/scale`, `maxY − 1/scale` (1439 at 1x, 981.5 at 2x, a point in for the test pattern), where
+  a pointer pinned at the edge is; elsewhere where it did. Not changed, the next suspect if the Dock
+  still does not come: Sill's moves carry no mouse deltas, and macOS moves the Dock to another
+  display only for a push against the edge (a Dock last shown on the 1920×1080 display).
+- Verified: `swift build -c release` from `git archive` of b2bb428 and of main at 76bc100, only the
+  CaptureProbe warning; `Tests/checks/capture-scale` 79 checks and 19 of 19 mutants (the first
+  commit alone 42 and 9 of 9), in CI's mutants matrix; `Tests/checks/run-all.sh`, all 53 (454 s);
+  H2 against main's CLI at 76bc100, both from `git archive`, `--synthetic` on loopback (the software
+  encoder, no router, no screen): idle 35 s identical masked and sorted (8 lines), and with
+  `sillclient.py PORT 8 desktop` identical masked and sorted but for the stats lines of the seconds
+  the client leaves in, the same kinds reaching the client (the test pattern has no capture line,
+  so no new words); a dry run of input there (SILL_TEST_INPUT_LOG, a scripted pointer, nothing
+  posted): a tap at the pattern's far corner went to 1512,949 on main, to 1511,948 here, its middle
+  (756,475) and origin as before. A second round was refused by no-device.sh (Noah's iPad connected
+  at 01:50). Not run: `--virtual-display-selftest`, which warps this Mac's cursor, posts a HID move
+  and makes a display (its sources, VirtualDisplay's and VirtualStage's are untouched); any capture
+  of this Mac's displays or windows; Sill.app.
+- **Untested, for Noah** (Sill.app from this branch, release-signed with the embedded profile; the
+  iPad): on the 2560×1440 display a window picked fills the picture (Sill.log: "…, capturing at 1x,
+  the display's own (2x asked)") and Aa still fits it; the Desktop captures at 2560×1440 and runs at
+  60 fps (`enc.out` near `cap.complete`); with the Dock auto-hidden and the Desktop streaming, a drag
+  to the picture's bottom edge (the portrait trackpad, the Magic Keyboard's trackpad) brings up the
+  Dock (if not, note which display it was last on); a window dragged between the two 1x displays
+  streams on with no restart; with Virtual Display on, a picked window still at 2x.
+
 **The pairing window to screen sharing (2026-10-19, PR #157 by scripsweave, branch
 `fix/remote-desktop-qr-code` on their fork, from main at 5c323e6; issue #108, #137 closed as its
 duplicate).** The pairing window's `sharingType = .none` keeps it out of Screen Sharing, Apple
@@ -5529,7 +5586,13 @@ good.
   at any depth (#135's), never inside a bundle, another package or a
   framework, and never through a link inside a scanned folder (one given that
   is itself a link is followed), #76; pure, `Tests/checks/installed-apps`),
-  `WindowCapture` (ScreenCaptureKit), `SyntheticCapture` (test pattern for
+  `WindowCapture` (ScreenCaptureKit; its line names the scale it captures at),
+  `CaptureScale` (the pixel scale a capture runs at: the Resolution knob held to
+  the display's own, ScreenCaptureKit's `pointPixelScale` for the filter, so a
+  window on a 1x display fills its picture and nothing is upscaled; and
+  `InputLanding`, where a device's position lands on the Mac: at most the
+  source's last pixel row and column at its display's scale; pure,
+  `Tests/checks/capture-scale`), `SyntheticCapture` (test pattern for
   `--synthetic`; SILL_TEST_PATTERN=noise adds a square of noise,
   SILL_TEST_PATTERN=picture:<path> shows a still picture instead,
   SILL_TEST_STILL_AFTER=<s> sends no frame from s seconds on, as a window that
@@ -5560,7 +5623,7 @@ good.
   (which route a client came by, from its endpoint's scope, and the menu card's
   word for it: Wired, Wi-Fi, Direct or none; pure, checked on its own with
   `swiftc -package-name sill`, which its `package` access needs),
-  `InputInjector` (CGEvents: pointer, scroll with phases, text with modifier
+  `InputInjector` (CGEvents: pointer and scroll where InputLanding lands them, scroll with phases, text with modifier
   flags cleared explicitly (a ⌘Space before typing otherwise tainted the text
   events and Spotlight ignored them), HID keys as KeyStrokes gives them, each
   device's keys let go when it leaves and every key and button at the host's
@@ -6177,7 +6240,7 @@ good.
   `addresses`, `ask-limits`, `audio-codec` (the host's AAC-ELD encoder,
   packetizer and tone with the device's decoder, in memory; AudioToolbox only),
   `audio-packetizer`, `audio-playout` (iOSClient's AudioPlayout on a simulated
-  clock), `away-copy`, `away-quality`, `away-wire`, `cable-link`, `clientlink`,
+  clock), `away-copy`, `away-quality`, `away-wire`, `cable-link`, `capture-scale`, `clientlink`,
   `clipboard`, `compatibility`,
   `device-gate`, `display-wake`, `dmg-layout` (Scripts/dmg-layout's `.DS_Store` and alias
   writer, against Finder's own layout of the file, make-dmg.sh's layout
