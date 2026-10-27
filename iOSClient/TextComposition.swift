@@ -8,11 +8,11 @@ import StreamProtocol
 // What the stream's input view holds for iPadOS's text system (#138): the text an input method is
 // still composing (Zhuyin's ㄋㄧˇ, Pinyin's nihao, Japanese kana before conversion), kept on the device
 // and sent only once chosen (or, as it stands, when the Mac's caret is about to move or the input view
-// lets go of it), and what was typed since the Mac's caret was last moved by something else, so
-// dictation and an input method can revise what they put there (a dictated word corrected a moment
-// later: backspaces on the Mac, then the new text; Korean's syllables built again as each letter comes,
-// through a selection: `selection`). Beside it, `TextInputRules`: which input moves the Mac's caret,
-// and whose ⌃Space it is.
+// lets go of it), and what was typed since the Mac's caret was last moved by something else or by a
+// Return or a Tab typed, so dictation and an input method can revise what they put there (a dictated
+// word corrected a moment later: backspaces on the Mac, then the new text; Korean's syllables built
+// again as each letter comes, through a selection: `selection`). Beside it, `TextInputRules`: which
+// input moves the Mac's caret, and whose ⌃Space it is.
 //
 // Pure: Foundation and StreamProtocol's InputEvent only, checked on its own with swiftc
 // (Tests/checks/text-composition). Offsets are UTF-16, as UITextInput's are; the Mac is sent whole
@@ -143,11 +143,12 @@ struct TextComposition: Equatable {
         return commit(before + text + after)
     }
 
-    /// The Mac's caret is about to move some other way (a click, an arrow, a shortcut, a pick): what is
-    /// being composed goes to the Mac first, as it stands, where the caret still is, as a text field keeps
-    /// a composition when a tap moves its caret; then what was sent is forgotten, and every position the
-    /// text system holds is stale. Kept on the device across the move, the composition was lost: told
-    /// that the document changed, iPadOS's input method dropped it at the next key.
+    /// The Mac's caret is about to move some other way (a click, an arrow, a shortcut, a pick), or a
+    /// Return or a Tab typed as text has just gone (`TextInputRules.movesCaret`): what is being composed
+    /// goes to the Mac first, as it stands, where the caret still is, as a text field keeps a composition
+    /// when a tap moves its caret; then what was sent is forgotten, and every position the text system
+    /// holds is stale. Kept on the device across the move, the composition was lost: told that the
+    /// document changed, iPadOS's input method dropped it at the next key.
     mutating func forget() -> [Output] {
         let out = unmark()
         sent = ""
@@ -205,17 +206,34 @@ enum TextInputRules {
 
     /// Whether an input sent to the Mac, by any path (the picture, the portrait trackpad and key row, a
     /// hardware keyboard, Esc's key command), may move its caret: a button going down (a click, or the
-    /// start of a drag) or a key going down (an arrow, Return as a key, a shortcut, a modifier). Then
-    /// what was typed is no longer just before the caret there, so the input view forgets it
-    /// (`TextComposition.forget`, what is composed going first), and a correction dictation makes later
-    /// never backspaces where the caret is now. Typing (text, a backspace among it), moves, scrolls and
-    /// every up leave it.
+    /// start of a drag), a key going down (an arrow, Return as a key, a shortcut, a modifier), or text
+    /// that carries a Return or a Tab (`carriesReturnOrTab`). Then what was typed is no longer just
+    /// before the caret there, so the input view forgets it (`TextComposition.forget`, what is composed
+    /// going first), and a correction dictation makes later never backspaces where the caret is now.
+    /// Other typing (text, a backspace among it), moves, scrolls and every up leave it.
     static func movesCaret(_ event: InputEvent) -> Bool {
         switch event {
         case .pointer(let action, _, _): return action == .leftDown || action == .rightDown
         case .key(_, let down, _): return down
-        case .text, .scroll, .scrollGesture: return false
+        case .text(let text): return carriesReturnOrTab(text)
+        case .scroll, .scrollGesture: return false
         }
+    }
+
+    /// Whether text typed for the Mac carries a Return or a Tab ("\n", "\r" or "\t"), alone or anywhere
+    /// among other text: a hardware Return or Tab without shift and the on-screen keyboard's return key
+    /// arrive as "\n" and "\t", and dictation's "new line" can come inside a phrase. Sent, it may have
+    /// moved the Mac's caret past everything typed before it (a chat sent the line, a terminal ran the
+    /// command, a form went on to its next field), so it counts as the caret moving (`movesCaret`): the
+    /// text goes to the Mac whole, and right after it all of what was typed is forgotten, what follows
+    /// the Return in the same text too. The edit that sent it has ended any composition, so the forget
+    /// sends nothing ahead of it. A correction dictation then makes of the phrase before it (its capital,
+    /// its full stop: iPadOS's dictation keeps revising while the keyboard is up), taken before it, sends
+    /// nothing, rather than backspacing over the Return and typing the phrase and the Return again: the
+    /// message sent twice, the command run twice, backspaces into the next field. In an editor that
+    /// costs only that late correction. Unicode scalars, not characters: "\r\n" is one Character.
+    static func carriesReturnOrTab(_ text: String) -> Bool {
+        text.unicodeScalars.contains { $0 == "\n" || $0 == "\r" || $0 == "\t" }
     }
 
     /// Whether an active input mode (`UITextInputMode.activeInputModes`, by its primary language) is a

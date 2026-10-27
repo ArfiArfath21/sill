@@ -678,11 +678,12 @@ final class InputOverlayView: UIView, UITextInput, UIGestureRecognizerDelegate {
 
     /// The Mac's caret is about to move some other way than typing (a click, an arrow, a shortcut, a pick,
     /// from this view or from anywhere else: `InputOverlayProxy.caretMayHaveMoved`, called before what
-    /// moves it goes out): what an input method is still composing goes to the Mac first, as it stands,
-    /// where the caret still is (`TextComposition.forget`), as a tap in a text field keeps a composition;
-    /// then what was typed, which can no longer be revised there, is forgotten, and the text system is
-    /// told. A composition kept on the device across it was lost: the input method, told the document
-    /// changed, dropped it at the next key (Zhuyin in the simulator, 2026-10-20).
+    /// moves it goes out), or this view has just typed a Return or a Tab (`TextInputRules.movesCaret`: a
+    /// chat sent the line, a terminal ran it): what an input method is still composing goes to the Mac
+    /// first, as it stands, where the caret still is (`TextComposition.forget`), as a tap in a text field
+    /// keeps a composition; then what was typed, which can no longer be revised there, is forgotten, and
+    /// the text system is told. A composition kept on the device across it was lost: the input method,
+    /// told the document changed, dropped it at the next key (Zhuyin in the simulator, 2026-10-20).
     func forgetTyped() {
         guard !composition.sent.isEmpty || composition.isComposing else { return }
         if let marked = composition.marked {
@@ -1190,10 +1191,10 @@ final class InputOverlayProxy {
     }
     /// Something that may move the Mac's caret is going to the Mac, from anywhere on the stream screen
     /// (StreamClient.onCaretMayMove, before it goes out: the portrait trackpad's clicks, the key row's
-    /// keys, a pick, a menu item, a gesture, and the input view's own clicks and keys), or the streamed
-    /// source changed: what an input method is still composing goes to the Mac first, as it stands, and
-    /// the input view forgets what it remembers of what was typed (#138, `forgetTyped`), so a correction
-    /// dictation makes later never backspaces where the caret is now.
+    /// keys, a pick, a menu item, a gesture, and the input view's own clicks and keys and a Return or a
+    /// Tab it types), or the streamed source changed: what an input method is still composing goes to the
+    /// Mac first, as it stands, and the input view forgets what it remembers of what was typed (#138,
+    /// `forgetTyped`), so a correction dictation makes later never backspaces where the caret is now.
     func caretMayHaveMoved() { view?.forgetTyped() }
 
     // From the view (only the current one counts)

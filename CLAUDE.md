@@ -39,8 +39,17 @@ set up in the device's Settings decide.
   languages and dictation"; README's How it works; site/support.html's paragraph inside `<!-- Other
   languages` markers (docs/release-checklist.md part 1 §3's perl line); the next What's New
   (docs/app-store-metadata.md); docs/hardware-keyboard-plan.md's item 11 answered.
+- The verification (2026-10-26, fix-first: sill-handoff's
+  `triage/2026-10-20-reports/verdicts-2026-10-26/pr147-verdict.md`), one commit per theme: a Return or a
+  Tab typed as text ("\n", "\r" or "\t", alone or anywhere in it: a hardware one without shift, the
+  on-screen return key, dictation's "new line") counts as the Mac's caret moving
+  (`TextInputRules.movesCaret`, `carriesReturnOrTab`): it goes whole, then all of what was typed is
+  forgotten (`onCaretMayMove`, `forgetTyped`, the text system told), what follows the Return in the same
+  text too, so a correction dictation makes later of the phrase before it, taken before it, sends
+  nothing (it sent 15 backspaces and "Send the build.\n": the message sent twice, the command run twice).
 - Verified (2026-10-26, on the tree merged with main at 36e7212): `Tests/checks/text-composition` 99
-  checks and 60 of 60 mutants (in CI's matrix); key-strokes 353; `swift build -c release`; the iOS app
+  checks and 60 of 60 mutants (in CI's matrix; 119 and 65 of 65 since the verification's fix, above);
+  key-strokes 353; `swift build -c release`; the iOS app
   Debug and Release for the simulator and Debug for a device, only the known StreamClient capture
   warning; the touch rig, 72 scenarios; a private iPad simulator (iOS 27.0) against a loopback synthetic
   host (software encoder, `SILL_TEST_INPUT_LOG`, a scripted pointer), keys from `Tests/keyrig`: Zhuyin
@@ -52,7 +61,8 @@ set up in the device's Settings decide.
   `-AppleLocale`, not from its `AppleKeyboards` preference.
 - **Untested, for Noah and #138's testers (TestFlight):** Zhuyin and Pinyin on the on-screen keyboard and
   on a Magic Keyboard (the candidates beside the composition), Japanese, Korean, dictation in Chinese and
-  in English with its corrections and punctuation (nothing typed twice), ⌃Space with one keyboard and
+  in English with its corrections and punctuation (nothing typed twice), Return right after dictating in
+  Messages, Slack or Terminal (the line goes once), ⌃Space with one keyboard and
   with two, the Globe key, Caps Lock's switch to and from ABC, a tap mid-composition, a shortcut
   mid-composition, an Apple Pencil over the picture (no handwriting), VoiceOver.
 

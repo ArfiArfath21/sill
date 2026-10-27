@@ -628,10 +628,17 @@ what was typed since the caret last moved some other way, and forgets it at
 anything that may move the caret: a click or a key from any part of Sill (the
 picture, the portrait trackpad, the key row, a hardware keyboard, Esc), another
 window or the Desktop picked by anyone, an app opened, a window's buttons, a
-menu item, a three-finger gesture. A correction of what was forgotten sends
+menu item, a three-finger gesture, and a Return or a Tab typed as text (a
+hardware one without Shift, the on-screen keyboard's return key, dictation's
+"new line"), right after it goes: in a chat it sent the line, in a terminal it
+ran the command, in a form it moved to the next field. Text with one inside it
+goes whole, and then all of what was typed is forgotten, what follows the
+Return too; in an editor this costs only a late correction of the line before
+it, which keeps the words it had. A correction of what was forgotten sends
 nothing, rather than typing its words a second time where the caret is now
 (dictation's last touch to a phrase, its punctuation or capitals, arriving just
-after a click, say), whether the text system hands back the range it took
+after a click, or just after a Return, where it would have sent the message or
+run the command again), whether the text system hands back the range it took
 before the forget or builds it again from offsets it kept.
 Typing on the Mac itself, and another device's input, Sill does not see: a
 correction made right after either can land in the wrong place. Past 4,000
@@ -672,8 +679,10 @@ That simulator did not read the keyboards written to its `AppleKeyboards`
 preference; launching Sill with `-AppleLanguages '(zh-Hant-TW, en-US)'
 -AppleLocale zh_TW` (or `ko-KR`, `ja-JP`, `zh-Hans-CN`) gives it that
 language's own keyboards. Not yet on a device: Pinyin, Japanese, Korean,
-English dictation and its corrections, Control-Space with one keyboard, a
-shortcut mid-composition, an Apple Pencil over the picture, and VoiceOver.
+English dictation and its corrections, Return pressed right after dictating
+(in Messages, Slack or Terminal: the line goes once), Control-Space with one
+keyboard, a shortcut mid-composition, an Apple Pencil over the picture, and
+VoiceOver.
 
 ## The clipboard
 

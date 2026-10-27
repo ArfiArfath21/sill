@@ -4,7 +4,8 @@
 // the text system may revise it (a long dictation's corrections land where they were made), trimmed only
 // past its limit, and a correction whose range was taken before a forget or a trim sends nothing,
 // wherever its offsets fall now; what the text system selects is replaced by its next edit (Korean's
-// syllables). Then TextInputRules: which input moves the Mac's caret, which input modes are keyboards,
+// syllables); a Return or a Tab typed as text goes whole and ends what was typed, through the app's own
+// path (`type`). Then TextInputRules: which input moves the Mac's caret, which input modes are keyboards,
 // and whose ⌃Space it is. Scenario by scenario, then 25,000 seeded random edit sequences against a model
 // of the Mac's text field.
 //   swiftc -O iOSClient/TextComposition.swift Sources/StreamProtocol/Input.swift \
@@ -26,6 +27,24 @@ func apply(_ outputs: [C.Output], to text: inout String) {
         case .backspaces(let n): text = String(text.dropLast(n))
         }
     }
+}
+
+/// What the app does with what an edit leaves (InputOverlayView.typed, each output through
+/// StreamClient.sendInput): each output goes to the Mac, and before one that may move the Mac's caret
+/// (TextInputRules.movesCaret: a Return or a Tab typed as text) the input view forgets what was typed
+/// (StreamClient.onCaretMayMove, then InputOverlayView.forgetTyped, which does nothing while nothing is
+/// remembered or composed), what that forget sends going first. True when it forgot.
+@discardableResult
+func type(_ outputs: [C.Output], into c: inout C, mac: inout String) -> Bool {
+    var forgot = false
+    for output in outputs {
+        if case .text(let text) = output, R.movesCaret(.text(text)), !c.sent.isEmpty || c.isComposing {
+            apply(c.forget(), to: &mac)
+            forgot = true
+        }
+        apply([output], to: &mac)
+    }
+    return forgot
 }
 
 /// A range of whole characters of `s`, in UTF-16 offsets, as UIKit's ranges are.
@@ -204,6 +223,88 @@ do {   // dictation's last correction of a phrase (its punctuation and capitals)
           c.replace(NSRange(location: 1, length: 1), with: "你", taken: marked) == [] && c.length == 0 && mac == "earlier helloyㄋ")
 }
 
+do {   // dictation types a phrase, the person presses Return (a chat sends the line, a terminal runs it),
+       // then dictation's last pass over the phrase, its capital and full stop, comes with the range it
+       // took before the Return: the verification of #147, where it sent 15 backspaces and "Send the
+       // build.\n" (the line twice)
+    var c = C()
+    var mac = ""
+    type(c.insert("send the build"), into: &c, mac: &mac)
+    let taken = c.generation
+    let phrase = NSRange(location: 0, length: 14)       // "send the build", as the text system holds it
+    let typed = c.insert("\n")                          // a hardware Return, or the keyboard's return key
+    check("a Return typed as text goes to the Mac as text", typed == [.text("\n")])
+    let forgot = type(typed, into: &c, mac: &mac)
+    check("…whole, after the phrase", mac == "send the build\n")
+    check("…and what was typed is forgotten right after it, a new document",
+          forgot && c.sent.isEmpty && !c.isComposing && c.generation == taken + 1)
+    let out = c.replace(phrase, with: "Send the build.", taken: taken)
+    type(out, into: &c, mac: &mac)
+    check("a correction of the phrase before it, taken before it, sends nothing: the line goes once",
+          out == [] && mac == "send the build\n" && c.sent.isEmpty)
+    let back = c.deleteBackward()
+    type(back, into: &c, mac: &mac)
+    check("a backspace right after it still reaches the Mac", back == [.backspaces(1)] && mac == "send the build")
+    type(c.insert("ok"), into: &c, mac: &mac)
+    let now = c.generation
+    let corrected = c.replace(NSRange(location: 0, length: 2), with: "OK", taken: now)
+    type(corrected, into: &c, mac: &mac)
+    check("…and what is typed after it is remembered and corrected as before",
+          corrected == [.backspaces(2), .text("OK")] && mac == "send the buildOK" && c.sent == "OK" && c.generation == now)
+}
+
+do {   // a Tab typed as text: a form goes on to its next field
+    var c = C()
+    var mac = ""
+    type(c.insert("Noah"), into: &c, mac: &mac)
+    let taken = c.generation
+    let forgot = type(c.insert("\t"), into: &c, mac: &mac)
+    check("a Tab typed as text goes, then what was typed is forgotten", forgot && mac == "Noah\t" && c.sent.isEmpty && c.generation == taken + 1)
+    let out = c.replace(NSRange(location: 0, length: 4), with: "Noah S", taken: taken)
+    check("…so a correction of what came before it sends no backspaces into the next field", out == [] && mac == "Noah\t")
+    type(c.insert("Saffer"), into: &c, mac: &mac)
+    check("…and what is typed in the next field is remembered", c.sent == "Saffer" && mac == "Noah\tSaffer")
+}
+
+do {   // a Return inside the text (dictation's "new line" in a phrase), and one a correction brings
+    var c = C()
+    var mac = ""
+    type(c.insert("dear Ann"), into: &c, mac: &mac)
+    let taken = c.generation
+    let forgot = type(c.insert(",\nthanks"), into: &c, mac: &mac)
+    check("text with a Return inside it goes to the Mac whole", mac == "dear Ann,\nthanks")
+    check("…then all of what was typed is forgotten, what follows the Return too",
+          forgot && c.sent.isEmpty && c.generation == taken + 1)
+    check("…so a correction of either part, taken before, sends nothing",
+          c.replace(NSRange(location: 0, length: 4), with: "Dear", taken: taken) == []
+          && c.replace(NSRange(location: 10, length: 6), with: "thanks!", taken: taken) == [] && mac == "dear Ann,\nthanks")
+    type(c.insert("ok"), into: &c, mac: &mac)
+    let now = c.generation
+    let ending = c.replace(NSRange(location: 0, length: 2), with: "OK.\n", taken: now)
+    let ended = type(ending, into: &c, mac: &mac)
+    check("a correction that brings a Return goes whole, then ends what was typed",
+          ending == [.backspaces(2), .text("OK.\n")] && ended && mac == "dear Ann,\nthanksOK.\n"
+          && c.sent.isEmpty && c.generation == now + 1)
+    c.setMarked("ㄋ", selected: NSRange(location: 1, length: 0))
+    let composed = c.generation
+    let chosen = type(c.insert("你\n"), into: &c, mac: &mac)
+    check("a candidate that brings one replaces the composition, goes whole, then ends what was typed",
+          chosen && mac == "dear Ann,\nthanksOK.\n你\n" && !c.isComposing && c.sent.isEmpty && c.generation == composed + 1)
+}
+
+do {   // a phrase with no Return or Tab: what was typed is kept, so dictation's correction lands where it was
+       // made, as before
+    var c = C()
+    var mac = ""
+    type(c.insert("send the build"), into: &c, mac: &mac)
+    let taken = c.generation
+    let out = c.replace(NSRange(location: 0, length: 14), with: "Send the build.", taken: taken)
+    let forgot = type(out, into: &c, mac: &mac)
+    check("a phrase without a Return or a Tab is kept: its correction goes as backspaces and the rest typed",
+          !forgot && out == [.backspaces(14), .text("Send the build.")] && mac == "Send the build."
+          && c.sent == "Send the build." && c.generation == taken)
+}
+
 do {   // Korean: the input method selects the syllables it is still building, deletes them and types them
        // again, as each letter comes (2-Set on a hardware keyboard in the iPad simulator, 2026-10-20: g k s
        // r m f, 한글; ignoring the selection, the Mac got 한한한글)
@@ -322,7 +423,14 @@ check("a button's up does not", !R.movesCaret(.pointer(.leftUp, x: 0.5, y: 0.5))
 check("a key going down does (an arrow, a shortcut, a modifier)",
       R.movesCaret(.key(hidUsage: 0x50, down: true, modifiers: 0)) && R.movesCaret(.key(hidUsage: 0xE3, down: true, modifiers: R.command)))
 check("a key going up does not", !R.movesCaret(.key(hidUsage: 0x50, down: false, modifiers: 0)))
-check("typed text does not, a backspace among it", !R.movesCaret(.text("a")) && !R.movesCaret(.text("\u{8}")) && !R.movesCaret(.text("\n")))
+check("typed text does not, a backspace among it",
+      !R.movesCaret(.text("a")) && !R.movesCaret(.text("\u{8}")) && !R.movesCaret(.text("send the build")) && !R.movesCaret(.text("你好")))
+check("a Return or a Tab typed as text does (a chat's line sent, a command run, the next field)",
+      R.movesCaret(.text("\n")) && R.movesCaret(.text("\t")) && R.movesCaret(.text("\r")))
+check("…anywhere among other text (dictation's new line in a phrase)",
+      R.movesCaret(.text("dear Ann,\nthanks")) && R.movesCaret(.text("done.\n")) && R.movesCaret(.text("\tindented")))
+check("…a CRLF too, one Character of two scalars", R.movesCaret(.text("a\r\nb")) && R.carriesReturnOrTab("\r\n"))
+check("…and nothing else that is blank", !R.carriesReturnOrTab(" ") && !R.carriesReturnOrTab("\u{A0}") && !R.carriesReturnOrTab("\u{3000}") && !R.carriesReturnOrTab(""))
 check("a scroll does not", !R.movesCaret(.scroll(x: 0.5, y: 0.5, dx: 0, dy: 0.1)))
 check("a scroll's phases do not", [ScrollPhase.began, .ended, .momentumBegan, .momentumEnded].allSatisfy { !R.movesCaret(.scrollGesture($0, x: 0.5, y: 0.5)) })
 
@@ -376,15 +484,17 @@ struct Seeded: RandomNumberGenerator {
 var generator = Seeded(state: 0x5111_0138)
 
 /// `runs` sequences of 12 edits each from `alphabet`, with selections among them, and forgets, stale
-/// corrections and trims when `forgets`, against a model of the Mac's text field: it always ends with
-/// what is remembered, and is exactly that while nothing was forgotten; a new document (`generation`)
-/// comes with a forget or a trim, and only then; a selection is never empty, never while composing,
-/// inside what was sent, and gone after an edit. The first failure is printed; the number of failed
-/// runs, of stale corrections tried (past the end, and taken in a document since forgotten), and of
-/// selections an edit replaced, are returned.
-func randomRuns(_ runs: Int, alphabet: [String], forgets: Bool) -> (fails: Int, stale: Int, taken: Int, replaced: Int) {
+/// corrections and trims when `forgets`, each edit's outputs going to the Mac as the app sends them
+/// (`type`: a Return or a Tab typed ends what was typed), against a model of the Mac's text field: it
+/// always ends with what is remembered, and is exactly that while nothing was forgotten; a new document
+/// (`generation`) comes with a forget, a trim or a Return or a Tab typed, and only then; what is
+/// remembered never holds a Return or a Tab; a selection is never empty, never while composing, inside
+/// what was sent, and gone after an edit. The first failure is printed; the number of failed runs, of
+/// stale corrections tried (past the end, and taken in a document since forgotten), of selections an
+/// edit replaced, and of Returns and Tabs typed that ended what was typed, are returned.
+func randomRuns(_ runs: Int, alphabet: [String], forgets: Bool) -> (fails: Int, stale: Int, taken: Int, replaced: Int, ended: Int) {
     func word() -> String { (0..<Int.random(in: 1...3, using: &generator)).map { _ in alphabet.randomElement(using: &generator)! }.joined() }
-    var failed = 0, staleTried = 0, takenTried = 0, replaced = 0
+    var failed = 0, staleTried = 0, takenTried = 0, replaced = 0, endedTyping = 0
     var firstFailure: String?
     for run in 0..<runs {
         var c = C()
@@ -395,19 +505,20 @@ func randomRuns(_ runs: Int, alphabet: [String], forgets: Bool) -> (fails: Int, 
         for step in 0..<12 {
             let before = c
             var why: String?
+            var ended = false   // a Return or a Tab this edit typed made the input view forget what was typed
             let op = forgets ? Int.random(in: 0..<11, using: &generator) : [0, 1, 2, 3, 4, 9].randomElement(using: &generator)!
             switch op {
-            case 0: apply(c.insert(word()), to: &mac)
+            case 0: ended = type(c.insert(word()), into: &c, mac: &mac)
             case 1:
                 let w = word()
-                apply(c.setMarked(w, selected: NSRange(location: Int.random(in: 0...w.utf16.count, using: &generator), length: 0)), to: &mac)
+                ended = type(c.setMarked(w, selected: NSRange(location: Int.random(in: 0...w.utf16.count, using: &generator), length: 0)), into: &c, mac: &mac)
                 if let selected = before.selection {
                     if c.sent != (before.sent as NSString).replacingCharacters(in: selected, with: "") {
                         why = "a composition over a selection did not replace it"
                     }
                 } else if c.sent != before.sent { why = "a composition changed what was sent" }
-            case 2: apply(c.unmark(), to: &mac)
-            case 3: apply(c.deleteBackward(), to: &mac)
+            case 2: ended = type(c.unmark(), into: &c, mac: &mac)
+            case 3: ended = type(c.deleteBackward(), into: &c, mac: &mac)
             case 4:
                 // Whole characters only: UIKit's ranges never split one.
                 let chars = Array(c.document)
@@ -416,9 +527,11 @@ func randomRuns(_ runs: Int, alphabet: [String], forgets: Bool) -> (fails: Int, 
                 let range = utf16Range(c.document, characters: a..<b)
                 if c.length > 0, stale == nil { stale = NSRange(location: c.length + 1, length: Int.random(in: 0...3, using: &generator)) }
                 if taken == nil { taken = (range, c.generation) }
-                apply(c.replace(range, with: word(), taken: c.generation), to: &mac)
+                ended = type(c.replace(range, with: word(), taken: c.generation), into: &c, mac: &mac)
             case 5:
-                apply(c.forget(), to: &mac)
+                // As the input view's own forget sends it: a Return in what was composed goes with it,
+                // and there is nothing left to forget after it.
+                ended = type(c.forget(), into: &c, mac: &mac)
                 everReset = true
                 if c.isComposing { why = "a forget kept the composition on the device" }
                 else if let composed = before.marked, !mac.hasSuffix(before.sent + composed) {
@@ -456,10 +569,13 @@ func randomRuns(_ runs: Int, alphabet: [String], forgets: Bool) -> (fails: Int, 
             }
             if why == nil, [0, 3, 4, 5].contains(op), c.selection != nil { why = "an edit or a forget kept the selection" }
             if before.selection != nil, [0, 1, 3].contains(op) { replaced += 1 }
-            let newDocument = op == 5 || (op == 7 && before.wantsTrim)
+            if ended { endedTyping += 1; everReset = true }
+            if why == nil, op == 5, ended { why = "a forget's own composition made the input view forget again" }
+            let newDocument = op == 5 || (op == 7 && before.wantsTrim) || ended
             if why == nil, c.generation != before.generation + (newDocument ? 1 : 0) {
-                why = "the document's generation moved without a forget or a trim, or stayed through one"
+                why = "the document's generation moved without a forget, a trim or a Return or a Tab typed, or stayed through one"
             }
+            if why == nil, R.carriesReturnOrTab(c.sent) { why = "what is remembered holds a Return or a Tab typed" }
             if why == nil, c.length != c.document.utf16.count { why = "the length is not the document's" }
             if why == nil, !mac.hasSuffix(c.sent) { why = "the Mac's text does not end with what is remembered" }
             if why == nil, !everReset, mac != c.sent { why = "with nothing forgotten, the Mac's text is not what was sent" }
@@ -472,7 +588,7 @@ func randomRuns(_ runs: Int, alphabet: [String], forgets: Bool) -> (fails: Int, 
         }
     }
     if let firstFailure { print("     \(firstFailure)") }
-    return (failed, staleTried, takenTried, replaced)
+    return (failed, staleTried, takenTried, replaced, endedTyping)
 }
 
 // Forgets among the edits. No lone combining mark here: one typed right after a forget joins a
@@ -483,9 +599,10 @@ check("20,000 seeded random sequences: the Mac's text always ends with what is r
 check("…stale corrections among them (\(forgetful.stale) past the end, \(forgetful.taken) taken before a forget), none of which sent anything",
       forgetful.stale > 1_000 && forgetful.taken > 1_000)
 check("…and \(forgetful.replaced) selections replaced by the next insert, backspace or composition", forgetful.replaced > 1_000)
+check("…and \(forgetful.ended) Returns typed as text among them, each ending what was typed", forgetful.ended > 1_000)
 // No forget: a combining mark that joins the character before it is retyped with it.
 let joining = randomRuns(5_000, alphabet: ["a", "e", "\u{301}", "👍", "\u{1F3FD}", "ㄋ", "ˇ", " "], forgets: false)
-check("5,000 seeded random sequences with combining marks and skin tones: the Mac's text is what was sent", joining.fails == 0)
+check("5,000 seeded random sequences with combining marks and skin tones: the Mac's text is what was sent", joining.fails == 0 && joining.ended == 0)
 check("…\(joining.replaced) selections among them replaced", joining.replaced > 500)
 
 print("\(passes) passed, \(fails) failed")
