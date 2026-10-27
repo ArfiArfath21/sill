@@ -206,6 +206,10 @@ at the defaults, change one at a time. captureScale (Resolution: 2 Retina, 1
 Standard) is pixels per point at most: a capture runs at the lesser of it and
 its display's own scale, so on a 1x display both are 1x (a window captured
 there at 2x showed in the top-left quarter of the picture before 2026-10-27).
+A window drawn at its display's own scale asks one pixel more on an odd side
+("Capture started: 1118×610 … filter (1117.0, 610.0)"): ScreenCaptureKit
+draws it 1:1 with one black column or row past it, where a pixel fewer had it
+shrink the window by one (CaptureScale.windowPixels).
 The stream rate is the device's own: each client reports its panel's ceiling
 (120 on ProMotion iPads and iPhones, 60 on the iPad mini) and 60 while Low
 Power Mode is on; the host runs capture, encoder and the virtual display at
