@@ -14,7 +14,8 @@ import SillHostCore
 /// restart.
 ///
 /// Defaults are registered from `HostConfig.app`: the CLI's (`HostConfig.standard`) with the virtual
-/// display on (Noah, 2026-10-27), so a fresh install streams like the CLI with `--virtual-display`.
+/// display and Send Audio on (Noah, 2026-10-27), so a fresh install streams like the CLI with
+/// `--virtual-display --audio`.
 /// Registered, never written: a key a change saved always wins over them (`virtualDisplay` 0 stays
 /// off whatever the default), and launch arguments override for one run without being saved
 /// (`-maxFPS 60`, `-virtualDisplay 0`), because a save writes only the keys a change touched. Launch

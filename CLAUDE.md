@@ -8,11 +8,16 @@ Formerly winstream; the folder still carries the old name.
 
 ## Current step
 
-**Tiles and Virtual Display on by default (2026-10-27, branch `defaults-tiles-vd` from main at
+**Tiles, Virtual Display and Send Audio on by default (2026-10-27, branch `defaults-tiles-vd` from main at
 3c257485, fast-forwarded to 3b546374 (#234) before its first commit; PR #236).** Noah, 2026-10-27:
 "make tiles not list the default behavior of the app. Also have Virtual Desktop on by default. Of
 course, if a user changes a setting remember their choice for future sessions as you do now. Make
-this a separate PR after #117 merges." No wire change.
+this a separate PR after #117 merges." Later that morning, testing #235: "Send Audio should be on
+by default, and mute should be off by default." No wire change.
+- Sill.app's Send Audio is on by default too (`HostConfig.app.sendAudio`; the CLI's `--audio` still
+  opts in; a saved `sendAudio` wins, so a Mac whose user turned it off stays off): the menu's
+  checkmark and Settings › Streaming's switch start on; README's Good to know, support.html's Sound
+  section and privacy.html say so. Mute on the device was off by default already (#235).
 - The device: the connect screen shows tiles unless its person chose the list
   (`ConnectionList.defaultStyle`, `storedStyle`: a stored `Sill.connectionStyle`, "list" or "tiles",
   always wins; nothing stored, or a value no build writes, reads as tiles). ConnectScreen keeps the

@@ -111,6 +111,9 @@ package struct HostConfig: Equatable, Sendable {
     package static let app: HostConfig = {
         var c = standard
         c.virtualDisplay = true
+        // Send Audio on too (Noah, 2026-10-27: "Send Audio should be on by default"): a fresh Sill.app
+        // sends the Mac's sound to its devices; the CLI's `--audio` still opts in. A saved key wins.
+        c.sendAudio = true
         return c
     }()
 

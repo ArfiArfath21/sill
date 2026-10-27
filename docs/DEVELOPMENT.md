@@ -454,7 +454,8 @@ and open Sill again.
 ## The Mac's sound (beta)
 
 Send Audio is a beta (2026-10-20; docs/audio-plan.md's header says what ends
-it), off by default, and the Mac's alone: Sill.app's status menu ("Send Audio
+it), on by default in Sill.app since 2026-10-27 (`HostConfig.app`; the CLI's
+`--audio` opts in), and the Mac's alone: Sill.app's status menu ("Send Audio
 (Beta)") and Settings › Streaming ("Send audio (beta)"), or the CLI's
 `--audio`, whose line says "(beta)". A device's row in its Settings panel
 shows it read-only with a "Beta" tag, and the Mac refuses a device's change

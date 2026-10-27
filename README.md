@@ -85,8 +85,8 @@ Sill has layouts of its own.
   Sill sends what you copied on your device to your Mac's clipboard, where you
   press ⌘V. Sill never reads your device's clipboard by itself, and copies a
   password manager marks as concealed stay on your Mac.
-- **Sound from your Mac** is a beta, off until you turn on Send Audio (Beta)
-  in the Sill menu or in Sill's Settings on your Mac. Then Sill for Mac
+- **Sound from your Mac** is a beta, on by default; Send Audio (Beta) in the
+  Sill menu or in Sill's Settings on your Mac turns it off. Sill for Mac
   captures the sound of the window's app, or of every app for the Desktop,
   and your device plays it a moment behind the picture, never ahead of it.
   Your Mac keeps playing it too, and the Sound button mutes it on one device.
@@ -144,7 +144,7 @@ Sill has layouts of its own.
   a macOS update breaks it, Sill streams the window where it is.
 
 Good to know: Sill shows one window, or the whole desktop, at a time, and it
-plays your Mac's sound on your device as a beta, off by default. While the
+plays your Mac's sound on your device as a beta, on by default. While the
 virtual display is on, the window your device shows isn't on your Mac's screen
 until you stop. The clipboard carries text only, up to 256 KB at a time, and
 only between apps that both have it. Your Mac needs to be awake, with Sill
