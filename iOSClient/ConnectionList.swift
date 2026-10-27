@@ -33,11 +33,38 @@ enum ConnectionList {
     }
 
     /// Whether a session's end keeps a picture of the Mac's screen for its tile. Only while tiles are
-    /// on: the list shows no pictures and keeps none (turning tiles off deletes them). Only from a
-    /// window in front: one in the background, or the other of two Sill windows, draws nothing, and a
-    /// black picture would replace a good one. Only for a saved Mac: only its tile shows a picture.
+    /// on: the list is the default, and a Mac's screen is kept on the device only by someone who chose
+    /// tiles; a session that ends while the list shows leaves the kept picture as it was (the list hides
+    /// the pictures and keeps their files: `previewPlan`). Only from the session's window in front: the
+    /// other of two Sill windows, or one in the background, is not where the person was looking. Only
+    /// for a saved Mac: only its tile shows a picture.
     static func takesPreview(style: Style, sceneActive: Bool, saved: Bool) -> Bool {
         style == .tiles && sceneActive && saved
+    }
+
+    /// What a launch or a change of style (the switch beside the title, a saved Mac's menu, another Sill
+    /// window) does to the tiles' pictures: the files that go and the Macs whose kept picture shows
+    /// (`previewPlan`).
+    struct PreviewPlan: Equatable {
+        /// File names to delete: only those of Macs no longer saved.
+        let delete: [String]
+        /// The saved Macs whose kept picture shows, read from its file, in order.
+        let show: [String]
+    }
+
+    /// A style never deletes a picture (Noah, 2026-10-27: switched to the list and back, the thumbnail
+    /// comes back). With tiles every saved Mac with a file shows its picture; with the list none shows,
+    /// and every file stays for when tiles come back. Either way the files of Macs no longer saved go
+    /// (`stalePreviewFiles`); Remove Preview Picture and Forget delete a Mac's own. `files`: the names in
+    /// the pictures' folder.
+    static func previewPlan(style: Style, files: [String], savedMacIDs: Set<String>) -> PreviewPlan {
+        let delete = stalePreviewFiles(in: files, keepingMacIDs: savedMacIDs)
+        guard style == .tiles else { return PreviewPlan(delete: delete, show: []) }
+        let show = files.filter { file in
+            let macID = String(file.dropLast(4))
+            return savedMacIDs.contains(macID) && previewFileName(for: macID) == file
+        }.map { String($0.dropLast(4)) }.sorted()
+        return PreviewPlan(delete: delete, show: show)
     }
 
     // MARK: The tile's picture: the stream's last keyframe, decoded

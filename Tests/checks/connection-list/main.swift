@@ -31,6 +31,35 @@ for style in C.Style.allCases {
     }
 }
 
+// A style never deletes a picture (Noah, 2026-10-27): the list hides the kept pictures and keeps their
+// files, tiles show them again at once; only the files of Macs no longer saved go, at a launch or a
+// change of style in either style. The round trip, step by step, as StreamClient.syncPreviews applies it.
+typealias Plan = C.PreviewPlan
+func applying(_ plan: Plan, to files: [String]) -> [String] { files.filter { !plan.delete.contains($0) } }
+let saved: Set<String> = ["M1", "M2"]
+let onDisk = ["M1.jpg", "M2.jpg", "GONE.jpg", "notes.txt"]
+let tilesLaunch = C.previewPlan(style: .tiles, files: onDisk, savedMacIDs: saved)
+check(tilesLaunch == Plan(delete: ["GONE.jpg"], show: ["M1", "M2"]),
+      "a tiles launch shows every saved Mac's picture and deletes only the picture of a Mac no longer saved")
+var kept = applying(tilesLaunch, to: onDisk)
+let toList = C.previewPlan(style: .list, files: kept, savedMacIDs: saved)
+check(toList == Plan(delete: [], show: []), "switched to the list: no picture shows, and no file is deleted")
+kept = applying(toList, to: kept)
+check(kept == ["M1.jpg", "M2.jpg", "notes.txt"], "after the switch to the list every saved Mac's picture is still on the device")
+let backToTiles = C.previewPlan(style: .tiles, files: kept, savedMacIDs: saved)
+check(backToTiles == Plan(delete: [], show: ["M1", "M2"]), "switched back to tiles: every kept picture shows again at once")
+check(C.previewPlan(style: .list, files: onDisk, savedMacIDs: saved) == Plan(delete: ["GONE.jpg"], show: []),
+      "a launch with the list hides the pictures, keeps the saved Macs' files and deletes a Mac no longer saved's")
+check(C.previewPlan(style: .tiles, files: ["M2.jpg"], savedMacIDs: saved) == Plan(delete: [], show: ["M2"]),
+      "a picture removed (Remove Preview Picture) does not come back; the others show")
+check(C.previewPlan(style: .tiles, files: ["M1.jpg", "M2.jpg"], savedMacIDs: ["M1"]) == Plan(delete: ["M2.jpg"], show: ["M1"]),
+      "a Mac forgotten since: its picture is deleted and not shown")
+check(C.previewPlan(style: .tiles, files: ["M1.png", "M1.jpg.jpg", ".jpg", "M2.jpg"], savedMacIDs: ["M1", "M2"])
+      == Plan(delete: ["M1.jpg.jpg", ".jpg"], show: ["M2"]),
+      "only a saved Mac's own .jpg shows; other names never show, and stale .jpg names go")
+check(C.previewPlan(style: .tiles, files: [], savedMacIDs: saved) == Plan(delete: [], show: []), "no files: nothing to show or delete")
+check(C.previewPlan(style: .tiles, files: ["M2.jpg", "M1.jpg"], savedMacIDs: saved).show == ["M1", "M2"], "the shown Macs in order")
+
 // Group cleaning and JSON persistence.
 check(C.cleanGroup(nil) == nil && C.cleanGroup("   \n\t ") == nil, "blank group is nil")
 check(C.cleanGroup("  Work \n Office ") == "Work Office", "whitespace and newlines collapse")

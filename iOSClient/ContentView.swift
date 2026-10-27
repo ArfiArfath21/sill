@@ -400,7 +400,8 @@ struct ContentView: View {
 ///   `-Sill.connectionStyle` the switch beside the title changes nothing until the next run: to try
 ///   the switch, write the default instead (`xcrun simctl spawn <udid> defaults write me.saffer.sill
 ///   Sill.connectionStyle tiles`). With tiles, a saved Mac's session that ends keeps its picture in
-///   Library/Caches/SillPreviews (the list keeps none, and turning tiles off deletes them): the session's
+///   Library/Caches/SillPreviews (none is taken while the list shows, which hides the kept ones and keeps
+///   their files until tiles come back: ConnectionList.previewPlan, StreamClient.syncPreviews): the session's
 ///   last keyframe, decoded (KeyframePicture), never a snapshot of the screen; the console's `tiles:`
 ///   lines say what came of it.
 /// * `-SillFreshKeyframe 1` — in the normal app and under `-SillLive 1`: with tiles on, Disconnect asks
@@ -1112,10 +1113,11 @@ struct ConnectScreen: View {
                 .disabled(ConnectionList.cleanGroup(newGroupName) == nil)
             Button("Cancel", role: .cancel) {}
         }
-        // Tiles turned off, by the switch beside the title or a saved Mac's menu: the pictures go, shown
-        // and stored, and none is kept again until tiles are back (ConnectionList.takesPreview).
+        // The switch beside the title or a saved Mac's menu: the list hides the pictures and keeps their
+        // files, and tiles show them again at once (ConnectionList.previewPlan); none is taken while the
+        // list shows (ConnectionList.takesPreview).
         .onChange(of: styleRaw) { _, raw in
-            if ConnectionList.storedStyle(raw) == .list { client.removeAllPreviews() }
+            client.syncPreviews(to: ConnectionList.storedStyle(raw))
         }
         .onChange(of: client.pairing) { old, new in
             // Paired but no session came (10 s): the card closes, and the Mac is a saved row.
@@ -1140,8 +1142,8 @@ struct ConnectScreen: View {
         // never spoken, and the rows keep the focus.
         .onAppear {
             announce(client.status)
-            // Tiles turned off in another Sill window while this one streamed: its pictures go too.
-            if style == .list, !client.macPreviews.isEmpty { client.removeAllPreviews() }
+            // The style changed in another Sill window while this one streamed: its pictures follow it.
+            client.syncPreviews(to: ConnectionList.storedStyle(styleRaw))
         }
         .onChange(of: client.status) { _, line in announce(line) }
     }

@@ -238,26 +238,32 @@ two columns from 340 pt wide, one on a narrower screen or at the accessibility
 text sizes. The rows are the default. With tiles on, a saved Mac's tile shows
 its screen as the last session with it ended, a 320 pt JPEG in
 Library/Caches/SillPreviews (never in a backup, unreadable while the device is
-locked), taken only for a session that ended in a window in front; Remove
-Preview Picture, Forget, the Mac's record going and switching back to the list
-delete it, and the list keeps none. The picture is never a snapshot of the
-screen: on a device the video is composited outside the app's own drawing, so
-a snapshot of the stream drew black where it was (the simulator composites it
-in software, so its photos looked right). The device keeps the session's last
-keyframe with the parameter sets it came with (one frame, replaced at each
-keyframe, dropped with the session) and decodes it as the session ends, with a
-VideoToolbox session of its own, off the main thread, given up after a second
-(`iOSClient/KeyframePicture.swift`); the tile shows it once it lands. The
-Mac's cursor is never in the video and the device's pointer is a layer of its
-own, so the picture has neither (nor the `-SillHUD` readout). Disconnect first
-asks the Mac for a keyframe (kind 44, as the picture's recovery does) and ends
-the session when it comes or after 300 ms, so the picture is the last thing on
-screen: only a Mac whose window list says a version after 0.5.1 is asked,
-since 0.5.1 skips the request and nothing else says which Macs take it (main's
-Sill.app says 0.5.1 until the next release, and SillHost says no version;
-`-SillFreshKeyframe 1` asks any Mac in a Debug build). A session lost or ended
-by the Mac gives the keyframe kept. A decode that fails, or a picture black
-throughout, writes nothing, and the old picture stays.
+locked), taken only for a session that ended in a window in front while tiles
+show. Switching to the list hides the pictures and keeps their files, so
+switching back to tiles shows them again at once; only Remove Preview Picture,
+Forget and the Mac's record going delete one (a launch and a change of style
+also delete the files of Macs no longer saved), and a session that ends while
+the list shows leaves the kept picture as it was: the list is the default, and
+a Mac's screen is kept on the device only by someone who chose tiles
+(`ConnectionList.takesPreview`, `previewPlan`). The picture is never a
+snapshot of the screen: on a device the video is composited outside the app's
+own drawing, so a snapshot of the stream drew black where it was (the
+simulator composites it in software, so its photos looked right). The device
+keeps the session's last keyframe with the parameter sets it came with (one
+frame, replaced at each keyframe, dropped with the session) and decodes it as
+the session ends, with a VideoToolbox session of its own, off the main thread,
+given up after a second (`iOSClient/KeyframePicture.swift`); the tile shows it
+once it lands. The Mac's cursor is never in the video and the device's pointer
+is a layer of its own, so the picture has neither (nor the `-SillHUD`
+readout). Disconnect first asks the Mac for a keyframe (kind 44, as the
+picture's recovery does) and ends the session when it comes or after 300 ms,
+so the picture is the last thing on screen: only a Mac whose window list says
+a version after 0.5.1 is asked, since 0.5.1 skips the request and nothing else
+says which Macs take it (main's Sill.app says 0.5.1 until the next release,
+and SillHost says no version; `-SillFreshKeyframe 1` asks any Mac in a Debug
+build). A session lost or ended by the Mac gives the keyframe kept. A decode
+that fails, or a picture black throughout, writes nothing, and the old picture
+stays.
 
 A saved Mac's menu also puts it in a group, Home, Work, Personal or a name of
 your own (New Group…): grouped Macs are listed under their group's name, the

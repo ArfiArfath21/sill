@@ -216,7 +216,8 @@ extension StreamClient {
     }
 
     /// The connect screen's arrangement as stored (`Sill.connectionStyle`, which ConnectScreen's switch
-    /// and a saved Mac's menu set): pictures are kept only with tiles (ConnectionList.takesPreview).
+    /// and a saved Mac's menu set): pictures are taken only with tiles (ConnectionList.takesPreview), and
+    /// shown only with tiles (`syncPreviews`).
     var connectionStyle: ConnectionList.Style {
         ConnectionList.storedStyle(UserDefaults.standard.string(forKey: ConnectionList.styleKey))
     }
@@ -228,27 +229,42 @@ extension StreamClient {
             .appendingPathComponent("SillPreviews", isDirectory: true)
     }
 
-    /// At launch: each saved Mac's picture while tiles are on. With the list there are none to show, and
-    /// none may stay: any left behind go.
-    func loadSavedPreviews() {
-        guard connectionStyle == .tiles else { removeAllPreviews(); return }
-        guard let dir = Self.previewsDirectory else { return }
-        var loaded: [String: UIImage] = [:]
-        for mac in savedMacs {
-            guard let name = ConnectionList.previewFileName(for: mac.macID),
-                  let data = try? Data(contentsOf: dir.appendingPathComponent(name)),
-                  let image = UIImage(data: data) else { continue }
-            loaded[mac.macID] = image
+    /// At launch, and whenever the connect screen's style may have changed (its switch, a saved Mac's
+    /// menu, another Sill window: ConnectScreen): with tiles each saved Mac's kept picture shows, read
+    /// from its file; with the list none shows and every file stays, so switching back to tiles shows them
+    /// at once (ConnectionList.previewPlan). The files of Macs no longer saved go either way. Nothing when
+    /// `style` is the one the shown pictures already follow, so a connect screen that comes back keeps
+    /// pictures that landed meanwhile (and the harness's mock keeps its own).
+    func syncPreviews(to style: ConnectionList.Style) {
+        guard style != previewStyle else { return }
+        previewStyle = style
+        let dir = Self.previewsDirectory
+        let files = dir.flatMap { try? FileManager.default.contentsOfDirectory(atPath: $0.path) } ?? []
+        let plan = ConnectionList.previewPlan(style: style, files: files, savedMacIDs: Set(savedMacs.map(\.macID)))
+        if !savedMacsSeeded, let dir {
+            for stale in plan.delete { try? FileManager.default.removeItem(at: dir.appendingPathComponent(stale)) }
         }
-        macPreviews = loaded
-        pruneSavedPreviews()
+        var shown: [String: UIImage] = [:]
+        if let dir {
+            for macID in plan.show {
+                guard let name = ConnectionList.previewFileName(for: macID),
+                      let data = try? Data(contentsOf: dir.appendingPathComponent(name)),
+                      let image = UIImage(data: data) else { continue }
+                shown[macID] = image
+            }
+        }
+        if !(shown.isEmpty && macPreviews.isEmpty) { macPreviews = shown }
+        #if DEBUG
+        print("tiles: \(style): \(shown.count) picture\(shown.count == 1 ? "" : "s") shown, \(files.filter { $0.hasSuffix(".jpg") }.count - plan.delete.count) kept"
+              + (plan.delete.isEmpty ? "" : ", \(plan.delete.count) of Macs no longer saved deleted"))
+        #endif
     }
 
     /// A session's end with tiles on, once its last keyframe is decoded (`tearDown`, `takePreview`): the
     /// tile shows it at once (`macPreviews`, published, so a connect screen already showing picks it
     /// up) and its JPEG is written. The file has complete protection: unreadable while the device is
-    /// locked. Sill reads it only at launch and writes it only for a session that ended in a window in
-    /// front, a second at most later, so both happen while the device is unlocked.
+    /// locked. Sill reads it only at launch and when tiles come back, and writes it only for a session
+    /// that ended in a window in front, a second at most later, so all happen while the device is unlocked.
     func savePreview(_ image: UIImage, for macID: String) {
         guard let name = ConnectionList.previewFileName(for: macID) else { return }
         macPreviews[macID] = image
@@ -268,17 +284,6 @@ extension StreamClient {
         macPreviews.removeValue(forKey: macID)
         guard let dir = Self.previewsDirectory, let name = ConnectionList.previewFileName(for: macID) else { return }
         try? FileManager.default.removeItem(at: dir.appendingPathComponent(name))
-    }
-
-    /// Tiles turned off (ConnectScreen, for its switch and a saved Mac's menu), or the list at launch:
-    /// every picture goes, shown and stored.
-    func removeAllPreviews() {
-        if !macPreviews.isEmpty { macPreviews = [:] }
-        guard let dir = Self.previewsDirectory, FileManager.default.fileExists(atPath: dir.path) else { return }
-        try? FileManager.default.removeItem(at: dir)
-        #if DEBUG
-        print("tiles: the list: every picture deleted")
-        #endif
     }
 
     func pruneSavedPreviews() {

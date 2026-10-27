@@ -161,8 +161,11 @@ final class StreamClient: ObservableObject {
     @Published var savedMacs: [SavedMac] = []
     /// Custom group names assigned to saved Macs (ConnectionList), persisted in `ConnectionList.groupsKey`.
     @Published var macGroups: [String: String] = [:]
-    /// Last-stream preview pictures for saved Macs (ConnectionList), stored in Caches/SillPreviews.
+    /// Last-stream preview pictures for saved Macs (ConnectionList), stored in Caches/SillPreviews: those
+    /// shown, which is none while the list shows (the files stay: `syncPreviews`).
     @Published var macPreviews: [String: UIImage] = [:]
+    /// The style the shown pictures follow (`syncPreviews`); nil before the first look at launch.
+    var previewStyle: ConnectionList.Style?
     /// This connection's latest kind 18: who the Mac is and how to reach it from afar. Verified
     /// against the pin when the Mac is a saved one; otherwise decoded unverified, shown in the
     /// panel's Away from home group and never saved.
@@ -972,7 +975,7 @@ final class StreamClient: ObservableObject {
         savedMacs = SavedMacs.decode(UserDefaults.standard.string(forKey: SavedMacs.defaultsKey))
         macGroups = ConnectionList.decodeGroups(UserDefaults.standard.string(forKey: ConnectionList.groupsKey))
         #endif
-        loadSavedPreviews()
+        syncPreviews(to: connectionStyle)
         // Back from the background: the pings stopped while the app was suspended, which is no loss;
         // and the browsers, whose connection to mDNSResponder iOS may have made defunct meanwhile, are
         // made again (`cameForward`, issue #69).

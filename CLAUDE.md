@@ -6025,7 +6025,10 @@ good.
   connect screen's tiles and groups (issue #116, PR #117): `ConnectionList`
   (rows or tiles, `Sill.connectionStyle`, the rows by default; when a session's
   end keeps a picture, `takesPreview`: only with tiles, from the session's own
-  window in front, for a saved Mac; the picture's size, `previewPixels`, 640
+  window in front, for a saved Mac; what a launch or a change of style does,
+  `previewPlan`: the list hides the pictures and keeps their files, tiles show
+  them again, only the files of Macs no longer saved go; the picture's size,
+  `previewPixels`, 640
   pixels wide at most, and `looksBlack`; `keepsDecodedPicture`; whether
   Disconnect asks the Mac for a keyframe first, `freshPicture`, only a Mac
   that says a version after 0.5.1, `takesKeyframeRequests`; group names,
@@ -6034,7 +6037,8 @@ good.
   `Tests/checks/connection-list`; pbxproj AF01/FF01). ConnectScreen draws them
   (the switch beside the title, the tiles, a saved Mac's Group menu and New
   Group…), StreamClient+Remote keeps them (`savePreview` with complete file
-  protection in Library/Caches/SillPreviews, `removeAllPreviews` when tiles go),
+  protection in Library/Caches/SillPreviews, `syncPreviews` at launch and at a
+  change of style; only Remove Preview Picture and Forget delete a Mac's),
   and StreamClient takes the picture: the session's last keyframe with its
   parameter sets (`lastKeyframe`, on the network queue, one frame, dropped at
   `tearDown`), decoded at the session's end by `KeyframePicture` (a
