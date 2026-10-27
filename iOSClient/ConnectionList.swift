@@ -1,10 +1,16 @@
 import Foundation
 import CoreGraphics
+// In the app StreamProtocol is its own module; the connection-list check compiles this file together
+// with Sources/StreamProtocol/Compatibility.swift (SillVersion) and KeyframeRecovery.swift (its
+// spacing), where there is nothing to import.
+#if canImport(StreamProtocol)
+import StreamProtocol
+#endif
 
 /// The connect screen's arrangement (rows, or tiles with each saved Mac's last picture), the groups a
 /// saved Mac can be put in, and the stored pictures (issue #116; Windows App's Connection Center:
-/// tiles with stored screenshots and custom groups). Pure rules: Foundation and CoreGraphics only,
-/// checked by `Tests/checks/connection-list`.
+/// tiles with stored screenshots and custom groups). Pure rules: Foundation and CoreGraphics only
+/// (with SillVersion and KeyframeRecovery's spacing), checked by `Tests/checks/connection-list`.
 enum ConnectionList {
     enum Style: String, CaseIterable, Equatable {
         case list, tiles
@@ -84,6 +90,49 @@ enum ConnectionList {
     /// (Forget deleted its picture).
     static func keepsDecodedPicture(style: Style, saved: Bool) -> Bool {
         style == .tiles && saved
+    }
+
+    // MARK: A fresh keyframe when Sill ends the session
+
+    /// What Disconnect does before the session ends and its picture is taken (`freshPicture`).
+    enum FreshPicture: Equatable {
+        /// The picture from the keyframe kept now.
+        case stored
+        /// Ask the Mac for a keyframe (kind 44) and wait up to `freshKeyframeWait` for it, so the
+        /// picture is the last thing on screen: the one kept can be from long before (the encoder
+        /// makes one at a new source and every 4 × fps frames it encodes, so none while a window
+        /// stays still, and the changes since then are in later frames only).
+        case ask
+        /// A keyframe asked for by the picture's recovery is due (KeyframeRecovery): wait for it,
+        /// asking no other, which the Mac would refuse.
+        case awaitAsked
+    }
+
+    /// How long Disconnect waits for the keyframe it asked for. Then the session ends whatever came.
+    static let freshKeyframeWait: TimeInterval = 0.3
+    /// The last Sill for Mac that skips a keyframe request: 0.5.1, which every build of main still
+    /// says until the next release (PR #93 brought kind 44 after it).
+    static let lastVersionWithoutKeyframeRequests = SillVersion(components: [0, 5, 1])
+
+    /// Whether the Mac takes a keyframe request (kind 44), by the version its window list says: one
+    /// after 0.5.1. Nothing else on the wire says so, Sill for Mac 0.5.1 skips it, and main's builds
+    /// say 0.5.1 too until the next release; SillHost says no version. None of those is asked.
+    static func takesKeyframeRequests(hostVersion: String?) -> Bool {
+        guard let version = hostVersion.flatMap(SillVersion.init) else { return false }
+        return version > lastVersionWithoutKeyframeRequests
+    }
+
+    /// Disconnect's step before the session ends. Only when its end keeps a picture (`takesPreview`),
+    /// something streams (the Mac asks its encoder for nothing then) and the Mac takes the request.
+    /// `sinceLastAsk`: seconds since the picture's recovery last asked (KeyframeRecovery), nil for
+    /// never; `askOut`: that ask still waits for its keyframe. Asks keep the recovery's spacing (2 s,
+    /// so the Mac's one a second never refuses one): within it, wait for that ask's keyframe while it
+    /// is due, else the keyframe kept is the one it brought.
+    static func freshPicture(takesPreview: Bool, streaming: Bool, macTakesRequests: Bool,
+                             sinceLastAsk: TimeInterval?, askOut: Bool) -> FreshPicture {
+        guard takesPreview, streaming, macTakesRequests else { return .stored }
+        if let since = sinceLastAsk, since < KeyframeRecovery.spacing { return askOut ? .awaitAsked : .stored }
+        return .ask
     }
 
     /// Cleans a group name: whitespace and newlines collapsed to single spaces, at most

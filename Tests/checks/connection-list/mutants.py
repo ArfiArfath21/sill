@@ -89,6 +89,26 @@ MUTANTS = [
     ("a decoded picture kept for a forgotten Mac", "static func keepsDecodedPicture(style: Style, saved: Bool) -> Bool {\n        style == .tiles && saved",
      "static func keepsDecodedPicture(style: Style, saved: Bool) -> Bool {\n        style == .tiles"),
     ("a decode given longer", "static let decodeBound: TimeInterval = 1", "static let decodeBound: TimeInterval = 5"),
+    # Which Macs take a keyframe request.
+    ("0.5.1 asked too", "return version > lastVersionWithoutKeyframeRequests", "return version >= lastVersionWithoutKeyframeRequests"),
+    ("every version asked", "return version > lastVersionWithoutKeyframeRequests", "return true"),
+    ("no version asked", "guard let version = hostVersion.flatMap(SillVersion.init) else { return false }",
+     "guard let version = hostVersion.flatMap(SillVersion.init) else { return true }"),
+    ("an older last version", "static let lastVersionWithoutKeyframeRequests = SillVersion(components: [0, 5, 1])",
+     "static let lastVersionWithoutKeyframeRequests = SillVersion(components: [0, 5])"),
+    # Disconnect's fresh keyframe.
+    ("asked when the end keeps no picture", "guard takesPreview, streaming, macTakesRequests else { return .stored }",
+     "guard streaming, macTakesRequests else { return .stored }"),
+    ("asked while nothing streams", "guard takesPreview, streaming, macTakesRequests else { return .stored }",
+     "guard takesPreview, macTakesRequests else { return .stored }"),
+    ("a Mac that skips it asked", "guard takesPreview, streaming, macTakesRequests else { return .stored }",
+     "guard takesPreview, streaming else { return .stored }"),
+    ("asked within the recovery's spacing", "if let since = sinceLastAsk, since < KeyframeRecovery.spacing { return askOut ? .awaitAsked : .stored }", ""),
+    ("waits for an ask that came", "return askOut ? .awaitAsked : .stored }", "return .awaitAsked }"),
+    ("never waits for the recovery's ask", "return askOut ? .awaitAsked : .stored }", "return .stored }"),
+    ("the spacing's end still within it", "since < KeyframeRecovery.spacing", "since <= KeyframeRecovery.spacing"),
+    ("the Mac's 1 s for the recovery's 2", "since < KeyframeRecovery.spacing", "since < 1"),
+    ("a longer wait", "static let freshKeyframeWait: TimeInterval = 0.3", "static let freshKeyframeWait: TimeInterval = 3"),
 ]
 caught = 0
 for name, old, new in MUTANTS:
@@ -98,7 +118,9 @@ for name, old, new in MUTANTS:
     with tempfile.TemporaryDirectory() as t:
         mf = os.path.join(t, "ConnectionList.swift"); open(mf, "w").write(src.replace(old, new, 1))
         exe = os.path.join(t, "c")
-        subprocess.run(["swiftc", "-O", mf, os.path.join(HERE, "main.swift"), "-o", exe], capture_output=True, text=True)
+        subprocess.run(["swiftc", "-O", mf, os.path.join(WT, "iOSClient/KeyframeRecovery.swift"),
+                        os.path.join(WT, "Sources/StreamProtocol/Compatibility.swift"), os.path.join(HERE, "main.swift"),
+                        "-o", exe], capture_output=True, text=True)
         if not os.path.exists(exe): print(f"{name}: did not compile"); continue
         r = subprocess.run([exe], capture_output=True, text=True, timeout=60)
         failed = [l for l in r.stdout.splitlines() if l.startswith("FAIL")]
