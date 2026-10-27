@@ -1045,6 +1045,19 @@ paired for Remote Access connects at home with no further step.
   Sill" on the row of a Mac with an older Sill); a Debug build still dials an
   older Sill.app's plain door until it has seen that Mac speak TLS (launch it
   once with `-SillForgetHomeTLS 1` to forget).
+- **A row keeps its Mac's TXT record** (the door's `p` and the recognition tag)
+  for as long as the same browser keeps listing that Mac, whatever interfaces
+  come and go: with the USB cable pulled, iPadOS listed the Mac on its other
+  interfaces with no record at all (2026-10-27: until this rule the row read
+  "Update Sill"). A name that leaves the browser's results is forgotten, and so
+  is all a browser saw once Sill makes it again (back from the background, or
+  after it failed): a service that took the Mac's name meanwhile is read only
+  with what it advertises itself, so a Mac that really went back to an older
+  Sill, or another service under its name, reads "Update Sill" once it is listed
+  afresh. Only within one browser's listing can another service that takes the
+  name without a removal the browser reports be read as the Mac
+  (DiscoveryPolicy.rowRecords says what follows). The DEBUG console's
+  `discovery:` lines say "TXT record kept" or "no TXT record".
 - **The command-line host** keeps its plain, open door (The command-line host,
   above). With `--pairing` it prints its code and link in Terminal, and again
   after each device's ask; `--print-cable` prints what the cable rule reads on
