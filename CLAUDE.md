@@ -9,7 +9,7 @@ Formerly winstream; the folder still carries the old name.
 ## Current step
 
 **Capture at the display's own pixel scale (2026-10-27, branch `capture-scale` from main at
-74d099c2, main at 76bc100 (#157) and 48a4ef3 (#147) merged in; PR #PRNUM).** Noah, tonight, Sill.app from 74d099c2 on
+74d099c2, main at 76bc100 (#157) and 48a4ef3 (#147) merged in; PR #233).** Noah, tonight, Sill.app from 74d099c2 on
 this Mac with its lid closed, an external 2560×1440 display at 1x as the main one and a 1920×1080 at
 1x to its left (CGDisplayBounds (-1920, 214); read, nothing captured): a window picked showed in the
 top-left quarter of the iPad's picture, black around it, Aa changing nothing, while the Desktop
