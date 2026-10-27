@@ -646,23 +646,42 @@ being composed).
 A correction needs what is just before the Mac's caret, so the device remembers
 what was typed since the caret last moved some other way, and forgets it at
 anything that may move the caret: a click or a key from any part of Sill (the
-picture, the portrait trackpad, the key row, a hardware keyboard, Esc), another
-window or the Desktop picked by anyone, an app opened, a window's buttons, a
-menu item, a three-finger gesture, and a Return or a Tab typed as text (a
-hardware one without Shift, the on-screen keyboard's return key, dictation's
-"new line"), right after it goes: in a chat it sent the line, in a terminal it
-ran the command, in a form it moved to the next field. Text with one inside it
-goes whole, and then all of what was typed is forgotten, what follows the
-Return too; in an editor this costs only a late correction of the line before
-it, which keeps the words it had. A correction of what was forgotten sends
-nothing, rather than typing its words a second time where the caret is now
-(dictation's last touch to a phrase, its punctuation or capitals, arriving just
-after a click, or just after a Return, where it would have sent the message or
-run the command again), whether the text system hands back the range it took
-before the forget or builds it again from offsets it kept.
+picture, the portrait trackpad, the key row, a hardware keyboard, Esc, and
+Shift-Return and Shift-Tab, which go as keys), another window or the Desktop
+picked by anyone, an app opened, a window's buttons, a menu item, a
+three-finger gesture. A Return or a Tab typed as text (a hardware one without
+Shift, the on-screen keyboard's return key, dictation's "new line", alone or
+in the middle of what is being dictated) goes whole and keeps what was typed,
+but makes everything up to it final: in a chat it may have sent the line, in a
+terminal run the command, in a form moved to the next field. A correction that
+would change anything before the last Return or Tab typed sends nothing, rather
+than backspacing over it and typing the line and the Return again (the message
+sent twice, the command run twice, backspaces into the next field), whether
+the text system hands back the range it took or builds it again from offsets it
+kept; what follows the Return or the Tab, in the same text or typed after it,
+is corrected as any typing is. So dictation that hears "new line" in the middle
+of a sentence types every word once and goes on typing the words after it; only
+a late touch to the line before the Return (its capital, its full stop) is left
+out, in an editor too, where that line keeps the words it had. The person's own
+backspace still goes back across a Return (in an editor it joins the lines; in
+a chat that sent the line it deletes nothing), and what was before the deleted
+Return stays final.
+
+After a click, a key or a pick, a correction of what was forgotten sends
+nothing when the text system hands back the range it took before (dictation's
+last touch to a phrase, its punctuation or capitals, arriving just after a
+click), or builds one again from offsets it kept that starts past what was
+typed since. One built again that starts where what was typed began (the usual
+case: a phrase dictated right after a click, a pick or the start of the
+session starts there) cannot be told from a range taken since, and its
+correction is typed where the caret is now: its words a second time. That
+holds for a click, a key or a pick, as it did before. After a Return or a Tab
+nothing is forgotten: the same correction would change what is final, and
+sends nothing.
 Typing on the Mac itself, and another device's input, Sill does not see: a
 correction made right after either can land in the wrong place. Past 4,000
-characters typed with nothing in between, all but the last 1,000 are forgotten.
+characters typed with no click, key or pick in between (a Return or a Tab
+typed is none), all but the last 1,000 are forgotten.
 Scribble never writes over the picture (the Apple Pencil is the Mac's mouse
 there), and Writing Tools, math results and grammar suggestions are off in the
 input view, as autocorrection and predictions are: each would rewrite text the
@@ -676,7 +695,10 @@ pressesBegan (control): iPadOS's keyboard switch` for a Control-Space that
 stays on the device, and a `textinput:` line for each call iPadOS's text system
 makes and for what went to the Mac (`textinput: setMarkedText "ㄋㄧ" (2,0)`,
 `textinput: unmarkText`, `textinput: sent "你好"`, `textinput: selected (0,2) of
-what was typed, for the next edit`, and each time the input view
+what was typed, for the next edit`, `textinput: sent "\n"; what was typed up to
+its last Return or Tab is final: 15 of 15 units`, `textinput: replace (0,14)
+with "Send the build.", it would change what went before a Return or a Tab
+typed: nothing sent`, and each time the input view
 takes the keyboard `textinput: first responder; the keyboards set up: en-US,
 zh-Hant, emoji; this one zh-Hant`): what to read in Xcode's console when an
 input method or dictation types something twice, or not at all.
@@ -708,8 +730,11 @@ preference; launching Sill with `-AppleLanguages '(zh-Hant-TW, en-US)'
 -AppleLocale zh_TW` (or `ko-KR`, `ja-JP`, `zh-Hans-CN`) gives it that
 language's own keyboards. Not yet on a device: Pinyin, Japanese, Korean,
 English dictation and its corrections, Return pressed right after dictating
-(in Messages, Slack or Terminal: the line goes once), Control-Space with one
-keyboard, a shortcut mid-composition, an Apple Pencil over the picture, and
+(in Messages, Slack or Terminal: the line goes once), dictation with "new line"
+said in the middle of a sentence and the talking going on (in TextEdit and in
+Messages or Slack, in English and in Chinese: every word arrives once, and
+nothing is sent twice), Control-Space with one keyboard, a shortcut
+mid-composition, an Apple Pencil over the picture, and
 VoiceOver.
 
 ## The clipboard

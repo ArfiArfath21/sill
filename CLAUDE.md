@@ -42,12 +42,12 @@ set up in the device's Settings decide.
 - The verification (2026-10-26, fix-first: sill-handoff's
   `triage/2026-10-20-reports/verdicts-2026-10-26/pr147-verdict.md`), one commit per theme: a Return or a
   Tab typed as text ("\n", "\r" or "\t", alone or anywhere in it: a hardware one without shift, the
-  on-screen return key, dictation's "new line") counts as the Mac's caret moving
-  (`TextInputRules.movesCaret`, `carriesReturnOrTab`): it goes whole, then all of what was typed is
-  forgotten (`onCaretMayMove`, `forgetTyped`, the text system told), what follows the Return in the same
-  text too, so a correction dictation makes later of the phrase before it, taken before it, sends
-  nothing (it sent 15 backspaces and "Send the build.\n": the message sent twice, the command run twice);
-  a finger's tap or long press on the letterbox mid-composition sends nothing (its forget after the guard
+  on-screen return key, dictation's "new line") counted as the Mac's caret moving
+  (`TextInputRules.movesCaret`, `carriesReturnOrTab`): it went whole, then all of what was typed was
+  forgotten (`onCaretMayMove`, `forgetTyped`, the text system told), so a correction dictation made later
+  of the phrase before it, taken before it, sent nothing (it sent 15 backspaces and "Send the build.\n":
+  the message sent twice, the command run twice), a forget the second verification replaced with the
+  fence (below); a finger's tap or long press on the letterbox mid-composition sends nothing (its forget after the guard
   that drops it, as touchesBegan's, where it sent the composition as it stood with no click);
   and DEVELOPMENT.md says the keyboard's name shows over the picture at any switch while the input view
   holds the keyboard, the on-screen keyboard's Globe key included (`inputModeChanged`), not only with a
@@ -75,10 +75,40 @@ set up in the device's Settings decide.
   move, 你, then the click; with an uncommitted DEBUG step standing in for dictation (`insertText`,
   then `replace` with the range it held), a correction after a hardware Return sent nothing (2dc6c75's
   build with the same step: 15 backspaces and "Send the build.\n") and one with no Return went as before.
+- The second verification (2026-10-26, fix-first: `pr147-verdict-2.md` beside it): forgetting at a typed
+  Return was wrong for dictation's own "new line" said mid-utterance. The document empty after it, the
+  phrase's last pass through the range from where it began (offset 0, never past an empty document's
+  end, so not stale) was typed again at the caret, Return included (the Mac with the phrase twice, a
+  chat a second, garbled message), and in other models of how iPadOS sends the rest of an utterance the
+  words after the Return never arrived, or went three times (the verifier's harness, S1–S12). Now the
+  fence (`TextComposition.fence`): a Return or a Tab typed as text keeps the document and its
+  generation, goes whole, and makes what was sent up to just after its last Return or Tab final; a
+  correction whose first change falls before it sends nothing (`refusal`'s `.final`), wherever its
+  range starts, so an utterance sent again whole from its start that only adds words after the Return
+  goes; a selection starting before it is not kept (the next edit goes at the end); an edit's
+  backspaces stop at it (the difference looked for after it, so a CR and an LF typed later cost no
+  backspace over the CR); the person's own backspace (text, from the on-screen keyboard and from a
+  hardware one without ⌘, ⌃ or ⌥) goes back across it and takes it back to what is left, which stays
+  final; a second Return moves it to just after itself; a forget puts it at 0 and a trim moves it with
+  the text it keeps (to 0 when the cut passes it); a composition follows what was sent, after it; the
+  4,000-character cap stays, reached across Returns now. `TextInputRules.movesCaret` is false for all
+  text again (`endOfReturnOrTab` says where the fence goes); clicks, keys (⇧Return and ⇧Tab among them),
+  picks, gestures and menu items keep the full forget. Decided here: the fence goes just after the last
+  Return or Tab, not at the end of the text that brought it (the verifier's variant), as what follows
+  the Return went where the caret went: the verifier's own text with only "deploy it " corrected after
+  is sent, and a hypothesis that revises a word after the Return as it adds more keeps its new words
+  (the harness's S13: the variant lost " it"). Known: one correction that both changes the line before
+  a Return and adds words after it sends nothing, its new words with it (no model in the harness does
+  that; the testers' "new line" step would show it). Docs: DEVELOPMENT.md's "Other languages and
+  dictation" (the fence, and plainly: after a click, a key or a pick a correction through a range built
+  again from offsets kept, starting where what was typed began, is typed again at the caret, as before;
+  after a Return or a Tab it sends nothing), the checks README.
 - **Untested, for Noah and #138's testers (TestFlight):** Zhuyin and Pinyin on the on-screen keyboard and
   on a Magic Keyboard (the candidates beside the composition), Japanese, Korean, dictation in Chinese and
   in English with its corrections and punctuation (nothing typed twice), Return right after dictating in
-  Messages, Slack or Terminal (the line goes once), ⌃Space with one keyboard and
+  Messages, Slack or Terminal (the line goes once), dictation with "new line" said in the middle of a
+  sentence, talking on, in TextEdit and in Messages or Slack, in English and in Chinese (every word
+  arrives once, nothing is sent twice), ⌃Space with one keyboard and
   with two, the Globe key, Caps Lock's switch to and from ABC, a tap mid-composition, a shortcut
   mid-composition, an Apple Pencil over the picture (no handwriting), VoiceOver.
 
@@ -5712,17 +5742,19 @@ good.
   declined, what is composed sent first and what was typed forgotten when the
   Mac's caret may move (`forgetTyped`, from `StreamClient.onCaretMayMove`, before
   it goes out: a pick, a launch, a window's button and a menu item follow the
-  queued input, `sendAfterInput`) and right after a Return or a Tab it types;
+  queued input, `sendAfterInput`), and what came before a Return or a Tab it types
+  made final (`TextComposition.fence`), what was typed kept;
   `InputOverlayProxy`, who holds
   the keyboard, carrying out `HardwareKeyboardPolicy`; `HardwareKeyboardMonitor`,
   GameController's keyboard), `TextComposition` (what the input view holds for
   iPadOS's text system: the composition, what was typed since the Mac's caret
   last moved, corrections as backspaces and text, none from a range taken before
-  a forget or a trim (`generation`), what the text system selects of it
+  a forget or a trim (`generation`) and none that would change what went before
+  a Return or a Tab typed (`fence`, `refusal`), what the text system selects of it
   replaced by its next edit (`selection`: Korean's syllables built again);
   `TextInputRules`, which input
-  moves the Mac's caret (a Return or a Tab typed as text among it:
-  `carriesReturnOrTab`) and whose ⌃Space it is; pure,
+  moves the Mac's caret (no typed text, a Return or a Tab among it), where a
+  Return or a Tab typed ends (`endOfReturnOrTab`) and whose ⌃Space it is; pure,
   `Tests/checks/text-composition`; pbxproj AC0138/FC0138), `HardwareKeyboardPolicy` (when the stream's input
   view holds the keyboard for a hardware keyboard and when it is the person's
   own; pure, `Tests/checks/hardware-keyboard`; pbxproj AC01/FC01), `KeyChords`
