@@ -114,6 +114,24 @@ set up in the device's Settings decide.
   one wholly before the fence is still not kept (the text system selects the character a backspace
   deletes, so the person's backspace right after a Return deletes that Return). Telling the text
   system at a Return (an experiment) did not change what the input method selects.
+- Verified after the second verification's fix (2026-10-27, on 3187d56, the tree with main at c215514 in
+  it): text-composition 178 checks and 87 of 87 mutants (F1–F14 the fence's, J1–J8 the crossing
+  selection's; in CI's matrix); the verifier's harness, S1–S12, against its fence variant: the same output
+  in every scenario; five more (S13–S17) where the two differ only in S13 and S14 (the variant drops the
+  words a hypothesis adds as it revises one after the Return, and a correction of only the words after the
+  Return in the same text), and S18, Korean's rebuild across a Return, where the variant sends a second
+  Return at each letter and this rule none; key-strokes 353; `swift build -c release` from `git archive`
+  (only the CaptureProbe warning); the iOS app Debug and Release for the simulator and Debug for a device
+  on Xcode 27.1, only the known StreamClient capture warning; the touch rig 72 of 72 against main's
+  (74d099c); a private iPad simulator (iOS 27.0) against a loopback synthetic host (software encoder, no
+  router, no ScreenCaptureKit, `SILL_TEST_INPUT_LOG`, a scripted pointer), keys from `Tests/keyrig`, the
+  device's bytes recorded by `sillrelay.py`: with an uncommitted DEBUG step standing in for dictation
+  (`insertText`, then `replace` through the range from where the text began), "send the build", the
+  hardware Return's "\n", nothing for the phrase's correction after it, "send the build\ndeploy it "
+  whole, nothing for its whole-phrase pass, 10 backspaces and "Deploy it. " for the words after its
+  Return, "hello there" corrected as before; a b c Return d e f as letters and one "\n"; ⌘S and Esc as
+  keys; Korean 2-Set's 한글⏎한글⏎한 once (before the crossing fix 한글⏎⏎⏎한글⏎); Zhuyin's ㄋㄧˇ⏎⏎ㄋㄧˇ⏎⏎
+  as 你⏎你⏎ once; a Backspace right after a Return deleted that Return; `-SillInputTest 1` as before.
 - **Untested, for Noah and #138's testers (TestFlight):** Zhuyin and Pinyin on the on-screen keyboard and
   on a Magic Keyboard (the candidates beside the composition), Japanese, Korean, dictation in Chinese and
   in English with its corrections and punctuation (nothing typed twice), Return right after dictating in

@@ -727,7 +727,14 @@ click; and with a Debug step of the verification's own standing in for
 dictation (its text typed, then replaced through the range it held), a
 correction after a hardware Return sent nothing, where the build before the
 fix sent 15 backspaces and the line again, and one with no Return went as
-before.
+before. With the second verification's fix (2026-10-27): the same step's text
+with a Return inside it went whole, the last pass over its whole phrase sent
+nothing, and a correction of only the words after its Return went as
+backspaces and those words; Korean typed after a Return (2-Set's g k s r m f,
+Return, then again) reached the host as 한글, Return, 한글, Return, once (its
+keyboard deletes the Return with the first syllable after it and types both
+again, and the Return was not sent twice); Zhuyin's 你, Return, 你, Return
+once; and a Backspace right after a Return deleted it.
 That simulator did not read the keyboards written to its `AppleKeyboards`
 preference; launching Sill with `-AppleLanguages '(zh-Hant-TW, en-US)'
 -AppleLocale zh_TW` (or `ko-KR`, `ja-JP`, `zh-Hans-CN`) gives it that
