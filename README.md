@@ -85,11 +85,12 @@ Sill has layouts of its own.
   Sill sends what you copied on your device to your Mac's clipboard, where you
   press ⌘V. Sill never reads your device's clipboard by itself, and copies a
   password manager marks as concealed stay on your Mac.
-- **Sound from your Mac** is a beta, off until you turn on Send Audio (Beta)
-  in the Sill menu or in Sill's Settings on your Mac. Then Sill for Mac
-  captures the sound of the window's app, or of every app for the Desktop,
-  and your device plays it a moment behind the picture, never ahead of it.
-  Your Mac keeps playing it too, and the Sound button mutes it on one device.
+- **Sound from your Mac** is a beta, off until you turn on Send Audio: in the
+  Sill menu or Sill's Settings on your Mac, or in the settings panel of Sill on
+  your iPhone or iPad. Then Sill for Mac captures the sound of the window's
+  app, or of every app for the Desktop, and every connected device plays it a
+  moment behind the picture, never ahead of it. Your Mac keeps playing it too,
+  and Mute in a device's settings panel silences it on that device alone.
 - **On iPhone Duo**, Sill follows the hinge: open it flat and your Mac fills
   the inner display; half open, the picture is above the fold with a trackpad
   and keys below; closed, Sill runs on the cover display. Nothing you touch

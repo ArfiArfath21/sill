@@ -171,8 +171,9 @@ device's panel says so. Its Virtual Display switch works only when `SillHost`
 runs with `--virtual-display`. `--direct-wireless` starts it with Direct
 Wireless Connection on (see Direct Wireless Connection below); it is off by
 default here too. `--audio` starts it with Send Audio on (The Mac's sound
-below, a beta), off by default too and the only switch for the run (a device
-cannot change it); with `--synthetic` the sound is a test tone. The
+below, a beta), off by default too; a device turns it on or off from its
+Settings panel, until `SillHost` quits; with `--synthetic` the sound is a
+test tone. The
 clipboard is shared as in Sill.app (The clipboard, below); `--no-clipboard`
 turns it off for the run.
 
@@ -368,25 +369,27 @@ the package reference. Nothing else. A new source file needs its four
 
 A connected iPhone or iPad changes the same settings from its own Settings
 panel (the gear, the last button of its bar): Quality, Resolution, Frame Rate,
-Prioritize Encoding Speed, Virtual Display and Direct Wireless Connection, with
-exactly the Mac's choices; Send Audio shows there read-only, the Mac's alone
-(The Mac's sound, below). Sill.app saves a device's change like a menu click,
+Prioritize Encoding Speed, Virtual Display, Send Audio (a beta: The Mac's
+sound, below) and Direct Wireless Connection, with exactly the Mac's choices.
+Sill.app saves a device's change like a menu click,
 and its Settings window and menu show it; the change applies to every connected
 device, and a streaming setting restarts the stream for a moment. A device away
 from home sets the away quality instead (Remote access, below). To put one
 setting back to its default, quit Sill, run `defaults delete
 me.saffer.sill.mac <key>` (`bitrate`, `maxFPS`, `captureScale`, `awayBitrate`,
-`awayCaptureScale`, `prioritizeSpeed`, `virtualDisplay` or `directWireless`)
-and open Sill again.
+`awayCaptureScale`, `prioritizeSpeed`, `virtualDisplay`, `sendAudio` or
+`directWireless`) and open Sill again.
 
 ## The Mac's sound (beta)
 
 Send Audio is a beta (2026-10-20; docs/audio-plan.md's header says what ends
-it), off by default, and the Mac's alone: Sill.app's status menu ("Send Audio
-(Beta)") and Settings › Streaming ("Send audio (beta)"), or the CLI's
-`--audio`, whose line says "(beta)". A device's row in its Settings panel
-shows it read-only with a "Beta" tag, and the Mac refuses a device's change
-("Settings from ‹device› refused: send audio (set on this Mac only)"). It
+it), off by default: Sill.app's status menu ("Send Audio (Beta)") and
+Settings › Streaming ("Send audio (beta)"), the CLI's `--audio`, whose line
+says "(beta)", or a device's Settings panel, whose Send Audio switch has a
+"Beta" tag: a device's change applies to every connected device and Sill.app
+saves it, as Quality's (Noah, 2026-10-27; the log says "Settings from
+‹device›: send audio off → on"). A Mac from the beta (2026-10-20 to 27)
+refuses a device's change, and the device's switch goes back. It
 sends the sound of what streams to every connected device that plays it: the
 streamed window's app (every window of it: macOS captures sound per app), or
 every app but Sill for the Desktop. The Mac keeps playing it too. It comes
@@ -402,10 +405,9 @@ the sound. The log says what the sound is of ("Audio: capturing Safari's sound
 delete me.saffer.sill.mac sendAudio` puts it back to off. docs/audio-plan.md
 has the design.
 
-On the device, the bar's Sound button (where the bar holds it beside Menus; on
-a phone held upright at the end of the thumbnails' row, and with Larger
-Picture nowhere: the panel's switch alone) and the Settings panel's
-Sound switch mute it on that device alone, remembered across launches
+On the device, the Settings panel's Mute switch (This iPad's group, for every
+Mac with sound, Send Audio on or off; no bar has a Sound button since
+2026-10-27) mutes it on that device alone, remembered across launches
 (`Sill.soundMuted`); the Mac keeps sending. It plays mixed with the device's own
 audio, on silent too, as a video app does, and never in the background.
 Headphones taken out mute it and say so. The device keeps it a little behind
