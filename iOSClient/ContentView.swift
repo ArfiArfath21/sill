@@ -195,7 +195,7 @@ struct ContentView: View {
 ///   iPad, Take the Tour). `-SillSettingsScroll gestures` starts them at the This iPad group
 ///   instead (its switches and rows, which the footnotes under them push out of the end's view on a
 ///   short screen), `-SillSettingsScroll sound` at the Send Audio row, `-SillSettingsScroll mute` at
-///   This iPad's Mute switch, and `-SillSettingsScroll reverse` at its Reverse Scrolling switch.
+///   the Mute row under Send Audio, and `-SillSettingsScroll reverse` at its Reverse Scrolling switch.
 /// * `-SillSettingsCase <case>` — what the mock Mac's settings look like: `default` (Sill.app),
 ///   `cli`, `software`, `custom`, `vdproblem`, `vdstream`, `legacy`, `pending`, `timeout`,
 ///   `direct`, `directlink` (connected over it), `nodirect` (a host without it), `wired` or
@@ -431,7 +431,7 @@ struct ContentView: View {
 ///   orientation at launch (a phone simulator sideways, with its real safe areas). The Duo's inner
 ///   display refuses it (UISceneErrorDomain 101): fold and turn its simulator with Tests/duorig.
 /// * The Mac's sound (docs/audio-plan.md §7.8): the Settings panel's two switches, Send Audio (the
-///   Mac's, for every device) and This iPad's Mute (this device's own). In the mock: `-SillSound
+///   Mac's, for every device) and Mute right under it (this device's own). In the mock: `-SillSound
 ///   on|muted` makes the mock Mac send its sound and this device play it or have it muted (Mute off or
 ///   on; the mock plays nothing), and `-SillSettingsCase sound|soundoff|soundnote|nosound` the Send
 ///   Audio row on, off, on with the Mac's note (why no sound comes), or a Mac without sound (the row

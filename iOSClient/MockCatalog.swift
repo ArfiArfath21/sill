@@ -291,7 +291,7 @@ enum MockCatalog {
     /// `-SillSettingsCase`: the states the Settings panel has to look right in. The mock streams
     /// 2880×1800 · 60 fps · 15 Mbps over Wi-Fi unless a case says otherwise.
     enum SettingsCase: String {
-        case `default`   // Sill.app: saved, the virtual display available and off, Send Audio off (This iPad's Mute shows)
+        case `default`   // Sill.app: saved, the virtual display available and off, Send Audio off (Mute under it shows)
         case cli         // SillHost without --virtual-display: kept until it quits, the switch off and disabled
         case software    // the hardware encoder is down: the callout, a 1440×900 stream under Retina / 120 fps targets
         case custom      // a bitrate set by hand on the Mac: "Custom — 12 Mbps"
@@ -324,7 +324,7 @@ enum MockCatalog {
         case linklow         // behind at Low · Standard: "even at Low", no button
         case linkstalled     // stalled: the Mac's alone, so no callout
         // The Mac's sound (docs/audio-plan.md §7.8; Send Audio and Mute, the panel's two switches):
-        case sound           // the Mac sends its sound: the Send Audio row on, and This iPad's Mute
+        case sound           // the Mac sends its sound: the Send Audio row on, and Mute under it
         case soundoff        // a Mac with sound, Send Audio off: the row off (as `default`), and Mute
         case soundnote       // on, and the Mac could not capture it: the note under the row
         case nosound         // a Mac without sound (Sill for Mac 0.5.1): the row off and disabled, "Update Sill…", no Mute
@@ -409,7 +409,7 @@ enum MockCatalog {
         guard c != .legacy else { return }
         var state = HostSettingsState(
             // A Mac with sound, Send Audio off, as Sill for Mac has it since the sound came: the panel's
-            // Send Audio switch and This iPad's Mute show. `nosound` and `nodirect` are older Macs.
+            // Send Audio switch and Mute under it show. `nosound` and `nodirect` are older Macs.
             settings: StreamSettings(maxFPS: 120, bitrate: 15_000_000, captureScale: 2, prioritizeSpeed: false, virtualDisplay: false,
                                      directWireless: false, sendAudio: false),
             persistent: true, virtualDisplayAvailable: true, softwareEncoder: false,
@@ -478,7 +478,7 @@ enum MockCatalog {
             break
         }
         // `-SillSound on|muted`: the Mac sends its sound (Send Audio on), and this device plays it or has it
-        // muted (This iPad's Mute off or on; the mock plays nothing). Never saved.
+        // muted (Mute off or on; the mock plays nothing). Never saved.
         switch UserDefaults.standard.string(forKey: "SillSound") {
         case "on"?: state.settings.sendAudio = true; client.soundMuted = false
         case "muted"?: state.settings.sendAudio = true; client.soundMuted = true

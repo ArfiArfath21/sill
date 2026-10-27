@@ -454,7 +454,7 @@ the sound. The log says what the sound is of ("Audio: capturing Safari's sound
 delete me.saffer.sill.mac sendAudio` puts it back to off. docs/audio-plan.md
 has the design.
 
-On the device, the Settings panel's Mute switch (This iPad's group, for every
+On the device, the Settings panel's Mute switch (right under Send Audio, off by default, for every
 Mac with sound, Send Audio on or off; no bar has a Sound button since
 2026-10-27) mutes it on that device alone, remembered across launches
 (`Sill.soundMuted`); the Mac keeps sending. It plays mixed with the device's own

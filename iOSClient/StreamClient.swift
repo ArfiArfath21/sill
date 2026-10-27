@@ -402,7 +402,7 @@ final class StreamClient: ObservableObject {
     var lastViewport: Viewport?
 
     // The Mac's sound (kind 43; docs/audio-plan.md §7.5, StreamClient+Audio.swift, AudioOutput).
-    /// This device's mute, the Settings panel's Mute switch (This iPad's group): local, remembered
+    /// This device's mute, the Settings panel's Mute switch (right under Send Audio; off by default): local, remembered
     /// (`Sill.soundMuted`; the switch saves it through `setSoundMuted`), never sent to the Mac. Main thread.
     @Published var soundMuted = UserDefaults.standard.bool(forKey: StreamClient.soundMutedKey) {
         didSet { if soundMuted != oldValue { sound.setMuted(soundMuted) } }

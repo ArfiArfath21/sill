@@ -17,10 +17,11 @@ import StreamProtocol
 /// Every control shows `client.settings.displayed` (the Mac's value with this device's unanswered
 /// pick over it) and sends through `client.changeSettings`, one field per control, from its action
 /// only, Send Audio's switch among them (for every device, as Quality: docs/audio-plan.md, Q8 as Noah
-/// revised it on 2026-10-27). Errors show inline, never in alerts. After the Mac's settings come the
-/// device's own groups: This iPad (or iPhone), whose switches are preferences here and send nothing to
-/// the Mac (Mute, this device's own of the Mac's sound, while the Mac has sound, on or off,
-/// `StreamClient.soundMuted`; Larger Picture, `StreamClient.largerPictureKey`,
+/// revised it on 2026-10-27), with Mute right under it (this device's own of the Mac's sound, off by
+/// default, `StreamClient.soundMuted`, while the Mac has sound, on or off; Noah, 2026-10-27). Errors show
+/// inline, never in alerts. After the Mac's settings come the device's own groups: This iPad (or
+/// iPhone), whose switches are preferences here and send nothing to the Mac (Larger Picture,
+/// `StreamClient.largerPictureKey`,
 /// on an iPhone without a hinge whose picture it makes larger, `largerPictureOffered`; Share Clipboard,
 /// `StreamClient.clipboardKey`, while the Mac shares its clipboard, with the system's Paste for this
 /// device's text; Reverse Scrolling, `StreamClient.reverseScrollKey`; Three-Finger Gestures,
@@ -74,8 +75,8 @@ struct HostSettingsPanel: View {
     }
     /// DEBUG `-SillSettingsScroll gestures`: the rows start scrolled to the This iPad group, so a
     /// photo of a short screen shows its switches and rows, which the footnote under them pushes out
-    /// of `-SillSettingsEnd`'s view; `sound`, to the Send Audio row; `mute`, to This iPad's Mute
-    /// switch; `reverse`, to Reverse Scrolling's switch, so a photo of the panel in the lower half shows
+    /// of `-SillSettingsEnd`'s view; `sound`, to the Send Audio row; `mute`, to the Mute row
+    /// under it; `reverse`, to Reverse Scrolling's switch, so a photo of the panel in the lower half shows
     /// it and its footnote, which the clipboard's rows above it push out of `gestures`' view there.
     private static var startsAt: String? {
         #if DEBUG
@@ -309,7 +310,7 @@ struct HostSettingsPanel: View {
                 // from here for every device, as Quality is (Noah, 2026-10-27: the plan's Q8 revised): the
                 // Mac saves it and tells every device; an older Mac that refuses it sends it back, with the
                 // warning haptic. Why no sound comes, when the Mac says, under it. A beta: a tag after its
-                // title ("Send Audio, beta" to VoiceOver) and the footnote's first word; This iPad's Mute,
+                // title ("Send Audio, beta" to VoiceOver) and the footnote's first word; Mute, right under it,
                 // this device's own, carries none. A Mac without sound (nil: Sill for Mac 0.5.1 and older)
                 // shows the row off and disabled, its footnote saying to update Sill there, as the panel
                 // says for what else an older Mac lacks.
@@ -327,6 +328,22 @@ struct HostSettingsPanel: View {
                     .accessibilityInputLabels(["Send Audio"])
                     .accessibilityHint(send == nil ? "Update Sill on \(mac) to use this." : "")
                     .rowFrame()
+                    // Mute, right under Send Audio (Noah, 2026-10-27): this device's own (`soundMuted`,
+                    // off by default, remembered, never sent), the only control of the Mac's sound on the
+                    // device since the bars' Sound button went. For every Mac with sound, Send Audio on
+                    // or off, so a device can keep itself silent before any device turns the sound on,
+                    // and the row never comes and goes with the switch above it; none for a Mac without
+                    // sound, whose Send Audio row says to update it.
+                    if client.macHasSound {
+                        RowDivider()
+                        Toggle(isOn: Binding(get: { client.soundMuted }, set: { client.setSoundMuted($0) })) {
+                            Text("Mute").foregroundStyle(Palette.text)
+                        }
+                        .accessibilityLabel("Mute sound from \(mac)")
+                        .accessibilityInputLabels(["Mute", "Mute sound from \(mac)"])
+                        .rowFrame()
+                        .id(Self.muteID)
+                    }
                 }
                 .id(Self.sendAudioID)
                 if send == true, let note = state.audioNote {
@@ -506,8 +523,7 @@ struct HostSettingsPanel: View {
 
     // MARK: This device
 
-    /// This device's own group, after the Mac's: Mute while the Mac has sound (Send Audio on or off), then
-    /// on an iPhone its switch for Larger Picture, then Share Clipboard while the Mac shares its clipboard,
+    /// This device's own group, after the Mac's: on an iPhone its switch for Larger Picture, then Share Clipboard while the Mac shares its clipboard,
     /// with Paste on ‹Mac› (the system's Paste control) under it while on, then Reverse Scrolling (for
     /// every Mac: it only turns this device's own deltas around), then its switch for three-finger
     /// gestures, and what each does when the Mac takes them (Take the Tour follows it). After the Mac's
@@ -525,23 +541,6 @@ struct HostSettingsPanel: View {
             .padding(.bottom, 6)
             .accessibilityAddTraits(.isHeader)
             .id(Self.gesturesGroupID)
-        // The Mac's sound, first: this device's own mute (`soundMuted`: remembered, never sent), the only
-        // control of it on the device since the bars' Sound button went (Noah, 2026-10-27). For every Mac
-        // with sound, Send Audio on or off, so a device can keep itself silent before any device turns
-        // the sound on, and the row never comes and goes with that switch; none for a Mac without sound,
-        // whose Send Audio row says to update it.
-        if client.macHasSound {
-            Rows {
-                Toggle(isOn: Binding(get: { client.soundMuted }, set: { client.setSoundMuted($0) })) {
-                    Text("Mute").foregroundStyle(Palette.text)
-                }
-                .accessibilityLabel("Mute sound from \(mac)")
-                .accessibilityInputLabels(["Mute", "Mute sound from \(mac)"])
-                .rowFrame()
-            }
-            .id(Self.muteID)
-            Footnote(text: Self.muteFooter(mac: mac, device: device))
-        }
         if offersLargerPicture {
             Rows {
                 Toggle(isOn: $largerPicture) {
@@ -596,27 +595,21 @@ struct HostSettingsPanel: View {
         Footnote(text: gesturesFooter)
     }
 
-    /// Under Send Audio's switch (docs/audio-plan.md §7.7): on, that every device hears it and how one
-    /// silences itself (Mute, under This iPad); off, what turning it on does; either way, that this
-    /// device is muted while it is; for a Mac without sound (nil), what to update. Each starts with
-    /// "Beta.".
+    /// Under Send Audio's switch and the Mute row below it (docs/audio-plan.md §7.7): on, that every
+    /// device hears it and that Mute silences this one alone; off, what turning it on does, and Mute
+    /// the same; either way, that this device is muted while it is; for a Mac without sound (nil), what
+    /// to update (no Mute row then). Each starts with "Beta.".
     static func sendAudioFooter(_ send: Bool?, muted: Bool, mac: String, device: String) -> String {
-        let mutedHere = " This \(device) is muted (Mute, below)."
+        let mute = " Mute silences it on this \(device) alone; \(mac) keeps sending and playing it."
+            + (muted ? " This \(device) is muted." : "")
         switch send {
         case true?:
-            return "Beta. Every connected device hears what streams, and \(mac) keeps playing it too."
-                + (muted ? mutedHere : " To silence only this \(device), turn on Mute below.")
+            return "Beta. Every connected device hears what streams, and \(mac) keeps playing it too." + mute
         case false?:
-            return "Beta. Turn this on to hear what streams on every connected device; \(mac) keeps playing it too."
-                + (muted ? mutedHere : "")
+            return "Beta. Turn this on to hear what streams on every connected device; \(mac) keeps playing it too." + mute
         case nil:
             return "Beta. Update Sill on \(mac) to hear its sound on this \(device)."
         }
-    }
-
-    /// Under This iPad's Mute: that it is this device's alone, and that the Mac keeps sending and playing.
-    static func muteFooter(mac: String, device: String) -> String {
-        "Silences \(mac)’s sound on this \(device) alone; \(mac) keeps sending it and playing it."
     }
 
     /// Under Reverse Scrolling's switch: what it turns around, a finger's drag over the picture and two

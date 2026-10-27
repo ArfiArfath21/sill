@@ -72,7 +72,7 @@ should not be in the main button tray but instead in settings. Sound should be a
 settings menu." Q8 and Q10 as the beta took them are revised: a device's Settings panel sets Send
 Audio for every device again (Q8's default: the host accepts a device's `sendAudio` from either door
 and Sill.app saves it as a menu click), and no bar has a Sound button (Q10): the device's own mute
-is This iPad's **Mute** switch, in the same panel. The last section, "Two switches in the device's
+is the **Mute** switch right under Send Audio (off by default). The last section, "Two switches in the device's
 Settings panel", has the changes and their checks; the sections above keep the design as it was,
 each marked where it changed.
 
@@ -313,8 +313,8 @@ the device's own delays.
   (2026-10-20):** no Sound button in Larger Picture's row 1, which stays main's (Apps, Menus while
   the Mac sent its menus, Aa, Keyboard, Desktop, Settings); there, as in a Slide Over, the panel's
   switch is the only Sound control (Q10, as the beta took it; §7.6). **Since 2026-10-27 (Noah): no
-  Sound button in any bar.** The device's own control is This iPad's **Mute** switch in the
-  Settings panel (on mutes), for every Mac with sound, Send Audio on or off (the last section).
+  Sound button in any bar.** The device's own control is the **Mute** switch right under Send Audio in the
+  Settings panel (on mutes; off by default), for every Mac with sound, Send Audio on or off (the last section).
 
 ### Not in this step
 
@@ -1065,7 +1065,7 @@ and dropped, jumps.
 **Gone since 2026-10-27** (Noah: "I've decided the audio setting should not be in the main button
 tray but instead in settings."): no bar has the Sound button, and `PhonePortraitLayout`'s `sound`,
 `menusBesideSound` and `stripBesideBoth` went with it (every bar is main's before the sound). The
-switch is This iPad's **Mute** (on mutes: `soundMuted`, remembered, never sent), first in the group,
+switch is **Mute** (on mutes: `soundMuted`, remembered, never sent), right under Send Audio (Noah, 2026-10-27: "right below the Send Audio setting"; first in This iPad until then),
 for every Mac with sound whether Send Audio is on or off (`macHasSound`: its kind 16 carries
 `sendAudio`), so a device keeps itself silent before any device turns the sound on; VoiceOver's
 label "Mute sound from ‹Mac›"; the footnote "Silences ‹Mac›’s sound on this ‹device› alone; ‹Mac›
@@ -1138,10 +1138,10 @@ thumbnail strip, as the Menus button (#36) takes its own.
   ‹Mac› to hear what streams on every connected device; ‹Mac› keeps playing it too."**; on,
   **"Beta. Every connected device hears what streams; ‹Mac› keeps playing it too. Sound mutes it
   on this ‹device› alone. Turn Send Audio off in Sill on ‹Mac›."** Since 2026-10-27: on, **"Beta.
-  Every connected device hears what streams, and ‹Mac› keeps playing it too. To silence only this
-  ‹device›, turn on Mute below."**; off, **"Beta. Turn this on to hear what streams on every
-  connected device; ‹Mac› keeps playing it too."**; either, while this device is muted, ending
-  **"This ‹device› is muted (Mute, below)."** instead of the advice; a Mac without sound, **"Beta.
+  Every connected device hears what streams, and ‹Mac› keeps playing it too. Mute silences it on
+  this ‹device› alone; ‹Mac› keeps sending and playing it."**; off, **"Beta. Turn this on to hear what
+  streams on every connected device; ‹Mac› keeps playing it too."** with the same Mute sentence;
+  either, while this device is muted, ending **"This ‹device› is muted."**; a Mac without sound, **"Beta.
   Update Sill on ‹Mac› to hear its sound on this ‹device›."**
 - **`audioNote`:** under the row, as a warning footnote.
 - **The ledger:** `SettingsField.sendAudio`, `only`, `adding`, `fields`, and rule 9
@@ -1155,7 +1155,7 @@ thumbnail strip, as the Menus button (#36) takes its own.
   `-SillMacMenu` the mock shows the Menus button too, so a photo has both at the end of the phone's
   row 2; `-SillIdiom pad` draws an iPad window's compact halves on an iPhone simulator. The mock
   answers `sendAudio` as it answers the others. No `-SillSound…` argument exists yet (checked
-  2026-09-27). **Since 2026-10-27:** `-SillSound on|muted` sets This iPad's Mute off or on (no
+  2026-09-27). **Since 2026-10-27:** `-SillSound on|muted` sets Mute off or on (no
   button), `-SillSettingsCase nosound` draws a Mac without sound (the Send Audio row off and
   disabled, "Update Sill…", no Mute; `default` is now a Mac with sound, Send Audio off),
   `-SillSettingsScroll mute` scrolls to the Mute switch, `-SillSoundToggle` and
@@ -1470,7 +1470,7 @@ rewritten for the layouts main has since #30 and #36, and Q12 says where the kin
     it); the rest of the default stands. **Revised by Noah on 2026-10-27: no Sound button in any
     bar.** "I've decided the audio setting should not be in the main button tray but instead in
     settings." The Settings panel's two switches instead: the Mac's group's Send Audio (Q8) and
-    This iPad's Mute, the device's own.
+    Mute right under it, the device's own.
 11. **Headphones unplugged.** Default: **mute and say so**, iOS's pause for a live feed. The
     alternative: keep playing on the speaker.
 12. **The kind number.** Default: **29**. 24, 25 and 27 are the Mac's menus and 26 its pointer, on
@@ -2408,3 +2408,14 @@ every heavy step paused while it was over 20):
   sent), then false. Against main's CLI (a host from the beta), the same switch: "Settings from Sill
   sound-toggle iPad (iPad17,4 simulator) refused: send audio (set on this Mac only)", and the switch
   back off by the next photo (0.2 s).
+
+### Mute right under Send Audio (2026-10-27, after the review)
+
+Noah, with the two switches on his iPad: "Mute setting should be right below the Send Audio setting",
+"And should be set to off by default." So the Mute row is the second row of Send Audio's card (a
+`RowDivider` between them, `muteID` on the row), shown while the Mac has sound (`macHasSound`), and
+This iPad's group lost it; the one footnote under the card says, Send Audio on or off, "Mute silences
+it on this ‹device› alone; ‹Mac› keeps sending and playing it." and, while muted, "This ‹device› is
+muted."; `muteFooter` is gone. Mute was off by default already (`soundMuted` reads `Sill.soundMuted`,
+false when unset); an iPad that ran the beta's bar button may carry a saved true, which the row shows.
+The results above photographed Mute first in This iPad; the panel's photos change by that row's place.
