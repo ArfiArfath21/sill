@@ -369,7 +369,7 @@ after the one that starts "Set quality". "Beta" goes on the feature, never on th
 2.2 keeps betas and trials of an app off the App Store (TestFlight is for those).
 
 ```text
-• Hear sound from your Mac in step with the picture, a beta feature that is off until you turn on Send Audio in Sill’s settings, on your Mac or your iPhone or iPad. Mute it on any device in Sill’s settings.
+• Hear sound from your Mac in step with the picture, a beta feature that is on unless you turn off Send Audio in Sill’s settings, on your Mac or your iPhone or iPad. Mute it on any device in Sill’s settings.
 ```
 
 The source is public under the Apache License 2.0 (since 2026-09-26), so the
@@ -589,7 +589,7 @@ are then 3,995 bytes (local-only 3,752), all ASCII, as this file's measure count
 last newline included). "Beta" stays on the feature, never on the app (guideline 2.2).
 
 ```text
-- Sound (optional beta feature): turn on Send Audio (Beta) in the Sill menu; the device plays it.
+- Sound (optional beta feature): Send Audio (Beta), in the Sill menu, is on; the device plays it.
 ```
 
 These are the notes as App Store Connect holds them since App Review's
@@ -844,8 +844,8 @@ Safe:
   tiles' paragraph, 232 characters, before the sound's: the draft 1,805
   characters; the rest unchanged.
 - With the sound's two switches in the device's Settings panel (Noah, 2026-10-27: Send Audio set
-  from a device for every device, Mute for each device, no Sound button), the sound's bullet 206
-  characters and the description with it 3,210 (without the line "Sill doesn’t play sound from
+  from a device for every device, Mute for each device, no Sound button), the sound's bullet 207
+  characters ("on unless you turn off", since #236) and the description with it 3,211 (without the line "Sill doesn’t play sound from
   your Mac."); the next What's New's sound paragraph 363, the draft 1,631; the review notes
   unchanged (their WHAT TO TRY line names the Sill menu, which still turns it on).
 - With Send Audio on by default on the Mac (2026-10-27, PR #236) the What's New's sound paragraph

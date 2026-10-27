@@ -1448,8 +1448,9 @@ simulator:
   every connect case shows tiles unless `-Sill.connectionStyle list` gives
   the list main showed by default before. A launch argument outranks the
   switch beside the title, so to try the switch write the default instead
-  (`xcrun simctl spawn <udid> defaults write me.saffer.sill
-  Sill.connectionStyle list`), or let `-SillStyleToggleAt <s>[,<s>…]` toggle
+  (with Sill not running, `plutil -replace Sill.connectionStyle -string list
+  "$(xcrun simctl get_app_container <udid> me.saffer.sill data)/Library/Preferences/me.saffer.sill.plist"`;
+  a `simctl spawn … defaults write` never reaches the app), or let `-SillStyleToggleAt <s>[,<s>…]` toggle
   it at those seconds after the connect screen shows, as the switch does (the
   choice is stored); the console says `connect: tiles (Sill.connectionStyle
   unset)` as each connect screen shows, and `connect: tiles → list at 4.0 s`

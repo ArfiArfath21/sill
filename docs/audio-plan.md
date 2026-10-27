@@ -48,8 +48,8 @@ a v2 feature by your earlier decision."
   permission, and the CLI prints nothing new unless asked.
 - **Now, not after v1.** BRIEF.md keeps audio out of v1 ("Out: … audio"), and this plan was written
   for after it. Noah's word on 2026-09-27 brings it forward (Q13): it is built now, and step 8
-  records the decision in BRIEF.md and CLAUDE.md. Send Audio stays off by default (Q1), so a
-  release that carries it changes nothing for anyone who leaves it off.
+  records the decision in BRIEF.md and CLAUDE.md. Send Audio stayed off by default (Q1) until
+  2026-10-27, when Noah set it on in Sill.app (PR #236; the CLI's `--audio` still opts in).
 
 **A beta (2026-10-20).** Noah, about PR #94: "Check the sound branch and see if it is polished, if
 so then merge as beta support." So Send Audio ships as a beta, off by default: the Mac's status
@@ -61,11 +61,13 @@ open questions by default, each one place to change (the last section, "The beta
 changes and their checks): Q8, Send Audio is the Mac's alone, as Share Clipboard is; Q10, no
 seventh button in Larger Picture's row 1; Q4 and Q5 as below (it plays with the silent switch on,
 and devices start unmuted); Q16 and H12, codec quality Medium at +3.9 to +4.4 points of a core in
-the harness (+4.0 on 2026-10-20), accepted while it is off by default. **What ends the beta:** P1–P16 pass on Noah's
+the harness (+4.0 on 2026-10-20), accepted while it was off by default (on in Sill.app since
+2026-10-27, so P13 now measures the default). **What ends the beta:** P1–P16 pass on Noah's
 devices (§11); H12 is met or Noah accepts the cost, with P13 (Sill.app's CPU in Activity Monitor,
 sound on and off) measured; P5 is answered (Virtual Display and a minimized app: whether
 ScreenCaptureKit still hears an app whose window moved off the main display); and P6 (the sync,
-filmed) is measured. Then the labels come off and Send Audio's default is Noah's call (Q1).
+filmed) is measured. Then the labels come off; Send Audio's default was Noah's call (Q1), taken on 2026-10-27, before
+these criteria were met: on in Sill.app.
 
 **Two switches in the device's Settings panel (2026-10-27).** Noah: "I've decided the audio setting
 should not be in the main button tray but instead in settings. Sound should be a toggle in the
@@ -288,7 +290,8 @@ the device's own delays.
 
 ### Controls
 
-- **Send Audio: a host setting, off by default in the first release with sound.**
+- **Send Audio: a host setting, off by default in the first release with sound; on by default in
+  Sill.app since 2026-10-27 (Noah, PR #236), the CLI's `--audio` opting in.**
   - The Mac keeps playing its own sound (ScreenCaptureKit does not silence the source). A device
     beside the Mac, the common case, would double every sound 60–155 ms late until someone mutes
     one of them.
@@ -1815,7 +1818,8 @@ device; test hosts on 127.0.0.1 and the software encoder, `no-device.sh` before 
 16. **The encoder's CPU.** Default: **codec quality Medium** (AudioToolbox's default), about 1 point
     of a core on a tonal signal. The alternative is Low: 0.6 points less, 3–9 dB less SNR on tonal
     sound. **Kept for the beta (2026-10-20)**, H12 unmet (+3.9 to +4.4 points of a core in the
-    harness, the gate 1.5) and accepted while Send Audio is off by default; Sill.app's real cost
+    harness, the gate 1.5) and accepted while Send Audio was off by default (on in Sill.app since 2026-10-27, so P13 measures the
+    default); Sill.app's real cost
     (P13) is one of the beta's exit criteria. Two levers if Noah wants them: Low, and two packets a
     message (about half the per-message cost, for 10.7 ms more; the wire already carries 1 to 255).
 
@@ -2208,7 +2212,8 @@ commit each on the contributor's branch, never a rebase:
 **The beta's defaults**, each one place to change: Q8 and Q10 as above; Q4 (it plays on silent, the
 support page says so) and Q5 (a device starts unmuted) kept; Q16, codec quality Medium, with H12
 unmet (+4.0 points of a core in the harness on 2026-10-20, against the gate's 1.5) and accepted
-while Send Audio is off by default, P13 (Sill.app's CPU in Activity Monitor, sound on and off) to be
+while Send Audio was off by default (on in Sill.app since 2026-10-27), P13 (Sill.app's CPU in
+Activity Monitor, sound on and off, now the default) to be
 measured before the beta ends. Left as the review left it: packets that come while muted or in the
 background still count for the cover (§7.5), so a short trip to the background can hold it at its
 bound (150 ms at home, 600 ms away) for 10 s before the sound jumps back; #152 (the stream kept

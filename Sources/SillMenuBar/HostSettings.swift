@@ -137,7 +137,8 @@ final class HostSettings {
             Key.updateCheck: true,
             // On, like the CLI: each device has its own switch, and a password manager's copies never go.
             Key.shareClipboard: base.shareClipboard,
-            // Off, like the CLI: the Mac keeps playing its own sound (docs/audio-plan.md, Q1).
+            // On, unlike the CLI (Noah, 2026-10-27: "Send Audio should be on by default"); a saved key
+            // wins. The Mac keeps playing its own sound too.
             Key.sendAudio: base.sendAudio,
             // Off: whoever can see this Mac's screen remotely could read a code (PairingWindowSharing).
             Key.showPairingWindowToScreenSharing: false,

@@ -2,7 +2,7 @@ import CoreGraphics
 
 /// The host's knobs, as one value. The CLI streams with `standard` (plus its --virtual-display and
 /// --direct-wireless flags); the menu bar app starts from `app`, the same values with the virtual display
-/// on, and lets Settings change them while it runs. Change `standard`, rebuild, measure: both pick it up.
+/// and Send Audio on, and lets Settings change them while it runs. Change `standard`, rebuild, measure: both pick it up.
 ///
 /// The coordinator takes a new value only between pipelines (inside `select`), so one pipeline
 /// never mixes two settings. See `StreamCoordinator.setTarget`.
@@ -58,8 +58,9 @@ package struct HostConfig: Equatable, Sendable {
     package var shareClipboard: Bool
     /// Send Audio: every connected device that plays the Mac's sound (its hello lists a codec) gets the
     /// sound of what streams, the streamed window's app or every app for the Desktop (AudioPipeline,
-    /// kind 43). Off by default: the Mac keeps playing its own sound, so a device beside it would
-    /// double every sound a moment late. The sound's own stream's, not the pipeline's: a change starts
+    /// kind 43). Off in `standard` (the CLI's `--audio` opts in), on in Sill.app since 2026-10-27 (`app`):
+    /// the Mac keeps playing its own sound, so a device beside it doubles every sound a moment late
+    /// until it mutes. The sound's own stream's, not the pipeline's: a change starts
     /// or stops that stream and never restarts the picture (absent from `restartNeeded`), whoever makes
     /// it. One value home or away, set from the Mac's menu and Settings, the CLI's `--audio`, or any
     /// device's Settings panel (`DeviceSettings.accepted`, then `applying` or `applyingAway` like every
@@ -88,7 +89,7 @@ package struct HostConfig: Equatable, Sendable {
     }
 
     /// The spike's knobs, formerly the `let`s at the top of the CLI's main.swift: the CLI's values, and
-    /// the app's but for the virtual display (`app`). Virtual display off here: the CLI turns it on
+    /// the app's but for the virtual display and Send Audio (`app`). Virtual display off here: the CLI turns it on
     /// with --virtual-display, which runs the AppKit loop the display needs. Direct Wireless off in
     /// both (Noah, 2026-09-24): AWDL costs every Wi-Fi stream its steadiness, and a shared network needs
     /// none of it. Remote access and internet access off in both: only the Mac's own user widens
@@ -96,8 +97,8 @@ package struct HostConfig: Equatable, Sendable {
     /// Standard (Noah, 2026-09-25): a slow connection never starts at the home quality. Require
     /// pairing on: a home door that speaks TLS admits only paired devices until the Mac's user says
     /// otherwise. Share clipboard with devices on (2026-10-14): each device has its own switch too, and
-    /// a password manager's copies never go. Send Audio off in both until Noah has tried it
-    /// (docs/audio-plan.md, Q1).
+    /// a password manager's copies never go. Send Audio off here; Sill.app's is on since 2026-10-27
+    /// (`app`).
     package static let standard = HostConfig(maxFPS: 120, captureScale: 2, bitrate: 15_000_000,
                                              awayBitrate: 4_000_000, awayCaptureScale: 1,
                                              prioritizeSpeed: false, virtualDisplay: false, directWireless: false,

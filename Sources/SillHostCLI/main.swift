@@ -9,8 +9,8 @@ import SillHostCore
 setvbuf(stdout, nil, _IOLBF, 0)
 
 // Knobs for the spike: maxFPS, captureScale, bitrate (per 60 fps), prioritizeSpeed. They live in
-// Sources/SillHost/HostConfig.swift now (`HostConfig.standard`), which is also where the menu bar
-// app's Settings start. Change, rebuild, measure.
+// Sources/SillHost/HostConfig.swift now (`HostConfig.standard`); the menu bar app's Settings start from
+// `HostConfig.app`. Change, rebuild, measure.
 var config = HostConfig.standard
 
 // Optional. Streams the first window whose app name or title matches, before any client asks.

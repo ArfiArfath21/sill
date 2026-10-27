@@ -138,7 +138,8 @@ Sill has layouts of its own.
   disconnects, or you quit Sill. With the virtual display off, a window you
   moved on your Mac meanwhile keeps its new place.
 - **The virtual display**, on unless you turn it off in the Sill menu or in
-  Sill's Settings on your Mac, moves the window you stream onto a display of
+  Sill's Settings on your Mac, or in the settings panel of Sill on your iPhone
+  or iPad, moves the window you stream onto a display of
   its own on your Mac, sized for your device, so it keeps updating when other
   windows cover it. The window leaves your Mac's screen while it streams and
   comes back where it was. The display uses a private macOS API, which is one

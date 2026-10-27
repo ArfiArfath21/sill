@@ -403,8 +403,10 @@ struct ContentView: View {
 ///   (ConnectionList.defaultStyle); `-Sill.connectionStyle list` shows the list as main did by default.
 ///   `-Sill.macGroups` writes nothing back (`'{}'` empties). A launch argument outranks what the app
 ///   saves, so under `-Sill.connectionStyle` the switch beside the title changes nothing until the next
-///   run: to try the switch, write the default instead (`xcrun simctl spawn <udid> defaults write
-///   me.saffer.sill Sill.connectionStyle list`), or let `-SillStyleToggleAt <s>[,<s>…]` toggle it at
+///   run: to try the switch, write the default instead (with Sill not running, `plutil -replace
+///   Sill.connectionStyle -string list "$(xcrun simctl get_app_container <udid> me.saffer.sill
+///   data)/Library/Preferences/me.saffer.sill.plist"`; a `simctl spawn … defaults write` never reaches
+///   the app), or let `-SillStyleToggleAt <s>[,<s>…]` toggle it at
 ///   those seconds after the connect screen shows, as the switch does (it stores the choice; the
 ///   console says "connect: tiles → list at 4.0 s, …", and "connect: tiles (Sill.connectionStyle unset)"
 ///   as each connect screen shows). With tiles, a saved Mac's session that ends keeps its picture in
