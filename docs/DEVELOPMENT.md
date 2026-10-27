@@ -694,7 +694,15 @@ first, then the click; Control-Space stayed on the device with keyboards in two
 languages and reached the host with one; Esc and Command-S reached it as keys,
 and Command-S pressed mid-composition went to the input method, nothing of it to
 the host. Again on the tree merged with main at 36e7212, the same day, with the
-same results.
+same results. With the verification's fixes, on the tree merged with main at
+c215514: a phrase typed, then Return, reached the host as its letters and one
+"\n", and what was typed was forgotten right after it; a tap on the black bars
+mid-composition sent nothing, and one on the picture the composition, then the
+click; and with a Debug step of the verification's own standing in for
+dictation (its text typed, then replaced through the range it held), a
+correction after a hardware Return sent nothing, where the build before the
+fix sent 15 backspaces and the line again, and one with no Return went as
+before.
 That simulator did not read the keyboards written to its `AppleKeyboards`
 preference; launching Sill with `-AppleLanguages '(zh-Hant-TW, en-US)'
 -AppleLocale zh_TW` (or `ko-KR`, `ja-JP`, `zh-Hans-CN`) gives it that

@@ -64,6 +64,17 @@ set up in the device's Settings decide.
   with control) with one; letters as text, ⌘S and Esc as keys, ⌘S mid-composition nowhere;
   `-SillInputTest 1` as before. The simulator takes a language's keyboards from `-AppleLanguages` and
   `-AppleLocale`, not from its `AppleKeyboards` preference.
+- Verified after the verification's fixes (2026-10-26, on the tree merged with main at c215514, #159):
+  text-composition 119 checks and 65 of 65 mutants; key-strokes 353; `run-all.sh`, all 49; the iOS app
+  Debug and Release for the simulator and Debug for a device on Xcode 27.1, only the known StreamClient
+  capture warning; the touch rig 72 of 72 against main's; a private iPad simulator (iOS 27.0) against a
+  loopback synthetic host, keys from `Tests/keyrig`, the device's bytes recorded by `sillrelay.py`:
+  "send the build", Return, "ok", Backspace, ⌘S and Esc went as the 14 letters, "\n" (then "forgot the
+  15 characters typed"), "o", "k", one backspace, ⌘S's keys and Esc's; `-SillInputTest 1` as before;
+  mid-composition (Zhuyin's 你) a scripted tap on the letterbox sent nothing, one on the picture the
+  move, 你, then the click; with an uncommitted DEBUG step standing in for dictation (`insertText`,
+  then `replace` with the range it held), a correction after a hardware Return sent nothing (2dc6c75's
+  build with the same step: 15 backspaces and "Send the build.\n") and one with no Return went as before.
 - **Untested, for Noah and #138's testers (TestFlight):** Zhuyin and Pinyin on the on-screen keyboard and
   on a Magic Keyboard (the candidates beside the composition), Japanese, Korean, dictation in Chinese and
   in English with its corrections and punctuation (nothing typed twice), Return right after dictating in
