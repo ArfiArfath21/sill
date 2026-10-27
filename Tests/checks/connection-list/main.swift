@@ -60,6 +60,30 @@ check(C.previewPlan(style: .tiles, files: ["M1.png", "M1.jpg.jpg", ".jpg", "M2.j
 check(C.previewPlan(style: .tiles, files: [], savedMacIDs: saved) == Plan(delete: [], show: []), "no files: nothing to show or delete")
 check(C.previewPlan(style: .tiles, files: ["M2.jpg", "M1.jpg"], savedMacIDs: saved).show == ["M1", "M2"], "the shown Macs in order")
 
+// Every row of one Mac shows that Mac's one picture, whatever way it reaches the Mac (Noah, 2026-10-27):
+// a network row whose tag names the saved Mac, a row taken for it by its Bonjour name alone, its Remote
+// row. Another Mac's rows show its own; a row of no saved Mac shows the placeholder.
+struct Tile: Equatable { let word: String; let macID: String?; let savedByName: String? }
+let pictures = ["M1": "M1's picture", "M2": "M2's picture"]
+func picture(_ t: Tile) -> String? { C.tileMac(macID: t.macID, savedByName: t.savedByName).flatMap { pictures[$0] } }
+let m1Wired = Tile(word: "Wired", macID: "M1", savedByName: nil)            // its tag names M1
+let m1WiFiByName = Tile(word: "Wi-Fi", macID: nil, savedByName: "M1")       // no tag, M1's Bonjour name
+let m1Remote = Tile(word: "Remote", macID: "M1", savedByName: nil)          // its saved record
+let m2Remote = Tile(word: "Remote", macID: "M2", savedByName: nil)
+let stranger = Tile(word: "Not paired", macID: nil, savedByName: nil)
+check([m1Wired, m1WiFiByName, m1Remote].map(picture) == ["M1's picture", "M1's picture", "M1's picture"],
+      "one Mac listed as Wired, Wi-Fi and Remote at once: every tile shows its one picture")
+check(picture(m2Remote) == "M2's picture" && picture(m1Remote) == "M1's picture", "two Macs: each shows its own picture")
+check(C.tileMac(macID: nil, savedByName: nil) == nil && picture(stranger) == nil, "a row of no saved Mac: the placeholder")
+check(C.tileMac(macID: nil, savedByName: "M1") == "M1", "a row taken for the saved Mac by its name alone stands for that Mac")
+check(C.tileMac(macID: "M1", savedByName: "M2") == "M1", "a row's tag names its Mac before any name does")
+check(picture(Tile(word: "Wired", macID: "M3", savedByName: nil)) == nil, "a saved Mac with no picture kept: the placeholder")
+let tileSections = C.sections(for: [m1Wired, m1WiFiByName, stranger, m1Remote, m2Remote],
+                              macID: { C.tileMac(macID: $0.macID, savedByName: $0.savedByName) }, groups: ["M1": "Home", "M2": "Work"])
+check(tileSections == [C.Section(title: "Home", items: [m1Wired, m1WiFiByName, m1Remote]),
+                       C.Section(title: "Work", items: [m2Remote]), C.Section(title: "Other", items: [stranger])],
+      "every row of one Mac is listed under its group, the row taken by its name too")
+
 // Group cleaning and JSON persistence.
 check(C.cleanGroup(nil) == nil && C.cleanGroup("   \n\t ") == nil, "blank group is nil")
 check(C.cleanGroup("  Work \n Office ") == "Work Office", "whitespace and newlines collapse")

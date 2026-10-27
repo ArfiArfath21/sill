@@ -263,7 +263,12 @@ says which Macs take it (main's Sill.app says 0.5.1 until the next release,
 and SillHost says no version; `-SillFreshKeyframe 1` asks any Mac in a Debug
 build). A session lost or ended by the Mac gives the keyframe kept. A decode
 that fails, or a picture black throughout, writes nothing, and the old picture
-stays.
+stays. Every tile of one Mac shows its one picture, whichever way the tile
+reaches it: a network or Direct row whose tag names the saved Mac, one with no
+tag taken for it by its Bonjour name (as a tap dials it), and its Remote row,
+which stays listed beside a row taken by name; another Mac's tiles show its
+own, and a row of no saved Mac the placeholder (`ConnectionList.tileMac`,
+which also lists each row under its Mac's group).
 
 A saved Mac's menu also puts it in a group, Home, Work, Personal or a name of
 your own (New Group…): grouped Macs are listed under their group's name, the
@@ -1202,9 +1207,11 @@ simulator:
 - `-SillDrawer 1`, `-SillSettings 1` (with `-SillSettingsCase …` for the
   settings of the mock Mac) and `-SillConnectCase …`: the drawer, the Settings
   panel or the connect screen in a given state.
-- `-SillConnectCase tiles`: the connect screen's tiles (five Macs, three saved
-  with a picture, in Home, Work and Other); `-SillVideoSize 1920x1080` gives
-  the pictures that shape. `-Sill.connectionStyle tiles` (or `list`) and
+- `-SillConnectCase tiles`: the connect screen's tiles (six, in Home, Work and
+  Other: the Mac mini twice, its Wired row taken for it by its name and its
+  Remote row, with its one picture; two more saved Macs with a picture each;
+  the Office iMac, not saved, and the Mac mini (2), no picture kept, with the
+  placeholder); `-SillVideoSize 1920x1080` gives the pictures that shape. `-Sill.connectionStyle tiles` (or `list`) and
   `-Sill.macGroups '{"HOMEPAIRING6":"Home"}'` set the arrangement and the
   saved Macs' groups, by Mac ID, for one run, in the mock and in the normal
   app; the groups are never written back. A launch argument outranks the

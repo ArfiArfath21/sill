@@ -6025,7 +6025,10 @@ good.
   connect screen's tiles and groups (issue #116, PR #117): `ConnectionList`
   (rows or tiles, `Sill.connectionStyle`, the rows by default; when a session's
   end keeps a picture, `takesPreview`: only with tiles, from the session's own
-  window in front, for a saved Mac; what a launch or a change of style does,
+  window in front, for a saved Mac; the saved Mac a row stands for, `tileMac`:
+  its tag's or record's, else the one it is taken for by name, so every row
+  of one Mac (Wired, Wi-Fi, Direct, Remote) shows its one picture and is listed
+  under its group; what a launch or a change of style does,
   `previewPlan`: the list hides the pictures and keeps their files, tiles show
   them again, only the files of Macs no longer saved go; the picture's size,
   `previewPixels`, 640

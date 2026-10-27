@@ -696,10 +696,18 @@ enum MockCatalog {
             client.macs = [home("Mac mini", .wifi, saved: true, homeTLS: true), studio]
             client.status = DiscoveryPolicy.reconnectLine(mac: "Mac mini", failed: DiscoveryPolicy.reconnectQuietAfter, direct: false)
         case .tiles:
-            let mini = home("Mac mini", .wifi, saved: true, homeTLS: true)
+            // The Mac mini twice, as on Noah's iPad (2026-10-27): its Wired row, taken for it by its Bonjour
+            // name (no tag of a saved Mac's, so its Remote row stays listed), and that Remote row. Both show
+            // its one picture (ConnectionList.tileMac); the Office iMac (not saved) and the Mac mini (2) (no
+            // picture kept) show the placeholder.
+            let wiredWord = DiscoveryPolicy.rowWord(door: .pairingRequired, saved: true, revoked: false, homeTLS: true,
+                                                    debug: StreamClient.debugBuild, method: .wired, cable: true)
+            let mini = FoundMac(name: "Mac mini", endpoint: .service(name: "Mac mini", type: "_sill._tcp", domain: "local.", interface: nil),
+                                route: .network, savedByName: "HOMEPAIRING8", method: .wired, door: .pairingRequired, homeWord: wiredWord)
+            let miniRemote = remote("Mac mini", "HOMEPAIRING8")
             let pro = remote("Noah Saffer’s MacBook Pro in the Studio", "A3C5HR4RBV67YR21")
             let second = remote("Mac mini (2)", "0123456789ABCDEF")
-            client.macs = [mini, studio, pro, second, home("Office iMac", .wired, saved: false)]
+            client.macs = [mini, studio, home("Office iMac", .wired, saved: false), miniRemote, pro, second]
             if client.macGroups.isEmpty {
                 client.macGroups = ["HOMEPAIRING8": "Home", "HOMEPAIRING6": "Home", "A3C5HR4RBV67YR21": "Work"]
             }

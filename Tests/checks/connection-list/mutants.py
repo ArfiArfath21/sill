@@ -12,6 +12,10 @@ MUTANTS = [
     ("a picture of a Mac not saved", "style == .tiles && sceneActive && saved", "style == .tiles && sceneActive"),
     ("a picture when any condition holds", "style == .tiles && sceneActive && saved", "style == .tiles || sceneActive || saved"),
     ("a picture only with the list", "style == .tiles && sceneActive && saved", "style == .list && sceneActive && saved"),
+    # Every row of one Mac shows its one picture (Noah, 2026-10-27).
+    ("a row taken by its name shows no picture", "        macID ?? savedByName\n", "        macID\n"),
+    ("the name before the tag", "        macID ?? savedByName\n", "        savedByName ?? macID\n"),
+    ("no row stands for a Mac", "        macID ?? savedByName\n", "        nil\n"),
     # A style never deletes a picture: the list hides them, tiles show them again (Noah, 2026-10-27).
     ("the switch to the list deletes the pictures",
      "guard style == .tiles else { return PreviewPlan(delete: delete, show: []) }",

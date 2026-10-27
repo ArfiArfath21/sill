@@ -42,6 +42,17 @@ enum ConnectionList {
         style == .tiles && sceneActive && saved
     }
 
+    /// The saved Mac a row of the connect screen stands for: whose picture its tile shows and whose group
+    /// it is listed under. The Mac its tag names (a network or Direct row) or its record (a Remote row),
+    /// else, for a row with no tag, the saved Mac it is taken for by its Bonjour name, as a tap dials it
+    /// (DiscoveryPolicy.rowMac, FoundMac.savedByName; a tag that names no saved Mac never stands for one).
+    /// So every row of one Mac, Wired, Wi-Fi, Direct and Remote, shows that Mac's one picture (Noah,
+    /// 2026-10-27: "all tiles show the same device, so should show the same preview"); another Mac's rows
+    /// show its own, and a row of no saved Mac the placeholder.
+    static func tileMac(macID: String?, savedByName: String?) -> String? {
+        macID ?? savedByName
+    }
+
     /// What a launch or a change of style (the switch beside the title, a saved Mac's menu, another Sill
     /// window) does to the tiles' pictures: the files that go and the Macs whose kept picture shows
     /// (`previewPlan`).

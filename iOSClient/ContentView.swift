@@ -337,9 +337,12 @@ struct ContentView: View {
 ///   on an "Update Sill" row) or `pairingrequired`; or `asleep` (issue #69: a saved Mac's row stays
 ///   listed and the automatic reconnect's dials of it have not connected: "Mac mini isn’t answering.
 ///   It may be asleep. Sill keeps trying, or tap it to try now."); or `tiles` (issue #116: the Macs as
-///   tiles, five of them, three saved with a picture, in Home, Work and Other: the mock's groups
-///   unless `-Sill.macGroups` gives others, and its pictures 208×132 unless `-SillVideoSize WxH` gives
-///   them that shape, 320 pt wide as a session's end keeps them). Ignored with `-SillLive 1`. The
+///   tiles, six of them in Home, Work and Other: the Mac mini twice, its Wired row taken for it by its
+///   name and its Remote row, showing its one picture (ConnectionList.tileMac), two more saved Macs with
+///   a picture each, and two with the placeholder, the Office iMac (not saved) and the Mac mini (2) (no
+///   picture kept); the mock's groups unless `-Sill.macGroups` gives others, and its pictures 208×132
+///   unless `-SillVideoSize WxH` gives them that shape, 320 pt wide as a session's end keeps them).
+///   Ignored with `-SillLive 1`. The
 ///   mock never browses; Search Nearby and a row's tap only change what it shows (see
 ///   `MockCatalog.ConnectCase`).
 /// * `-SillBrowserFail N` — in the normal app and under `-SillLive 1`: each of the first N network
@@ -1238,7 +1241,9 @@ struct ConnectScreen: View {
             .accessibilityHint("Opens the App Store.")
         }
 
-        let sections = ConnectionList.sections(for: client.macs, macID: \.macID, groups: client.macGroups)
+        // Every row of one Mac in its group, a row taken for it by its name too (ConnectionList.tileMac).
+        let sections = ConnectionList.sections(for: client.macs, macID: { ConnectionList.tileMac(macID: $0.macID, savedByName: $0.savedByName) },
+                                               groups: client.macGroups)
         if style == .list, sections.count <= 1, sections.first?.title == nil {
             ForEach(client.macs) { mac in
                 macRow(mac)
@@ -1398,7 +1403,8 @@ struct ConnectScreen: View {
 
     private func macTile(_ mac: FoundMac) -> some View {
         let highlighted = asking(mac)
-        let preview = mac.macID.flatMap { client.macPreviews[$0] }
+        // Every row of one Mac shows its one picture: Wired, Wi-Fi, Direct and Remote (ConnectionList.tileMac).
+        let preview = ConnectionList.tileMac(macID: mac.macID, savedByName: mac.savedByName).flatMap { client.macPreviews[$0] }
         return Button(action: { client.connect(to: mac) }) {
             VStack(alignment: .leading, spacing: 0) {
                 // The band sets the size; the picture fills it as an overlay, which never sizes the
