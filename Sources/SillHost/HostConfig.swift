@@ -60,10 +60,11 @@ package struct HostConfig: Equatable, Sendable {
     /// sound of what streams, the streamed window's app or every app for the Desktop (AudioPipeline,
     /// kind 43). Off by default: the Mac keeps playing its own sound, so a device beside it would
     /// double every sound a moment late. The sound's own stream's, not the pipeline's: a change starts
-    /// or stops that stream and never restarts the picture (absent from `restartNeeded`). One value
-    /// home or away, and the Mac's alone (docs/audio-plan.md, Q8, the beta's default): its menu and
-    /// Settings, or the CLI's `--audio`, set it; `DeviceSettings.accepted` refuses a device's change,
-    /// as Share Clipboard is never a device's to set.
+    /// or stops that stream and never restarts the picture (absent from `restartNeeded`), whoever makes
+    /// it. One value home or away, set from the Mac's menu and Settings, the CLI's `--audio`, or any
+    /// device's Settings panel (`DeviceSettings.accepted`, then `applying` or `applyingAway` like every
+    /// shared field: Noah, 2026-10-27, docs/audio-plan.md's Q8 as revised); each device mutes it for
+    /// itself alone, and that never reaches the Mac.
     package var sendAudio: Bool
 
     /// Every knob is required, so the compiler finds each place that builds one when a knob is added.
