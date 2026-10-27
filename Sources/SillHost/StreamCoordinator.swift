@@ -1517,8 +1517,16 @@ package final class StreamCoordinator {
                 if let resized = fitToViewport(w) { size = Self.liveBounds(of: id)?.size ?? resized }
                 describe = "\(w.owningApplication?.applicationName ?? "?") — \(w.title ?? "")\(useSoftwareEncoder ? " (software encoder)" : "")"
             }
-            let pixelScale = CaptureScale.effective(knob: captureScale, displayScale: displayScale)
-            width = evenPixels(size.width * pixelScale); height = evenPixels(size.height * pixelScale)
+            if sourceRect == nil {
+                // The window as it is, drawn 1:1 at its display's scale: an odd side rounds up, one black
+                // column or row past the window, never its pixels shrunk into one fewer (CaptureScale.windowPixels).
+                let pixels = CaptureScale.windowSize(size, knob: captureScale, displayScale: displayScale)
+                width = pixels.width; height = pixels.height
+            } else {
+                // A crop of Sill's virtual display, which ScreenCaptureKit scales to the buffer, as a display.
+                let pixelScale = CaptureScale.effective(knob: captureScale, displayScale: displayScale)
+                width = evenPixels(size.width * pixelScale); height = evenPixels(size.height * pixelScale)
+            }
             // Staged on the virtual display, nothing is activated or raised on select: the window
             // cannot be covered there, and the AX moves that put it there touch no focus.
         case .desktop:
@@ -1568,10 +1576,10 @@ package final class StreamCoordinator {
                 let fallback = "\(w.owningApplication?.applicationName ?? "?") — \(w.title ?? "")\(useSoftwareEncoder ? " (software encoder)" : "")"
                 let windowFilter = SCContentFilter(desktopIndependentWindow: w)
                 let windowScale = Self.displayScale(of: windowFilter)
-                let pixelScale = CaptureScale.effective(knob: captureScale, displayScale: windowScale)
+                let pixels = CaptureScale.windowSize(w.frame.size, knob: captureScale, displayScale: windowScale)
                 do {
                     try await startPipeline(source: source, filter: windowFilter, sourceRect: nil, displayScale: windowScale,
-                                            width: evenPixels(w.frame.width * pixelScale), height: evenPixels(w.frame.height * pixelScale),
+                                            width: pixels.width, height: pixels.height,
                                             describe: fallback, title: title, kind: kind)
                 } catch {
                     print("Could not start streaming \(fallback): \(error)")
@@ -1878,10 +1886,15 @@ package final class StreamCoordinator {
         CaptureScale.displayScale(pointPixelScale: filter.pointPixelScale)
     }
 
+    /// The display scale ScreenCaptureKit has for `w` as it is, in regular mode: its filter's, made afresh.
+    private static func displayScale(of w: SCWindow) -> CGFloat? {
+        displayScale(of: SCContentFilter(desktopIndependentWindow: w))
+    }
+
     /// The pixels a point a capture of `w` would run at now, in regular mode: the knob held to the
-    /// scale ScreenCaptureKit has for the window as it is (its filter's, made afresh).
+    /// scale ScreenCaptureKit has for the window as it is.
     private func capturePixelScale(of w: SCWindow) -> CGFloat {
-        CaptureScale.effective(knob: captureScale, displayScale: Self.displayScale(of: SCContentFilter(desktopIndependentWindow: w)))
+        CaptureScale.effective(knob: captureScale, displayScale: Self.displayScale(of: w))
     }
 
     /// "Safari — Apple Developer" for the app's menu; just the app for an untitled window.
@@ -2514,12 +2527,14 @@ package final class StreamCoordinator {
                 broadcastList()
                 return
             }
-            // The encoder is fixed to one size, so a resized window means a fresh pipeline: its size
-            // at the scale its capture would run at now (CaptureScale; a move to a display of another
-            // scale alone is `catalogPolled`'s).
+            // The encoder is fixed to one size, so a resized window means a fresh pipeline: when the
+            // size `select` would ask for it now, at the scale its capture would run at and by the same
+            // rounding, is not the encoder's (CaptureScale.windowNeedsRestart: a window whose odd side
+            // was rounded up never restarts at every poll; a move to a display of another scale alone
+            // is `catalogPolled`'s).
             if let scw = catalog.window(id: id) {
-                let s = capturePixelScale(of: scw)
-                if evenPixels(scw.frame.width * s) != encoderWidth || evenPixels(scw.frame.height * s) != encoderHeight {
+                if CaptureScale.windowNeedsRestart(encoder: (encoderWidth, encoderHeight), points: scw.frame.size,
+                                                   knob: captureScale, displayScale: Self.displayScale(of: scw)) {
                     _ = w
                     await select(active)
                     return
