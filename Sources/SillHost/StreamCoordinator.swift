@@ -97,11 +97,12 @@ package final class StreamCoordinator {
     /// input on that display's last pixel row and column at most (InputLanding).
     private var streamDisplayScale: CGFloat?
     /// Hardware HEVC normally. When a hardware session stops returning frames, or the launch probe
-    /// gets no answer, the stream runs on the software encoder at half the capture scale and up to
-    /// 60 fps, slow but alive (`enterSoftwareFallback`), until a re-check finds the hardware keeping
-    /// up with the stream again (`recheckLoop`, `hardwareIsBack`). The hardware has been stuck for
-    /// hours (2026-09-22) and busy for seconds (2026-09-24, when this used to last until the host
-    /// relaunched: 3 h at half resolution after a 1.8 s stall).
+    /// gets no answer, the stream runs on the software encoder at 1x (Standard: half the scale each
+    /// way on a Retina display, the hardware's own on a 1x one) and up to 60 fps, slow but alive
+    /// (`enterSoftwareFallback`), until a re-check finds the hardware keeping up with the stream
+    /// again (`recheckLoop`, `hardwareIsBack`). The hardware has been stuck for hours (2026-09-22)
+    /// and busy for seconds (2026-09-24, when this used to last until the host relaunched: 3 h at
+    /// half resolution, a Retina display's Standard, after a 1.8 s stall).
     private var useSoftwareEncoder = false
     private var softwareRestarts = 0
     private var lastSoftwareHangAt: CFAbsoluteTime = 0
@@ -2268,8 +2269,9 @@ package final class StreamCoordinator {
 
     // MARK: The software fallback and the way back
 
-    /// From here the software encoder carries every stream, at half the capture scale and up to 60
-    /// fps: a hardware session stopped returning frames (`afterHang`), or the launch probe got no
+    /// From here the software encoder carries every stream, at 1x (its knob is 1 at most: half the
+    /// scale each way on a Retina display, the hardware's own on a 1x one) and up to 60 fps: a
+    /// hardware session stopped returning frames (`afterHang`), or the launch probe got no
     /// answer. Busy or stuck cannot be told apart yet (a busy engine's frame comes back seconds
     /// later, and the encoder's deinit says so), so both start the re-check. A hang soon after a
     /// return means the busy spell is still on: the next check waits longer.
@@ -2289,10 +2291,13 @@ package final class StreamCoordinator {
         lastRecheck = now
         recheckDue = now + recheckInterval
         let next = Int(recheckInterval)
+        // The scale the software encoder captures at, in the capture line's words ("capturing at 1x"):
+        // `captureScale` is its knob from here, held to the stream's display (nothing streams yet at launch).
+        let at = CaptureScale.words(knob: captureScale, displayScale: streamDisplayScale)
         if afterHang {
-            print("Hardware HEVC encoder is not returning frames (busy or stuck); switching to the software encoder at half scale until the hardware keeps up again (next check in \(next) s).")
+            print("Hardware HEVC encoder is not returning frames (busy or stuck); switching to the software encoder, \(at), until the hardware keeps up again (next check in \(next) s).")
         } else {
-            print("The Mac's hardware video encoder is not answering; streaming with the software encoder at half scale until a check finds it keeping up (every \(next) s while a device is connected).")
+            print("The Mac's hardware video encoder is not answering; streaming with the software encoder, \(at), until a check finds it keeping up (every \(next) s while a device is connected).")
         }
         startRecheck()
     }

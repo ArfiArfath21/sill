@@ -4314,8 +4314,8 @@ frames submitted | completed) shows neither was a wedge:
 
 What the host does now:
 - The fallback is temporary. `enterSoftwareFallback` (a hardware hang, or the
-  launch probe) says "… (busy or stuck); switching to the software encoder at
-  half scale until the hardware keeps up again (next check in 30 s)." While a
+  launch probe) says "… (busy or stuck); switching to the software encoder,
+  capturing at 1x, until the hardware keeps up again (next check in 30 s)." While a
   device is connected (an idle host opens no session; the task ends with the
   last device) `recheckLoop` tests the hardware at the size the stream would
   have on it (the running one's at full scale, else the Desktop's):
