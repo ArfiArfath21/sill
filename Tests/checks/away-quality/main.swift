@@ -9,7 +9,9 @@
 // per 60 fps", "away points → Retina"); `effective(away:)`; a device's state shows the pair its
 // connection controls, and a change from away lands on the away pair and never on the home one, the
 // rest as at home; the whitelist is the same from both routes; who counts as away; when the away
-// quality is the target (and that the flag stays with nobody connected); and the two lines.
+// quality is the target (and that the flag stays with nobody connected); and the two lines. Also
+// HostConfig's other defaults: Share clipboard, Send Audio, and Sill.app's `app` (the CLI's
+// `standard` with the virtual display on).
 import CoreGraphics
 import Foundation
 
@@ -98,6 +100,19 @@ do {
     check(!off.applying(all).shareClipboard && !off.applyingAway(all).shareClipboard
           && standard.applying(all).shareClipboard && standard.applyingAway(all).shareClipboard,
           "a device's change never moves it, at home or away")
+}
+
+// Sill.app's defaults (HostConfig.app, which its HostSettings registers): the CLI's with the virtual
+// display on (Noah, 2026-10-27); the CLI keeps it off unless --virtual-display.
+do {
+    let app = HostConfig.app
+    check(!standard.virtualDisplay, "standard (the CLI): the virtual display off")
+    check(app.virtualDisplay, "app (Sill.app): the virtual display on")
+    var sameButVirtualDisplay = app
+    sameButVirtualDisplay.virtualDisplay = standard.virtualDisplay
+    check(sameButVirtualDisplay == standard, "app is standard but for the virtual display")
+    check(app.validated() == app, "app is valid as it is")
+    eq(standard.changes(to: app), "virtual display off → on", "changes: the one knob that differs")
 }
 
 // MARK: DeviceSettings

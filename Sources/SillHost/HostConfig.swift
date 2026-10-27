@@ -1,8 +1,8 @@
 import CoreGraphics
 
 /// The host's knobs, as one value. The CLI streams with `standard` (plus its --virtual-display and
-/// --direct-wireless flags); the menu bar app starts from the same values and lets Settings change
-/// them while it runs. Change `standard`, rebuild, measure: both pick it up.
+/// --direct-wireless flags); the menu bar app starts from `app`, the same values with the virtual display
+/// on, and lets Settings change them while it runs. Change `standard`, rebuild, measure: both pick it up.
 ///
 /// The coordinator takes a new value only between pipelines (inside `select`), so one pipeline
 /// never mixes two settings. See `StreamCoordinator.setTarget`.
@@ -23,7 +23,7 @@ package struct HostConfig: Equatable, Sendable {
     /// Apple: trades quality for encode speed; try after the baseline.
     package var prioritizeSpeed: Bool
     /// A picked window streams from its own HiDPI virtual display (see VirtualStage). Needs the
-    /// AppKit event loop, so the CLI turns it on only with --virtual-display.
+    /// AppKit event loop, so the CLI turns it on only with --virtual-display. On in Sill.app (`app`).
     package var virtualDisplay: Bool
     /// Direct Wireless Connection: peer-to-peer Wi-Fi (AWDL) on the listener and its Bonjour
     /// registration, so a device with no network in common can find and reach the Mac. Off by
@@ -86,9 +86,10 @@ package struct HostConfig: Equatable, Sendable {
         self.sendAudio = sendAudio
     }
 
-    /// The spike's knobs, formerly the `let`s at the top of the CLI's main.swift, and the app's
-    /// defaults. Virtual display off in both until Noah flips it. Direct Wireless off in both
-    /// (Noah, 2026-09-24): AWDL costs every Wi-Fi stream its steadiness, and a shared network needs
+    /// The spike's knobs, formerly the `let`s at the top of the CLI's main.swift: the CLI's values, and
+    /// the app's but for the virtual display (`app`). Virtual display off here: the CLI turns it on
+    /// with --virtual-display, which runs the AppKit loop the display needs. Direct Wireless off in
+    /// both (Noah, 2026-09-24): AWDL costs every Wi-Fi stream its steadiness, and a shared network needs
     /// none of it. Remote access and internet access off in both: only the Mac's own user widens
     /// exposure. 7455 is unassigned at IANA and below the ephemeral range. Away from home, Low ·
     /// Standard (Noah, 2026-09-25): a slow connection never starts at the home quality. Require
@@ -101,6 +102,17 @@ package struct HostConfig: Equatable, Sendable {
                                              prioritizeSpeed: false, virtualDisplay: false, directWireless: false,
                                              remoteAccess: false, remotePort: 7455, internetAccess: false,
                                              requirePairing: true, shareClipboard: true, sendAudio: false)
+
+    /// Sill.app's defaults: `standard` with the virtual display on (Noah, 2026-10-27: "have Virtual
+    /// Desktop on by default. Of course, if a user changes a setting remember their choice for future
+    /// sessions as you do now"). HostSettings registers these, so a key the Mac's user or a device ever
+    /// set (`virtualDisplay` in me.saffer.sill.mac) always wins, and only an install that never set it
+    /// streams a picked window from the virtual display by default. The CLI keeps `standard`.
+    package static let app: HostConfig = {
+        var c = standard
+        c.virtualDisplay = true
+        return c
+    }()
 
     /// The remote door's port when none is set.
     package static let defaultRemotePort = 7455

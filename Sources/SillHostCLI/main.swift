@@ -23,8 +23,9 @@ let synthetic = CommandLine.arguments.contains("--synthetic")
 
 // `SillHost --virtual-display`: a picked window is moved onto its own HiDPI virtual display and
 // that display is captured, so the window keeps repainting whatever covers its old spot on the
-// Mac. Off by default until Noah has tried it. Needs the AppKit event loop below: without it this
-// process never sees the display's modes (VirtualDisplay.swift, "Event loop").
+// Mac. Off by default here (Sill.app has it on since 2026-10-27: HostConfig.app). Needs the AppKit
+// event loop below: without it this process never sees the display's modes (VirtualDisplay.swift,
+// "Event loop").
 let virtualDisplay = CommandLine.arguments.contains("--virtual-display")
 config.virtualDisplay = virtualDisplay
 
