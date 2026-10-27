@@ -321,8 +321,8 @@ extension StreamClient {
     /// tag (`r`) and its home door (`p`, HomeDoorTXT entry by entry: a bare `p` reads as "1"). Nil
     /// when the result carries none: metadata other than `.bonjour`, or a record without an entry (an
     /// empty TXT record, one zero byte on the wire, reads so). DiscoveryPolicy.rowRecords then keeps
-    /// the last record that name carried while listed: with the USB cable pulled, iPadOS listed the
-    /// Mac on its other interfaces with none (Noah's iPad, 2026-10-27).
+    /// the last record that result carried while its browser listed it: with the USB cable pulled,
+    /// iPadOS listed the Mac on its other interfaces with none (Noah's iPad, 2026-10-27).
     static func record(of result: NWBrowser.Result) -> DiscoveryPolicy.RowRecord? {
         guard case .bonjour(let txt) = result.metadata, !txt.isEmpty else { return nil }
         let door: DiscoveryPolicy.HomeDoor
