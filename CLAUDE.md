@@ -8,6 +8,49 @@ Formerly winstream; the folder still carries the old name.
 
 ## Current step
 
+**A Mac's row keeps its TXT record when the cable goes (2026-10-27, branch `cable-unplug-row` from main
+at 74d099c, PR #232).** Noah, on the iPad mini's connect screen with the iPad on the Mac's USB cable: the
+row read "Wired", and from the moment the cable came out "Update Sill", for good. The console (Debug):
+`discovery: Noah’s MacBook Pro: Wired, seen on anpi0 (wiredEthernet), en2 (wiredEthernet), en0 (wifi)
+(p=1)`, then `…: Wired, seen on en2 (wiredEthernet), en0 (wifi) (saved Mac H6WQ… by its name
+alone)`, then `…: Wi‑Fi, seen on en0 (wifi) (saved Mac … by its name alone)`: iPadOS listed the same
+result on the interfaces left with no TXT record at all, so `rowMac` took the row by its name alone,
+`HomeDoorTXT.door` read a plain door and `rowWord`'s no-downgrade rule said "Update Sill" for a Mac seen
+over TLS (a tap dialed nothing; by the same rules the saved Mac's Remote row came beside it). Device
+only, no wire change.
+- The rule (`DiscoveryPolicy.rowRecords`, pure, `RowRecord`): a row is read with its result's own record
+  (`r`, `p`), else the last one its name carried while its browser has listed it without a break; a
+  record that comes replaces it, whatever it says; a name that leaves the browser's results is
+  forgotten (the browser's removal is the break, no timer). A row never gains a door no record gave it;
+  a tap and the reconnect dial by `homeDial` as before (pinned over TLS, never plain for a Mac seen over
+  TLS); a Mac really back on a plain door reads "Update Sill" once listed afresh; a name never listed
+  with a record reads as a plain door, as before. Known: a downgrade whose removal the browser never
+  reports keeps the old record until the name leaves (its dial pinned, failing, never plain).
+- Glue: `StreamClient.record(of:)` (nil for metadata other than `.bonjour` and for an empty record) in
+  place of `tag(of:)` and `door(of:)`; `recomputeMacs` keeps `networkRecords` and `nearbyRecords` (the
+  nearby ones cleared with its browser) and reads every row and the `homeTLS` marking through them; the
+  DEBUG test rows carry a record of their own. The `discovery:` line adds "(TXT record kept: this result
+  carries none)" or "(no TXT record)", and a plain door's word, "(no p, Update Sill)".
+- Verified: `home-device` 203 checks and 129 of 129 mutants, `home-model` 73 and 24 of 24, `policy` 458
+  (`records.swift`) and 163 of 163, `remote-rules` 144 and 76 of 76; `run-all.sh`, all 51; the three iOS
+  builds on Xcode 27.1 and the first commit's tree alone, only the known `StreamClient` capture warning.
+  Live on a private iPad mini simulator (iOS 27.0, deleted after) against `SillHost --synthetic --pairing`
+  under `_silltest._tcp` on loopback, paired at the home door. `dns-sd -R` of the host's name was renamed
+  "(2)", so a bare PTR record of it (a scratch `DNSServiceRegisterRecord` tool, lo0, no SRV or TXT) kept
+  the name listed once the host was killed, without a record (the simulator's browser lists a new name
+  only once its TXT record answers, and keeps a listed one whose record went). origin/main's build: `(saved
+  Mac … by its name alone)`, "Update Sill", "… runs an older Sill…", the Remote row beside it, nothing
+  dialed; this build: `(p=1) (TXT record kept: this result carries none)`, the row as before, no Remote
+  row, the reconnect dialing over TLS, pinned (failing there, never plain); the name gone, then a plain
+  registration of it (`dns-sd -i lo0 -R` to a plain host): `(… by its name alone) (no p, Update Sill) (no
+  TXT record)`, "Update Sill", nothing dialed. Not live: a tap then (no UI input here; the checks have it).
+- **Untested, for Noah:** a Debug build on the iPad mini, Sill.app on the Mac, the connect screen with the
+  cable in, then unplugged: the `discovery:` lines keep `(p=1)` with "(TXT record kept: this result carries
+  none)", the row reads "Wi‑Fi" (no "Update Sill", no Remote row) and a tap connects; plugged in again,
+  "Wired"; the same while streaming over the cable. And a plain CLI host under the saved Mac's name: quit
+  Sill.app and run `swift run -c release SillHost` (no `--pairing`) on that Mac: the row reads "Update
+  Sill" and a tap dials nothing.
+
 **The Mac's sound on the device: the wire, the host and Sill.app (2026-09-27,
 branch `audio` from main at 643af6b with the plan merged in from `audio-plan`
 (1fb9b71, 6e852ef) and refreshed (51520dd), main at da43f6b (PR #38) merged in
@@ -5872,7 +5915,9 @@ good.
   (`autoDesktop`; issue #69); pairing at home's rows and words, a tap's dial, the device's
   cable check and how a session at home ends: `rowWord`, `homeDial`,
   `onCable`, `rowMac`, `reconnectEnd`, `macInfoNamesSession`,
-  `removalRevokes`; pure, checked with swiftc), `StreamScreen`
+  `removalRevokes`; the TXT record each row is read with, its result's own or else the last its
+  name carried while its browser lists it, forgotten once the name leaves (`rowRecords`: the cable
+  pulled, 2026-10-27); pure, checked with swiftc), `StreamScreen`
   (landscape: top bar, thumbnails, drawer, Aa, Keyboard, Desktop; layout
   selection by size incl. Duo outer display, and `DuoLayout.phoneArrangement`,
   the idiom: which arrangement `.outerPortrait` draws; `DuoLayout.isPortrait`,

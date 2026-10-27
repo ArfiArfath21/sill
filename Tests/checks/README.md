@@ -122,7 +122,10 @@ both sides' cases and mutants, with `phone-portrait`'s 13 cases and four mutants
 all), and `tour`'s case goes (111,191); and Send Audio is the Mac's alone (Q8): `away-quality` gains
 its 12 cases and five mutants (AQ20–AQ24: 83 and 24). At its merge with main at c215514 (#159),
 `protocol`'s 234 + 8 and 42 are both sides' cases and mutants together (the sound's 221 + 8 and
-34, Reverse Scrolling's 13 and 8).
+34, Reverse Scrolling's 13 and 8). `home-device`, `home-model` and `policy` (with `records.swift`)
+grew with the `cable-unplug-row` branch (2026-10-27: the TXT record a row is read with, kept while its
+name stays listed, `rowRecords`), where the mutants of the four checks that compile
+`DiscoveryPolicy.swift` ran again, every one caught.
 
 A mutant changes the checked file in one place and must make the check fail: `run.sh --mutants`
 (or `run-all.sh --mutants`) passes only when the script's last line counts every mutant as caught.
