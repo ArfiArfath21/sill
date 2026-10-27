@@ -131,18 +131,20 @@ serves the root or `/docs`, never `/site`. So:
   `<!-- Clipboard` and `<!-- /Clipboard -->`, privacy.html's item on the device's request for the
   picture again after it was interrupted (PR #93, kind 44) between `<!-- Keyframe` and
   `<!-- /Keyframe -->`, the display wake's (PR #151, support.html's paragraph on Sill waking a
-  sleeping display) between `<!-- Display wake` and `<!-- /Display wake -->`, and the connect
+  sleeping display) between `<!-- Display wake` and `<!-- /Display wake -->`, the connect
   screen's tiles' (PR #117, privacy.html's item on the tiles' pictures and group names) between
-  `<!-- Tiles` and `<!-- /Tiles -->`. A republish before the release that ships them (for words
-  that hold for the builds already out, such as support.html's on a Mac asleep or restarted, or on
-  a black picture) deletes those blocks in the sill-site copy after the rsync below (the perl
-  lines, one per marker) and puts privacy.html's date back to the one last published; then
-  `grep -n -i clipboard ../sill-site/*.html` prints only privacy.html's log line ("which devices
-  share the clipboard", true of the builds out too, as "what you copy" in its lede and "never what
-  you copy" in both log lines are), and `grep -n -i keyframe ../sill-site/*.html`, `grep -n "wakes
-  your Mac’s display" ../sill-site/*.html` and `grep -n -i -E 'tiles|group name'
-  ../sill-site/*.html` print nothing. The release that ships each deletes its markers in `site/`
-  and keeps the words.
+  `<!-- Tiles` and `<!-- /Tiles -->`, and Reverse Scrolling's (PR #159: privacy.html's item and
+  support.html's section) between `<!-- Reverse Scrolling` and `<!-- /Reverse Scrolling -->`. A
+  republish before the release that ships them (for words that hold for the builds already out,
+  such as support.html's on a Mac asleep or restarted, or on a black picture) deletes those blocks
+  in the sill-site copy after the rsync below (the perl lines, one per marker) and puts
+  privacy.html's date back to the one last published; then `grep -n -i clipboard
+  ../sill-site/*.html` prints only privacy.html's log line ("which devices share the clipboard",
+  true of the builds out too, as "what you copy" in its lede and "never what you copy" in both log
+  lines are), and `grep -n -i keyframe ../sill-site/*.html`, `grep -n "wakes your Mac’s display"
+  ../sill-site/*.html`, `grep -n -i -E 'tiles|group name' ../sill-site/*.html` and `grep -n -i
+  'reverse scrolling' ../sill-site/*.html` print nothing. The release that ships each deletes its
+  markers in `site/` and keeps the words.
 - Once sill is public, it can serve the site itself: `git subtree push --prefix site origin gh-pages`,
   then Settings › Pages › gh-pages, / (root). Retire sill-site then.
 
@@ -153,6 +155,7 @@ perl -0pi -e 's/[ \t]*<!-- Clipboard:.*?<!-- \/Clipboard -->\n//gs' ../sill-site
 perl -0pi -e 's/[ \t]*<!-- Keyframe:.*?<!-- \/Keyframe -->\n//gs' ../sill-site/*.html   # only before the keyframe request's release (PR #93)
 perl -0pi -e 's/[ \t]*<!-- Display wake:.*?<!-- \/Display wake -->\n//gs' ../sill-site/*.html   # only before the display wake's release
 perl -0pi -e 's/[ \t]*<!-- Tiles:.*?<!-- \/Tiles -->\n//gs' ../sill-site/*.html           # only before the tiles' release
+perl -0pi -e 's/[ \t]*<!-- Reverse Scrolling:.*?<!-- \/Reverse Scrolling -->\n//gs' ../sill-site/*.html   # only before Reverse Scrolling's release
 git -C ../sill-site add -A && git -C ../sill-site commit -m "Update the site" && git -C ../sill-site push
 ```
 
