@@ -25,7 +25,9 @@ struct FoundMac: Identifiable, Hashable {
     /// stranger's until its key says otherwise.
     let savedByName: String?
     /// The row's TXT record carries a recognition tag (any, a saved Mac's or not). A row whose tag
-    /// names no saved Mac is never one (DiscoveryPolicy.rowMac, `reconnectMatches`).
+    /// names no saved Mac is never one (DiscoveryPolicy.rowMac, `reconnectMatches`). The record is
+    /// the result's own, else the last one its name carried while listed (DiscoveryPolicy.rowRecords),
+    /// and so is `door`'s.
     let carriesTag: Bool
     /// How the Mac is reachable, the word at the end of a network or Direct row ("Wired", "Wi-Fi",
     /// "Direct"), or nil when the interfaces it was seen on do not say (DiscoveryPolicy.method), and
@@ -519,6 +521,11 @@ final class StreamClient: ObservableObject {
     /// while a browser made again settles, those of the one it replaced beside them.
     private var networkResults: [NWBrowser.Result] = []
     private var nearbyResults: [NWBrowser.Result] = []
+    /// The TXT record each name those results list is read with, by browser
+    /// (DiscoveryPolicy.rowRecords): its result's own, else the last one it carried while listed.
+    /// A browser made again keeps them, as its rows keep the names it still lists.
+    private var networkRecords: [String: DiscoveryPolicy.RowRecord] = [:]
+    private var nearbyRecords: [String: DiscoveryPolicy.RowRecord] = [:]
     /// The two browsers across their rebuilds (issue #69): iOS makes a suspended app's connection to
     /// mDNSResponder defunct, so each is made again on the return from the background and after it
     /// fails (DiscoveryPolicy.rebuildBrowser).
@@ -1259,6 +1266,7 @@ final class StreamClient: ObservableObject {
         nearbyBrowser?.cancel()
         nearbyBrowser = nil
         nearbyResults = []
+        nearbyRecords = [:]
         nearbyLife.rebuildWork?.cancel()
         nearbyLife.settleWork?.cancel()
         nearbyLife = BrowserLife()
@@ -1284,7 +1292,10 @@ final class StreamClient: ObservableObject {
     /// session's Mac is on (DiscoveryPolicy.pathSightings), which `followBestPath` follows. A row
     /// whose TXT tag this device resolves is that saved Mac, whatever its Bonjour name; a result
     /// without a tag is no saved Mac (an older host, or briefly during a re-registration: the
-    /// reconnect still finds it by the Bonjour name last used with it). Then a Remote row for each
+    /// reconnect still finds it by the Bonjour name last used with it). A result without a TXT
+    /// record at all is read with the last one its name carried while its browser has listed it
+    /// (DiscoveryPolicy.rowRecords): with the USB cable pulled, iPadOS listed the Mac on its other
+    /// interfaces with none, and its row read "Update Sill" (2026-10-27). Then a Remote row for each
     /// saved Mac neither browser lists, once the network has had its 3 s. Each row also carries its
     /// home door, from its TXT record's `p`, and the word that follows from it and from what this
     /// device knows of that Mac (DiscoveryPolicy.rowWord: "Not paired", "Update Sill"…); a saved Mac
@@ -1295,38 +1306,44 @@ final class StreamClient: ObservableObject {
         if mockDiscovery { return }
         #endif
         // Each result's interfaces twice, as NWInterface, to dial on, and as the policy spells them,
-        // its TXT tag, which names a saved Mac, and its home door (`p`). `stands` is the DEBUG test
-        // rows' saved Mac (they carry no tag): the one a `-SillConnect` address counts as, and the
-        // remote session's for `-SillMoveHomeTest`'s row.
+        // and its TXT record (its tag, which names a saved Mac, and its home door, `p`), nil when it
+        // carries none. The DEBUG test rows carry a record of their own making, no tag and the door
+        // they stand for, so a kept record never changes them; `stands` is their saved Mac: the one
+        // a `-SillConnect` address counts as, and the remote session's for `-SillMoveHomeTest`'s row.
         typealias Seen = (name: String, endpoint: NWEndpoint, interfaces: [NWInterface], policy: [DiscoveryPolicy.Interface],
-                          tag: String?, door: DiscoveryPolicy.HomeDoor, stands: String?)
+                          record: DiscoveryPolicy.RowRecord?, stands: String?)
         var network: [Seen] = networkResults.map {
-            (Self.serviceName(of: $0), $0.endpoint, Array($0.interfaces), $0.interfaces.map(Self.policyInterface), Self.tag(of: $0),
-             Self.door(of: $0), nil)
+            (Self.serviceName(of: $0), $0.endpoint, Array($0.interfaces), $0.interfaces.map(Self.policyInterface), Self.record(of: $0), nil)
         }
         #if DEBUG
         // The move and path tests' rows are the -SillConnect address's Mac: with `-SillHomeDoor`, the
         // one saved Mac when exactly one is saved (docs/home-pairing-plan.md §7.9).
         let stands = Self.testHomeDoor != .plain && savedMacs.count == 1 ? savedMacs[0].macID : nil
-        network += testNetworkRows.map { ($0.name, $0.endpoint, [], [], nil, Self.testHomeDoor, stands) }
+        network += testNetworkRows.map { ($0.name, $0.endpoint, [], [], DiscoveryPolicy.RowRecord(tag: nil, door: Self.testHomeDoor), stands) }
         // The move home test's row is the remote session's saved Mac at a home door that speaks TLS
         // (`-SillMoveHomeTest`: its host runs --pairing, as Sill.app's home door does).
-        network += testHomeRows.map { ($0.name, $0.endpoint, [], [], nil, .pairingRequired, $0.macID) }
-        if let row = pathTest?.row { network.append((row.name, row.endpoint, [], row.interfaces, nil, Self.testHomeDoor, stands)) }
+        network += testHomeRows.map { ($0.name, $0.endpoint, [], [], DiscoveryPolicy.RowRecord(tag: nil, door: .pairingRequired), $0.macID) }
+        if let row = pathTest?.row {
+            network.append((row.name, row.endpoint, [], row.interfaces, DiscoveryPolicy.RowRecord(tag: nil, door: Self.testHomeDoor), stands))
+        }
         #endif
         let nearby: [Seen] = nearbyResults.map {
-            (Self.serviceName(of: $0), $0.endpoint, Array($0.interfaces), $0.interfaces.map(Self.policyInterface), Self.tag(of: $0),
-             Self.door(of: $0), nil)
+            (Self.serviceName(of: $0), $0.endpoint, Array($0.interfaces), $0.interfaces.map(Self.policyInterface), Self.record(of: $0), nil)
         }
         let rows = DiscoveryPolicy.rows(network: network.map(\.name), nearby: nearby.map { ($0.name, $0.policy.map(\.name)) })
         let now = ProcessInfo.processInfo.systemUptime
         directSince = DiscoveryPolicy.directSince(directSince, rows: rows, now: now)
         sightings = DiscoveryPolicy.sightings(sightings, listed: Set(network.map(\.name)), now: now)
         paths = DiscoveryPolicy.pathSightings(paths, network: network.map { ($0.name, $0.policy) }, now: now)
+        // The record each row is read with: its result's own, else the last one its name carried
+        // while its browser has listed it (DiscoveryPolicy.rowRecords).
+        networkRecords = DiscoveryPolicy.rowRecords(networkRecords, listed: network.map { ($0.name, $0.record) })
+        nearbyRecords = DiscoveryPolicy.rowRecords(nearbyRecords, listed: nearby.map { ($0.name, $0.record) })
+        let records = (network: networkRecords, nearby: nearbyRecords)
+        let record = { (row: (name: String, direct: Bool)) in (row.direct ? records.nearby : records.network)[row.name] }
         // A saved Mac seen with `p` has a door that speaks TLS: remembered first, so a row of it
         // without `p` (a replayed tag, or an older Sill.app put back) reads "Update Sill" at once.
-        let listed = rows.compactMap { row in (row.direct ? nearby : network).first { $0.name == row.name } }
-        let seenTLS = Set(listed.filter { $0.door != .plain }.compactMap { SavedMacs.recognize(tag: $0.tag, in: savedMacs) })
+        let seenTLS = Set(rows.compactMap(record).filter { $0.door != .plain }.compactMap { SavedMacs.recognize(tag: $0.tag, in: savedMacs) })
         if let marked = SavedMacs.seenOverTLS(seenTLS, in: savedMacs) {
             savedMacs = marked
             storeSavedMacs()
@@ -1345,14 +1362,15 @@ final class StreamClient: ObservableObject {
             guard let seen = (row.direct ? nearby : network).first(where: { $0.name == row.name }) else { return nil }
             let wired = DiscoveryPolicy.dialInterface(direct: row.direct, interfaces: seen.policy)
             let wifi = DiscoveryPolicy.wifiInterface(direct: row.direct, interfaces: seen.policy)
-            let macID = SavedMacs.recognize(tag: seen.tag, in: savedMacs) ?? seen.stands
-            let carriesTag = !(seen.tag ?? "").isEmpty
+            let read = record(row)
+            let macID = SavedMacs.recognize(tag: read?.tag, in: savedMacs) ?? seen.stands
+            let carriesTag = !(read?.tag ?? "").isEmpty
             let named = DiscoveryPolicy.rowMac(tagged: macID, carriesTag: carriesTag, name: row.name, saved: byName)
             let savedByName = named?.tagNamed == false ? named?.macID : nil
             let saved = named.flatMap { n in savedMacs.first { $0.macID == n.macID } }
             // A tag that names no saved Mac under a saved Mac's name: a Mac set up again (a new key),
             // or a look-alike; either way a tap asks, whatever its `p` (DiscoveryPolicy.rowDoor).
-            let door = DiscoveryPolicy.rowDoor(seen.door, otherTagUnderSavedName: DiscoveryPolicy.otherTagUnderSavedName(
+            let door = DiscoveryPolicy.rowDoor(read?.door ?? .plain, otherTagUnderSavedName: DiscoveryPolicy.otherTagUnderSavedName(
                 tagged: macID, carriesTag: carriesTag, name: row.name, saved: byName))
             let method = DiscoveryPolicy.method(direct: row.direct, interfaces: seen.policy)
             let word = DiscoveryPolicy.rowWord(door: door, saved: saved != nil, revoked: saved?.revoked == true,
@@ -1377,13 +1395,18 @@ final class StreamClient: ObservableObject {
         next += remote.map { FoundMac(name: $0.name, endpoint: nil, route: .remote, macID: $0.macID) }
         guard next != macs else { return }
         #if DEBUG
-        // What each row's word was read from, to check it on a device (the cable in and out).
+        // What each row's word was read from, to check it on a device (the cable in and out): its
+        // interfaces, its door and, when its result carries no TXT record, whether the row keeps the
+        // last one its name carried (DiscoveryPolicy.rowRecords).
         for mac in next where mac.route != .remote {
             let seen = (mac.direct ? nearby : network).first { $0.name == mac.name }
             let named = seen.map { s in s.interfaces.isEmpty ? s.policy.map { "\($0.name) (\($0.type))" } : s.interfaces.map { "\($0.name) (\($0.type))" } } ?? []
-            let door = mac.door == .plain ? "" : " (p=\(mac.door == .open ? "0" : "1")\(mac.homeWord == .method(mac.method) ? "" : ", \(mac.homeWord.word ?? "no word")"))"
+            let word = mac.homeWord == .method(mac.method) ? "" : ", \(mac.homeWord.word ?? "no word")"
+            let door = mac.door == .plain ? (word.isEmpty ? "" : " (no p\(word))") : " (p=\(mac.door == .open ? "0" : "1")\(word))"
             let byName = mac.savedByName.map { " (saved Mac \($0) by its name alone)" } ?? ""
-            print("discovery: \(mac.name): \(mac.method?.word ?? "no word"), seen on \(named.joined(separator: ", "))\(byName)\(door)")
+            let kept = seen == nil || seen?.record != nil ? ""
+                : record((name: mac.name, direct: mac.direct)) == nil ? " (no TXT record)" : " (TXT record kept: this result carries none)"
+            print("discovery: \(mac.name): \(mac.method?.word ?? "no word"), seen on \(named.joined(separator: ", "))\(byName)\(door)\(kept)")
         }
         #endif
         macs = next
@@ -1394,12 +1417,6 @@ final class StreamClient: ObservableObject {
             DispatchQueue.main.async { self.connect(to: mac) }
         }
         #endif
-    }
-
-    /// A result's recognition tag (TXT `r`), if it carries one.
-    static func tag(of result: NWBrowser.Result) -> String? {
-        if case .bonjour(let txt) = result.metadata { return txt[RecognitionTag.txtKey] }
-        return nil
     }
 
     /// An interface as DiscoveryPolicy spells it, case for case.
