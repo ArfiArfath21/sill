@@ -1507,8 +1507,8 @@ struct TextScaleControl: View {
     /// Whether the ruler has an Off detent (`TextScale.detents`, `TextScale.offersOff`).
     var offered = true
     /// Whether Aa can be used now (`TextScale.selectable`: only while a window streams). Otherwise
-    /// dimmed, no ruler, not adjustable, and VoiceOver hears `TextScale.unavailableHint`; its value
-    /// stays, for the next window.
+    /// dimmed, no ruler, a VoiceOver swipe changes nothing, and VoiceOver hears
+    /// `TextScale.unavailableHint`; its value stays, for the next window.
     var available = true
 
     var steps: [Double] { TextScale.detents(offered: offered) }
@@ -1558,7 +1558,8 @@ struct TextScaleControl: View {
         .zIndex(open ? 1 : 0)
         // A ruler asked open while Aa cannot be used (the harness's `-SillScaleOpen` over the Desktop)
         // folds at once; one open when the window stops streaming (closed on the Mac, the Desktop
-        // picked from another device) folds without applying (`onEnded`).
+        // picked from another device) folds without applying (`onChange(of: available)`, and `onEnded`
+        // applies nothing while Aa cannot be used).
         .onChange(of: open, initial: true) { _, isOpen in
             guard isOpen else { return }
             if available { live = position } else { open = false }
@@ -1596,24 +1597,20 @@ struct TextScaleControl: View {
         .accessibilityLabel("Text size")
         .accessibilityValue(TextScale.spoken(at: position))
         .accessibilityHint(available ? "" : TextScale.unavailableHint)
-        .modifier(AdjustableWhen(enabled: available) { direction in
+        // Always adjustable, so Aa stays one view and one accessibility element when a window starts or
+        // stops streaming: VoiceOver keeps its place on it, and the ruler's fold above runs. Dimmed, it
+        // is what a disabled slider is ("dimmed, adjustable"): a swipe changes nothing. (Adding the
+        // action only while Aa can be used made a new view and element at every change: the review of
+        // #181.)
+        .accessibilityAdjustableAction { direction in
+            guard available else { return }
             switch direction {
             case .increment: scale = TextScale.scale(at: TextScale.step(from: position, up: true, offered: offered))
             case .decrement: scale = TextScale.scale(at: TextScale.step(from: position, up: false, offered: offered))
             @unknown default: break
             }
-        })
-        .disabled(!available)     // VoiceOver: "dimmed"
-    }
-
-    /// Adjustable (swipe up or down under VoiceOver) only while Aa can be used: a dimmed Aa offers no
-    /// adjustment that would do nothing.
-    private struct AdjustableWhen: ViewModifier {
-        let enabled: Bool
-        let adjust: (AccessibilityAdjustmentDirection) -> Void
-        func body(content: Content) -> some View {
-            if enabled { content.accessibilityAdjustableAction(adjust) } else { content }
         }
+        .disabled(!available)     // VoiceOver: "dimmed"
     }
 
     /// The ruler: a track with a tick and a label at each detent that slides so the live value sits
