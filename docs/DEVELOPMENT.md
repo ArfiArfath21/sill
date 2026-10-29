@@ -511,8 +511,11 @@ window alone (`TextScale.offersOff`, from the running stream's
 `onVirtualDisplay` while a window streams). Aa sizes a window,
 never the Desktop: while the Desktop, or nothing, streams, every bar dims it,
 its ruler does not open, and VoiceOver hears "Available for a window."
-(`TextScale.selectable`; Noah, 2026-10-29). Sill for Mac 0.5.1 takes Off as a
-stop to the fitting: the window goes back only when it stops streaming.
+(`TextScale.selectable`; Noah, 2026-10-29). Sill for Mac 0.5.1 takes Off only as
+a stop to the fitting: it never puts a window it sized back (that came with
+issue #57, after 0.5.1), so the window keeps the size Sill gave it until it is
+resized on the Mac. A Mac built from main since #57 and before this change puts
+it back when it stops streaming.
 `Sources/StreamProtocol/TextScale.swift` is the rule (the detents, Off, what
 ends a fit, where Aa can be used), checked in `Tests/checks/protocol`.
 The window goes back to its own frame when it stops streaming:

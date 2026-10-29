@@ -459,7 +459,7 @@ Your Mac computers now show as tiles, each with its screen as you last left it. 
 
 Sound from your Mac, a beta feature: your iPhone or iPad plays the sound of the window you’re using, or of every app for the Desktop, a moment behind the picture. Send Audio in Sill’s settings on your iPhone or iPad, or in the Sill menu on your Mac, turns it off and on for every device, and Mute in Sill’s settings silences it on one device. It needs Sill for Mac from this release.
 
-Aa now starts at Off, which leaves your Mac’s window as it is, and sliding it back to Off puts a window Sill resized back to its own size, right away with Sill for Mac from this release (with an earlier one, when you switch windows). On Sill’s virtual display a window always fits, so Aa has no Off there. Aa is dimmed while the Desktop shows: it sizes a window.
+Aa now starts at Off, which leaves your Mac’s window as it is, and sliding it back to Off puts a window Sill resized back to its own size right away. That needs Sill for Mac from this release: with an earlier one, Off only stops the resizing. On Sill’s virtual display a window always fits, so Aa has no Off there. Aa is dimmed while the Desktop shows: it sizes a window.
 ```
 
 The sound's paragraph (PR #94) is "a beta feature", never a beta of the app (guideline 2.2), and waits,
