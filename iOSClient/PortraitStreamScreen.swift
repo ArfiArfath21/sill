@@ -168,7 +168,9 @@ struct PortraitStreamScreen: View {
     /// switch on: `PhonePortraitLayout.largerPicture(switchOn:streaming:)`); nil for the phone's usual
     /// arrangement (the switch off, the Desktop or nothing streaming), and in the halves.
     var largerKeyboard: CGFloat? = nil
-    @Binding var zoom: StreamZoom
+    /// The picture's pinch zoom (StreamScreen's; StreamZoom): not watched here, only by the picture's
+    /// own view, so a pinch redraws nothing else.
+    let zoom: StreamZoomModel
 
     private var streamShape: RoundedRectangle { RoundedRectangle(cornerRadius: 12, style: .continuous) }
     /// The Duo's fold across this screen (StreamScreen, iOS 27.1): where the halves split.
@@ -456,9 +458,8 @@ struct PortraitStreamScreen: View {
     /// the room this pane sits at the top of.
     private func picturePane(measured: Bool) -> some View {
         ZStack {
-            StreamView(client: client)
-                .scaleEffect(zoom.scale)
-                .offset(zoom.offset)
+            // Scaled and moved by the picture's zoom, inside the clip below.
+            ZoomedStreamView(client: client, zoom: zoom)
             InputOverlay(videoSize: client.videoSize,
                          send: { client.sendInput($0) },
                          setOwnPointer: { client.setOwnPointer($0, from: $1) },
@@ -467,8 +468,8 @@ struct PortraitStreamScreen: View {
                          latchedModifiers: latched,
                          onModifiersConsumed: { latched = [] },
                          sendGesture: { client.sendGesture($0, fingers: $1) },
-                         zoom: zoom,
-                         onZoomChange: { zoom = $0 })
+                         readZoom: { [zoom] in zoom.zoom },
+                         writeZoom: { [zoom] in zoom.set($0) })
         }
         .background(Palette.panel)
         .overlay(alignment: .top) { LinkLineView(text: linkLine) }

@@ -140,8 +140,11 @@ struct StreamScreen: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// The stream panel's size in points, reported by whichever layout is showing.
     @State private var panelSize: CGSize = .zero
-    /// Pinch-to-zoom state on the stream picture (issue #65).
-    @State private var zoom = StreamZoom()
+    /// The picture's pinch zoom (StreamZoom, issue #65): one per stream screen, so a turn keeps it and
+    /// the next session starts at 1×. Held, not watched (`@State`, as `overlay` is; a `@StateObject`
+    /// would redraw this whole screen at every step of a pinch): only the picture's own view watches it
+    /// (ZoomedStreamView).
+    @State private var zoom = StreamZoomModel()
     /// The viewport send waiting out its debounce, if any.
     @State private var pendingViewport: Task<Void, Never>? = nil
     /// The line over the stream while the link cannot carry the quality (docs/remote-bundle-plan.md
@@ -363,6 +366,8 @@ struct StreamScreen: View {
             #endif
         }
         .onChange(of: client.active) { _, source in
+            // Another source, whoever picked it: the whole picture again (a new frame size of the same
+            // source keeps the zoom where it is on the pane).
             zoom.reset()
             if source != .none { withAnimation(.easeOut(duration: 0.18)) { drawerOpen = false } }
             // Another source, whoever picked it: the Mac's caret is in another window (#138). A pick or a
@@ -1070,7 +1075,7 @@ struct StreamScreen: View {
                              linkLine: shownLinkLine,
                              takeTour: takeTour,
                              largerKeyboard: largerKeyboard,
-                             zoom: $zoom)
+                             zoom: zoom)
     }
 
     private var streamShape: RoundedRectangle { RoundedRectangle(cornerRadius: 12, style: .continuous) }
@@ -1080,10 +1085,10 @@ struct StreamScreen: View {
             Color.black
 
             ZStack {
-                StreamView(client: client)
-                    .scaleEffect(zoom.scale)
-                    .offset(zoom.offset)
-                // Same frame as the video, so a touch maps straight onto the streamed frame.
+                // Scaled and moved by the picture's zoom, inside the clip below.
+                ZoomedStreamView(client: client, zoom: zoom)
+                // Same frame as the video, so a touch maps straight onto the streamed frame (through the
+                // zoom, StreamZoom.unzoomedPoint).
                 InputOverlay(videoSize: client.videoSize,
                              send: { client.sendInput($0) },
                              setOwnPointer: { client.setOwnPointer($0, from: $1) },
@@ -1092,8 +1097,8 @@ struct StreamScreen: View {
                              latchedModifiers: latched,
                              onModifiersConsumed: { latched = [] },
                              sendGesture: { client.sendGesture($0, fingers: $1) },
-                             zoom: zoom,
-                             onZoomChange: { zoom = $0 })
+                             readZoom: { [zoom] in zoom.zoom },
+                             writeZoom: { [zoom] in zoom.set($0) })
             }
             .background(Palette.panel)
             .overlay(alignment: .top) { LinkLineView(text: shownLinkLine) }
