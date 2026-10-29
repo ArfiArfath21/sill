@@ -639,6 +639,24 @@ struct StreamScreen: View {
                 scaleOpen = true
             }
         }
+        // `-SillScaleScript '<s> <scale|off>[; …]'`: Aa's value set s seconds in, as the ruler's release
+        // sets it, whatever streams (a synthetic host streams only the Desktop, over which Aa is dimmed):
+        // the viewport it sends (the console's `viewport: …` line), and the host's `win.fitOff` for a
+        // scale then Off (issue #179). A test hook: the bars never send a scale while Aa is dimmed.
+        for step in (defaults.string(forKey: "SillScaleScript") ?? "").split(separator: ";") {
+            let parts = step.split(separator: " ")
+            let time = parts.count == 2 ? Double(parts[0]) : nil
+            let off = parts.count == 2 && parts[1].lowercased() == "off"
+            let scale = parts.count == 2 ? Double(parts[1]).map { TextScale.snap($0, offered: false) } : nil
+            guard let time, time >= 0, off || scale != nil else {
+                print("harness: -SillScaleScript: “\(step.trimmingCharacters(in: .whitespaces))” is not “<s> <scale|off>”; skipped")
+                continue
+            }
+            after(time) {
+                print("harness: Aa set to " + (off ? "Off" : TextScale.title(at: scale!)) + " at " + Self.points(CGFloat(time)) + " s")
+                textScale = off ? nil : scale
+            }
+        }
     }
     private static var launchArgumentsRan = false
 
@@ -677,7 +695,15 @@ struct StreamScreen: View {
             if element.isAccessibilityElement {
                 let f = element.accessibilityFrame
                 let label = element.accessibilityLabel ?? element.accessibilityValue ?? "(no label)"
-                lines.append("\(label) (\(Int(f.minX)),\(Int(f.minY)) \(Int(f.width))×\(Int(f.height)))")
+                // What VoiceOver says after the name: the value, the hint, dimmed and adjustable (Aa's
+                // Off and its dimmed state over the Desktop, issue #179).
+                var said: [String] = []
+                if element.accessibilityLabel != nil, let value = element.accessibilityValue, !value.isEmpty { said.append("value “\(value)”") }
+                if let hint = element.accessibilityHint, !hint.isEmpty { said.append("hint “\(hint)”") }
+                if element.accessibilityTraits.contains(.notEnabled) { said.append("dimmed") }
+                if element.accessibilityTraits.contains(.adjustable) { said.append("adjustable") }
+                lines.append("\(label) (\(Int(f.minX)),\(Int(f.minY)) \(Int(f.width))×\(Int(f.height)))"
+                             + (said.isEmpty ? "" : ": " + said.joined(separator: ", ")))
                 return
             }
             if let children = element.accessibilityElements, !children.isEmpty {
@@ -1480,6 +1506,10 @@ struct TextScaleControl: View {
     var iconSpacing: CGFloat = 2
     /// Whether the ruler has an Off detent (`TextScale.detents`, `TextScale.offersOff`).
     var offered = true
+    /// Whether Aa can be used now (`TextScale.selectable`: only while a window streams). Otherwise
+    /// dimmed, no ruler, not adjustable, and VoiceOver hears `TextScale.unavailableHint`; its value
+    /// stays, for the next window.
+    var available = true
 
     var steps: [Double] { TextScale.detents(offered: offered) }
     /// Padding either side of the visible ruler; two detents show each side of the thumb.
@@ -1506,10 +1536,6 @@ struct TextScaleControl: View {
                     .foregroundStyle(Palette.text)
                     .frame(height: iconBox)
             } else {
-    /// Whether Aa can be used now (`TextScale.selectable`: only while a window streams). Otherwise
-    /// dimmed, no ruler, not adjustable, and VoiceOver hears `TextScale.unavailableHint`; its value
-    /// stays, for the next window.
-    var available = true
                 Text("Aa")
                     .font(.system(size: height >= 60 ? 19 : 17, weight: .semibold))
                     .foregroundStyle(Palette.text)
@@ -1518,6 +1544,7 @@ struct TextScaleControl: View {
                 .font(.system(size: 11, weight: .medium))
                 .foregroundStyle(Palette.barLabel)
         }
+        .opacity(available ? 1 : Self.unavailableOpacity)     // dimmed: Aa sizes a window, and none streams
         .frame(width: width, height: height)
         .background(RoundedRectangle(cornerRadius: radius, style: .continuous).fill(Palette.control))
         .opacity(open ? 0 : 1)
@@ -1551,7 +1578,6 @@ struct TextScaleControl: View {
                     // slide left under the fixed thumb.
                     let dx = g.location.x - startX
                     let snapped = TextScale.snap(startValue + Double(dx / pointsPerStep) * 0.25, offered: offered)
-        .opacity(available ? 1 : Self.unavailableOpacity)     // dimmed: Aa sizes a window, and none streams
                     if snapped != live {
                         UISelectionFeedbackGenerator().selectionChanged()
                         withAnimation(.easeOut(duration: 0.1)) { live = snapped }
@@ -1562,7 +1588,8 @@ struct TextScaleControl: View {
                     // stream left a window during.
                     if available, position != live { scale = TextScale.scale(at: live) }
                     withAnimation(.easeOut(duration: 0.2)) { open = false }
-                }
+                },
+            including: available ? .all : .none      // dimmed: a touch opens nothing
         )
         .onDisappear { open = false }
         .accessibilityElement(children: .ignore)
@@ -1575,6 +1602,17 @@ struct TextScaleControl: View {
             case .decrement: scale = TextScale.scale(at: TextScale.step(from: position, up: false, offered: offered))
             @unknown default: break
             }
+        })
+        .disabled(!available)     // VoiceOver: "dimmed"
+    }
+
+    /// Adjustable (swipe up or down under VoiceOver) only while Aa can be used: a dimmed Aa offers no
+    /// adjustment that would do nothing.
+    private struct AdjustableWhen: ViewModifier {
+        let enabled: Bool
+        let adjust: (AccessibilityAdjustmentDirection) -> Void
+        func body(content: Content) -> some View {
+            if enabled { content.accessibilityAdjustableAction(adjust) } else { content }
         }
     }
 
@@ -1602,19 +1640,7 @@ struct TextScaleControl: View {
                         .foregroundStyle(value == live ? Palette.text : Palette.barLabel)
                         .frame(width: step, alignment: .center)
                         .offset(x: x(value) - step / 2, y: midY + 9)
-        })
-        .disabled(!available)     // VoiceOver: "dimmed"
-    }
-
-    /// Adjustable (swipe up or down under VoiceOver) only while Aa can be used: a dimmed Aa offers no
-    /// adjustment that would do nothing.
-    private struct AdjustableWhen: ViewModifier {
-        let enabled: Bool
-        let adjust: (AccessibilityAdjustmentDirection) -> Void
-        func body(content: Content) -> some View {
-            if enabled { content.accessibilityAdjustableAction(adjust) } else { content }
-                },
-            including: available ? .all : .none      // dimmed: a touch opens nothing
+                }
             }
             .frame(width: w, height: height, alignment: .topLeading)   // the mask below is sized to this
             .mask(
