@@ -531,10 +531,11 @@ enum TourPolicy {
         case .bar:
             var rows: [TourRow]
             // Aa sizes a window, never the Desktop (the Mac ignores a viewport's scale for it), and
-            // the first picture is the Desktop: the rows say whose text it is.
+            // the first picture is the Desktop, over which Aa is dimmed and not adjustable
+            // (TextScale.selectable): the rows say whose text it is, and VoiceOver's when to swipe.
             if voiceOver {
                 rows = [row("hand.point.up.left", [strong("Each window"), plain(" has actions: close, minimize, full screen, and move left or right. Swipe up or down to hear them.")]),
-                        row("textformat.size", [strong("Text size"), plain(" makes a window’s text on \(mac) larger or smaller. Swipe up or down on it.")])]
+                        row("textformat.size", [strong("Text size"), plain(" makes a window’s text on \(mac) larger or smaller. Swipe up or down on it while a window shows.")])]
             } else {
                 rows = [row("hand.point.up.left", [strong("Touch and hold"), plain(" a window to close, minimize or go full screen. Keep holding and drag to move it.")]),
                         row("textformat.size", [strong("Aa"), plain(": touch it and slide to make a window’s text larger or smaller.")])]

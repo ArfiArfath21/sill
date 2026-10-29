@@ -45,6 +45,14 @@ extension StreamClient {
 
     private static let localCursorDebounce: TimeInterval = 0.2
 
+    /// Whether Aa's ruler has Off: not while the Mac's virtual display is on, as this device knows its
+    /// settings (`TextScale.offersOff`). Every bar's Aa asks here.
+    var textScaleOffersOff: Bool { TextScale.offersOff(virtualDisplay: settings.displayed?.virtualDisplay) }
+
+    /// Whether Aa can be used now: only while a window streams (`TextScale.selectable`; Noah,
+    /// 2026-10-29). Every bar's Aa asks here, and the harness's `-SillScaleOpen`.
+    var textScaleSelectable: Bool { TextScale.selectable(streaming: active) }
+
     /// The session ended (`tearDown`): its last viewport and a pointer re-send still waiting go with
     /// it, so neither reaches the next connection, whose stream screen sends a viewport of its own
     /// once connected. The pointer flag stays, for that viewport to carry. Main thread.

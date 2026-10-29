@@ -913,7 +913,7 @@ check(barLarger.rows[0].symbol == "magnifyingglass" && barLarger.rows[0].spans.f
 check(barLarger.hint == "Under the picture, in the row of buttons: Apps, Aa and Keyboard.", "Larger Picture's bar hint")
 check(texts(words(.bar, F, device: "iPhone", voiceOver: true, thumbnails: false))
       == ["Apps lists the apps on Mac mini. Choose an open one again for its next window.",
-          "Text size makes a window’s text on Mac mini larger or smaller. Swipe up or down on it.",
+          "Text size makes a window’s text on Mac mini larger or smaller. Swipe up or down on it while a window shows.",
           "Keyboard types on Mac mini, on screen or with a hardware keyboard."], "Larger Picture's bar card under VoiceOver")
 check(words(.laptop, F, device: "iPhone", first: true, thumbnails: false).hint == "Under the buttons: the row of keys, then the trackpad."
       && texts(words(.laptop, F, device: "iPhone", first: true, thumbnails: false)) == texts(laptopPhone),
@@ -927,7 +927,7 @@ check([L, P].allSatisfy { layout in all.allSatisfy { words($0, layout, thumbnail
 // Under VoiceOver: no touch card, no trackpad rows, and no gesture VoiceOver cannot make.
 let barVO = words(.bar, L, voiceOver: true)
 check(texts(barVO) == ["Each window has actions: close, minimize, full screen, and move left or right. Swipe up or down to hear them.",
-                       "Text size makes a window’s text on Mac mini larger or smaller. Swipe up or down on it.",
+                       "Text size makes a window’s text on Mac mini larger or smaller. Swipe up or down on it while a window shows.",
                        "Keyboard types on Mac mini, on screen or with a hardware keyboard."], "bar under VoiceOver: \(texts(barVO))")
 let laptopVO = words(.laptop, P, voiceOver: true, first: true)
 check(laptopVO.rows.count == 2 && laptopVO.rows[0].spoken == "Command, Option, Control and Shift stay on for the next key: Command, then C, copies."

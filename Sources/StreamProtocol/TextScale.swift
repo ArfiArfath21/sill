@@ -7,7 +7,11 @@ import Foundation
 /// untouched Aa and a fit at 1× left no way back to "leave my window alone" short of reconnecting.
 ///
 /// With the virtual display on the host sizes the window on its own display and takes no scale for
-/// "off" (a nil scale means 1× there), so the control does not offer Off then (`offered` false).
+/// "off" (a nil scale means 1× there), so the control does not offer Off then (`offered` false,
+/// `offersOff`).
+///
+/// Aa sizes a window, never the Desktop (the host ignores a viewport's scale for it), so it can be
+/// used only while a window streams (`selectable`; Noah, 2026-10-29): elsewhere every bar dims it.
 ///
 /// Pure: the control (StreamScreen's `TextScaleControl`) and the host both ask here.
 public enum TextScale {
@@ -64,4 +68,23 @@ public enum TextScale {
     public static func endsFit(from previous: Double?, to now: Double?) -> Bool {
         previous != nil && now == nil
     }
+
+    /// Whether the ruler has Off, from the Mac's Virtual Display setting as the device knows it (its
+    /// settings state, kind 16): not while it is on, where no scale is 1×; offered while it is off, and
+    /// before the Mac said (an older Mac, or the state not in yet), where no scale leaves the window
+    /// alone in regular mode.
+    public static func offersOff(virtualDisplay: Bool?) -> Bool { virtualDisplay != true }
+
+    /// Whether Aa can be used while `source` streams: only a window's. The Mac sizes a window to the
+    /// device's panel at Aa's scale; it ignores the scale for the Desktop, and with nothing streaming
+    /// there is nothing to size. Noah, 2026-10-29: "it should not be selectable while you are in
+    /// desktop mode, misleading". Elsewhere every bar dims Aa, its ruler never opens and VoiceOver hears
+    /// `unavailableHint`; the scale it shows stays, for the next window.
+    public static func selectable(streaming source: StreamSource) -> Bool {
+        if case .window = source { return true }
+        return false
+    }
+
+    /// What VoiceOver hears after a dimmed Aa's name and value.
+    public static let unavailableHint = "Available for a window."
 }

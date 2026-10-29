@@ -629,7 +629,12 @@ struct StreamScreen: View {
         if defaults.bool(forKey: "SillScaleOpen") {
             after(1.5) {
                 let scale = defaults.double(forKey: "SillScale")
-                if scale > 0 { textScale = scale }
+                if scale > 0 { textScale = TextScale.scale(at: scale) }     // 0.25 is Off's place: no scale
+                // Aa sizes a window: over the Desktop, or nothing, its ruler does not open (TextScale.selectable).
+                guard client.textScaleSelectable else {
+                    print("harness: the Aa ruler stays closed: Aa is for a window, and none streams")
+                    return
+                }
                 print("harness: the Aa ruler opened")
                 scaleOpen = true
             }
@@ -1348,7 +1353,7 @@ private struct TopBar: View {
             TextScaleControl(scale: $textScale, open: $scaleOpen,
                              width: metrics.buttonWidth, height: metrics.buttonHeight,
                              pointsPerStep: metrics.buttonHeight >= 60 ? 44 : 40,
-                             offered: client.settings.displayed?.virtualDisplay != true)
+                             offered: client.textScaleOffersOff, available: client.textScaleSelectable)
                 .tourTarget(.textSize)
 
             button(open: keyboardShown, symbol: "keyboard", label: "Keyboard",
@@ -1451,12 +1456,14 @@ struct BarButton<Content: View>: View {
 
 /// The Aa control: a bar button that opens into a ruler while the finger is down, the way the
 /// camera's zoom button opens into its dial and the Dynamic Island timer scrubs. The thumb stays
-/// put at the button's centre and the ruler slides under it: five detents, 0.5× to 1.5× in 0.25
-/// steps, a tick of haptic at each. The bar fades the buttons next to it while `open` and brings
-/// them back on release, when the chosen value is applied once (every change restarts the stream,
-/// so nothing is sent mid-drag). A nil scale means the Mac window is not fitted: the leftmost detent,
-/// Off, one step below 0.5× (`TextScale`; issue #179). Off is not offered while the virtual display
-/// is on, where a nil scale is 1×.
+/// put at the button's centre and the ruler slides under it: six detents, Off and then 0.5× to 1.5×
+/// in 0.25 steps, a tick of haptic at each. The bar fades the buttons next to it while `open` and
+/// brings them back on release, when the chosen value is applied once (every change restarts the
+/// stream, so nothing is sent mid-drag). A nil scale means the Mac window is not fitted: the leftmost
+/// detent, Off, one step below 0.5× (`TextScale`; issue #179). Off is not offered while the virtual
+/// display is on, where a nil scale is 1× (`offered`). Only a window is sized by it: while anything
+/// else streams it is dimmed, its ruler never opens and VoiceOver hears why (`available`,
+/// `TextScale.selectable`; Noah, 2026-10-29).
 struct TextScaleControl: View {
     @Binding var scale: Double?
     @Binding var open: Bool
@@ -1471,7 +1478,7 @@ struct TextScaleControl: View {
     /// text, 2 pt over the value (every bar that has always had it).
     var iconBox: CGFloat? = nil
     var iconSpacing: CGFloat = 2
-    /// Whether the ruler has an Off detent (`TextScale.detents`).
+    /// Whether the ruler has an Off detent (`TextScale.detents`, `TextScale.offersOff`).
     var offered = true
 
     var steps: [Double] { TextScale.detents(offered: offered) }
@@ -1499,6 +1506,10 @@ struct TextScaleControl: View {
                     .foregroundStyle(Palette.text)
                     .frame(height: iconBox)
             } else {
+    /// Whether Aa can be used now (`TextScale.selectable`: only while a window streams). Otherwise
+    /// dimmed, no ruler, not adjustable, and VoiceOver hears `TextScale.unavailableHint`; its value
+    /// stays, for the next window.
+    var available = true
                 Text("Aa")
                     .font(.system(size: height >= 60 ? 19 : 17, weight: .semibold))
                     .foregroundStyle(Palette.text)
@@ -1518,7 +1529,14 @@ struct TextScaleControl: View {
                 .allowsHitTesting(false)
         }
         .zIndex(open ? 1 : 0)
-        .onChange(of: open, initial: true) { _, isOpen in if isOpen { live = position } }
+        // A ruler asked open while Aa cannot be used (the harness's `-SillScaleOpen` over the Desktop)
+        // folds at once; one open when the window stops streaming (closed on the Mac, the Desktop
+        // picked from another device) folds without applying (`onEnded`).
+        .onChange(of: open, initial: true) { _, isOpen in
+            guard isOpen else { return }
+            if available { live = position } else { open = false }
+        }
+        .onChange(of: available) { _, now in if !now, open { withAnimation(.easeOut(duration: 0.2)) { open = false } } }
         .contentShape(Rectangle())
         .gesture(
             DragGesture(minimumDistance: 0, coordinateSpace: .local)
@@ -1533,13 +1551,16 @@ struct TextScaleControl: View {
                     // slide left under the fixed thumb.
                     let dx = g.location.x - startX
                     let snapped = TextScale.snap(startValue + Double(dx / pointsPerStep) * 0.25, offered: offered)
+        .opacity(available ? 1 : Self.unavailableOpacity)     // dimmed: Aa sizes a window, and none streams
                     if snapped != live {
                         UISelectionFeedbackGenerator().selectionChanged()
                         withAnimation(.easeOut(duration: 0.1)) { live = snapped }
                     }
                 }
                 .onEnded { _ in
-                    if position != live { scale = TextScale.scale(at: live) }     // a plain tap on an untouched control changes nothing
+                    // A plain tap on an untouched control changes nothing, and nor does a drag the
+                    // stream left a window during.
+                    if available, position != live { scale = TextScale.scale(at: live) }
                     withAnimation(.easeOut(duration: 0.2)) { open = false }
                 }
         )
@@ -1547,7 +1568,8 @@ struct TextScaleControl: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Text size")
         .accessibilityValue(TextScale.spoken(at: position))
-        .accessibilityAdjustableAction { direction in
+        .accessibilityHint(available ? "" : TextScale.unavailableHint)
+        .modifier(AdjustableWhen(enabled: available) { direction in
             switch direction {
             case .increment: scale = TextScale.scale(at: TextScale.step(from: position, up: true, offered: offered))
             case .decrement: scale = TextScale.scale(at: TextScale.step(from: position, up: false, offered: offered))
@@ -1580,7 +1602,19 @@ struct TextScaleControl: View {
                         .foregroundStyle(value == live ? Palette.text : Palette.barLabel)
                         .frame(width: step, alignment: .center)
                         .offset(x: x(value) - step / 2, y: midY + 9)
-                }
+        })
+        .disabled(!available)     // VoiceOver: "dimmed"
+    }
+
+    /// Adjustable (swipe up or down under VoiceOver) only while Aa can be used: a dimmed Aa offers no
+    /// adjustment that would do nothing.
+    private struct AdjustableWhen: ViewModifier {
+        let enabled: Bool
+        let adjust: (AccessibilityAdjustmentDirection) -> Void
+        func body(content: Content) -> some View {
+            if enabled { content.accessibilityAdjustableAction(adjust) } else { content }
+                },
+            including: available ? .all : .none      // dimmed: a touch opens nothing
             }
             .frame(width: w, height: height, alignment: .topLeading)   // the mask below is sized to this
             .mask(
