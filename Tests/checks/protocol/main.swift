@@ -597,6 +597,32 @@ check("text scale: decrement from 0.5 stops at 0.5 without Off", TextScale.step(
 check("text scale: increment from Off reaches 0.5, and stops at 1.5", TextScale.step(from: TextScale.off, up: true, offered: true) == 0.5 && TextScale.step(from: 1.5, up: true, offered: true) == 1.5)
 check("text scale: a scale then none ends the fit", TextScale.endsFit(from: 1.0, to: nil))
 check("text scale: none then none, a scale then a scale, and none then a scale do not", !TextScale.endsFit(from: nil, to: nil) && !TextScale.endsFit(from: 1.0, to: 0.5) && !TextScale.endsFit(from: nil, to: 1.0))
+// Every detent stands for one thing and comes back to its place; only Off stands for no scale, so no
+// scale of 0.25 (Off's place) ever reaches the Mac.
+for offered in [true, false] {
+    let detents = TextScale.detents(offered: offered)
+    check("text scale (Off \(offered ? "offered" : "not offered")): every detent comes back to its place",
+          detents.allSatisfy { TextScale.position(of: TextScale.scale(at: $0), offered: offered) == $0 })
+    check("text scale (Off \(offered ? "offered" : "not offered")): only Off is no scale, and every scale is 0.5 to 1.5",
+          detents.filter { TextScale.scale(at: $0) == nil } == (offered ? [TextScale.off] : [])
+            && detents.compactMap { TextScale.scale(at: $0) }.allSatisfy { $0 >= 0.5 && $0 <= 1.5 })
+    check("text scale (Off \(offered ? "offered" : "not offered")): each detent snaps to itself, and a step up then down comes back",
+          detents.allSatisfy { TextScale.snap($0, offered: offered) == $0 }
+            && detents.dropLast().allSatisfy { TextScale.step(from: TextScale.step(from: $0, up: true, offered: offered), up: false, offered: offered) == $0 })
+}
+check("text scale: the ruler's titles left to right", TextScale.detents(offered: true).map(TextScale.title(at:)) == ["Off", "0.5×", "0.75×", "1×", "1.25×", "1.5×"])
+// Off only where no scale leaves the window alone: not with the Mac's virtual display on, where no
+// scale is 1× (an untouched Aa there reads 1×).
+check("text scale: Off offered with the virtual display off", TextScale.offersOff(virtualDisplay: false))
+check("text scale: Off offered before the Mac said (an older Mac, the state not in yet)", TextScale.offersOff(virtualDisplay: nil))
+check("text scale: no Off with the virtual display on", !TextScale.offersOff(virtualDisplay: true)
+      && TextScale.position(of: nil, offered: TextScale.offersOff(virtualDisplay: true)) == 1.0)
+// Aa only while a window streams (Noah, 2026-10-29: "it should not be selectable while you are in
+// desktop mode, misleading"): the Mac sizes a window, never the Desktop.
+check("text scale: Aa can be used while a window streams", TextScale.selectable(streaming: .window(102)) && TextScale.selectable(streaming: .window(0)))
+check("text scale: not while the Desktop streams", !TextScale.selectable(streaming: .desktop))
+check("text scale: not while nothing streams", !TextScale.selectable(streaming: .none))
+check("text scale: VoiceOver hears a dimmed Aa is for a window", TextScale.unavailableHint == "Available for a window.")
 
 print(fails == 0 ? "ALL PASS (\(passes) checks)" : "\(fails) FAILED of \(passes + fails)")
 exit(Int32(min(fails, 100)))
