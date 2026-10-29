@@ -3149,7 +3149,7 @@ display unchanged; no wire change.
   sizes on iPhone simulators); `-SillKeyboard 1` raises the keyboard for real
   in a live session; `-SillKeyboardToggle <s>[,<s>…]` toggles it as the
   Keyboard button does; `-SillDrawer`, `-SillSettings` and `-SillScaleOpen`
-  open theirs 1.5 s into a live session; `viewport: 386×241 pt, scale none,
+  open theirs 1.5 s into a live session; `viewport: 386×241 pt, scale off,
   60 fps` on the console; `-SillInputTest 1` (loopback only) runs the key
   row's and the trackpad's own code once; `-SillIdiom pad` draws an iPad
   window's arrangement on an iPhone simulator.
@@ -5617,7 +5617,10 @@ Milestone 3, scaling and the virtual display. Two paths exist; adopt the second.
   scale (`Viewport`); the host resizes the real Mac window through
   Accessibility (`WindowSizer`) to panel ÷ scale points, so text renders at
   that scale on the device. Until the slider is first touched the scale is nil
-  and the Mac window is left alone (the control shows 1×). Since 2026-10-14
+  and the Mac window is left alone (the control shows 1×; since PR #181 it
+  shows Off, a sixth detent left of 0.5×, and Off again puts a window Sill
+  sized back at once; no Off with the virtual display on; Aa dimmed unless a
+  window streams: Current step, "Aa's Off"). Since 2026-10-14
   (issue #57) the window goes back to its own frame when it stops streaming
   (`WindowRestore`; Current step, "A window Sill sized goes back"). Harness:
   `-SillScaleOpen 1` photographs the unfolded state.
@@ -7238,8 +7241,12 @@ those seconds as the Keyboard button does, and in a live session (the normal
 app with `-SillConnect`, or `-SillLive 1`) `-SillDrawer 1`, `-SillSettings 1`
 and `-SillScaleOpen 1` open theirs 1.5 s after the stream starts
 (`-SillDrawerSearch <text>`: the open drawer searches with its field's keyboard
-up). The console
-prints `viewport: 386×241 pt, scale none, 60 fps` for each viewport sent, and on
+up; the Aa ruler only while a window streams: over a synthetic host's Desktop
+Aa is dimmed and the console says the ruler stays closed;
+`-SillScaleScript '<s> <scale|off>[; …]'` sets Aa's value at those seconds as
+the ruler's release does, whatever streams, so a synthetic host's `[1s]` lines
+show `win.fitOff` for a scale then Off). The console
+prints `viewport: 386×241 pt, scale off, 60 fps` for each viewport sent, and on
 a phone upright `trackpad: …, vertical span …` and, once the keyboard has moved,
 `keyboard: up, 301 pt tall, its top at …; the key row ends 10 pt above it`.
 `-SillAXDump <s>` lists the stream screen's accessibility elements in the
