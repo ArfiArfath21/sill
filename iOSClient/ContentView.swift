@@ -99,12 +99,16 @@ struct ContentView: View {
 ///   on the Duo's simulator too, and every layout is what the size alone gives, as before.
 /// * `-SillDrawer 1` — start with the app drawer open. This, `-SillScaleOpen 1` and `-SillSettings 1`
 ///   also work in a live session (the normal app with `-SillConnect`, and `-SillLive 1`), where each
-///   opens 1.5 s after the stream screen shows, once the Desktop has started (StreamScreen).
+///   opens 1.5 s after the stream screen shows, once the Desktop has started (StreamScreen); the Aa
+///   ruler only while a window streams, so never over a synthetic host's Desktop.
 ///   `-SillDrawerSearch <text>`: the open drawer searches for that text with the keyboard up for its
 ///   field (in a live session the real keyboard), so a photo shows what the keyboard leaves in view.
 /// * `-SillScaleOpen 1` — start with the Aa slider unfolded (as while a finger holds it), where Aa
 ///   can be used: while a window streams (`-SillActive desktop` or `none`: Aa dimmed, no ruler;
 ///   TextScale.selectable); `-SillScale 1.5` sets the scale it opens at (none, or 0.25, Off's place: Off).
+///   `-SillScaleScript '<s> <scale|off>[; …]'`, in a live session, sets Aa's value s seconds in as the
+///   ruler's release does, whatever streams (a synthetic host streams only its Desktop): the console's
+///   `viewport: …` lines, and the host's `win.fitOff` in its `[1s]` lines for a scale then Off (issue #179).
 /// * `-SillWindowMenu 1` — open the first thumbnail's traffic lights and keep them open.
 /// * `-SillKeyboard 1` — start with the software keyboard shown: in the mock only the Keyboard
 ///   button lights (a real keyboard upsets the fake screen); under `-SillLive 1` and in the normal

@@ -856,8 +856,9 @@ Safe:
   says it turns it off and on; the counts above were each taken on its own branch and are read again
   at the next release (docs/release-checklist.md).
 - With Aa's Off and Aa dimmed over the Desktop (PR #181, issue #179; Noah, 2026-10-29), a paragraph
-  of 355 characters at the end of the next What's New: the draft 2,243 characters with main at
-  35a9c47c merged in; the rest unchanged.
+  of 371 characters at the end of the next What's New (its review, 2026-10-29: the instant return
+  needs Sill for Mac from this release, an earlier one only stops the resizing): the draft 2,258
+  characters, without the block's last newline, with main at 150479b5 merged in; the rest unchanged.
 - The encryption key, now in `iOSClient/Info.plist`: Release builds of this
   branch for the simulator and for a device each have
   `"ITSAppUsesNonExemptEncryption" => false` in the built Sill.app's
