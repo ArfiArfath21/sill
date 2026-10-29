@@ -1477,7 +1477,13 @@ struct TextScaleControl: View {
     var steps: [Double] { TextScale.detents(offered: offered) }
     /// Padding either side of the visible ruler; two detents show each side of the thumb.
     static let sliderInset: CGFloat = 30
-    var sliderWidth: CGFloat { pointsPerStep * CGFloat(steps.count - 1) + Self.sliderInset * 2 }
+    /// The ruler's frame shows two detents either side of the thumb, whatever the detents: Off's
+    /// sixth slides in as the finger nears it. So every bar's ruler keeps the width it had with five,
+    /// and a phone's row 1 the room it was laid out for (PhonePortraitLayout's `rulerSpans`).
+    static let detentsEachSide = 2
+    var sliderWidth: CGFloat { pointsPerStep * CGFloat(2 * Self.detentsEachSide) + Self.sliderInset * 2 }
+    /// How much of itself a dimmed Aa shows.
+    static let unavailableOpacity = 0.35
 
     @State private var live: Double = 1.0
     @State private var startValue: Double = 1.0
@@ -1550,8 +1556,8 @@ struct TextScaleControl: View {
         }
     }
 
-    /// The ruler: a track with five ticks and labels that slides so the live value sits under the
-    /// fixed thumb; the ends fade out where they run past the panel.
+    /// The ruler: a track with a tick and a label at each detent that slides so the live value sits
+    /// under the fixed thumb; the ends fade out where they run past the frame (two detents each side).
     private var slider: some View {
         let w = sliderWidth
         let step = pointsPerStep
