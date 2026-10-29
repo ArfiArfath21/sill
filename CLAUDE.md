@@ -12,8 +12,10 @@ Formerly winstream; the folder still carries the old name.
 `aa-off`; issue #179, taschaub).** Noah's decisions of 2026-10-29: the Off detent ("off makes more sense
 than 1x"), and Aa not selectable while the Desktop streams ("misleading"). `TextScale` (pure,
 StreamProtocol; `Tests/checks/protocol`) holds Aa's detents: Off, one step left of 0.5×, is no scale (the
-Mac leaves the window alone) and an untouched Aa reads Off; Off only while the Mac's virtual display is off
-(`offersOff`: no scale is 1× there, so an untouched Aa reads 1×); Aa usable only while a window streams
+Mac leaves the window alone) and an untouched Aa reads Off; no Off while the window streams on the Mac's virtual
+display (`offersOff`: no scale is 1× there, so an untouched Aa reads 1×), judged by the running stream's
+`onVirtualDisplay` while a window streams (the review: Virtual Display on with the window streaming in place has
+Off), else by the setting; Aa usable only while a window streams
 (`selectable`): over the Desktop or nothing every bar (sideways, the halves, a phone's row 1, the Duo's)
 dims it to 35 %, its ruler never opens, a ruler open when the window stops streaming folds without
 applying, VoiceOver hears "Text size, Off, dimmed, Available for a window." and no adjustment; the value

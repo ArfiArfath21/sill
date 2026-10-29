@@ -45,9 +45,15 @@ extension StreamClient {
 
     private static let localCursorDebounce: TimeInterval = 0.2
 
-    /// Whether Aa's ruler has Off: not while the Mac's virtual display is on, as this device knows its
-    /// settings (`TextScale.offersOff`). Every bar's Aa asks here.
-    var textScaleOffersOff: Bool { TextScale.offersOff(virtualDisplay: settings.displayed?.virtualDisplay) }
+    /// Whether Aa's ruler has Off (`TextScale.offersOff`): not while the window streams on the Mac's
+    /// virtual display, by the running stream the Mac reports while a window streams (Virtual Display
+    /// can be on while the window streams in place), else by the Mac's Virtual Display setting as this
+    /// device knows it. Every bar's Aa asks here.
+    var textScaleOffersOff: Bool {
+        var windowOnVirtualDisplay: Bool? = nil
+        if case .window = active { windowOnVirtualDisplay = settings.host?.stream?.onVirtualDisplay }
+        return TextScale.offersOff(virtualDisplay: settings.displayed?.virtualDisplay, windowOnVirtualDisplay: windowOnVirtualDisplay)
+    }
 
     /// Whether Aa can be used now: only while a window streams (`TextScale.selectable`; Noah,
     /// 2026-10-29). Every bar's Aa asks here, and the harness's `-SillScaleOpen`.

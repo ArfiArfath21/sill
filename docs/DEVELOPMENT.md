@@ -502,8 +502,13 @@ window is resized until Aa is set. Off again puts the windows Sill sized back
 to their own frames at once, as when they stop streaming, and the stream
 restarts at the window's own size; the `[1s]` lines count it as `win.fitOff`.
 Only the device whose own scale it was ends a fit that way: another device's
-viewport without a scale ends nobody's. With the virtual display on, Aa has no
-Off (no scale is 1× there, so an untouched Aa reads 1×). Aa sizes a window,
+viewport without a scale ends nobody's. While a window streams on the virtual
+display Aa has no Off (no scale is 1× there, so an untouched Aa reads 1×); with
+Virtual Display on but the window streaming where it is (the virtual display
+not available on that macOS, off for the session, or a staging that failed:
+the Settings panel's note says which), Off is there, since no scale leaves the
+window alone (`TextScale.offersOff`, from the running stream's
+`onVirtualDisplay` while a window streams). Aa sizes a window,
 never the Desktop: while the Desktop, or nothing, streams, every bar dims it,
 its ruler does not open, and VoiceOver hears "Available for a window."
 (`TextScale.selectable`; Noah, 2026-10-29). Sill for Mac 0.5.1 takes Off as a

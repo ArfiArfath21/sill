@@ -617,6 +617,18 @@ check("text scale: Off offered with the virtual display off", TextScale.offersOf
 check("text scale: Off offered before the Mac said (an older Mac, the state not in yet)", TextScale.offersOff(virtualDisplay: nil))
 check("text scale: no Off with the virtual display on", !TextScale.offersOff(virtualDisplay: true)
       && TextScale.position(of: nil, offered: TextScale.offersOff(virtualDisplay: true)) == 1.0)
+// While a window streams, where it streams decides (the review, 2026-10-29): Virtual Display on with the
+// window streaming in place (the virtual display not available on that macOS, off for the session, or a
+// staging that failed) leaves it alone with no scale, so Off is offered and an untouched Aa reads Off;
+// a window still on the virtual display after the setting went off reads 1× until it restarts.
+check("text scale: Off with Virtual Display on when the window streams in place", TextScale.offersOff(virtualDisplay: true, windowOnVirtualDisplay: false)
+      && TextScale.position(of: nil, offered: TextScale.offersOff(virtualDisplay: true, windowOnVirtualDisplay: false)) == TextScale.off)
+check("text scale: no Off while the window streams on the virtual display", !TextScale.offersOff(virtualDisplay: true, windowOnVirtualDisplay: true)
+      && !TextScale.offersOff(virtualDisplay: false, windowOnVirtualDisplay: true) && !TextScale.offersOff(virtualDisplay: nil, windowOnVirtualDisplay: true))
+check("text scale: Off while the window streams in place, whatever the setting says", TextScale.offersOff(virtualDisplay: false, windowOnVirtualDisplay: false)
+      && TextScale.offersOff(virtualDisplay: nil, windowOnVirtualDisplay: false))
+check("text scale: with no window streaming the setting decides", TextScale.offersOff(virtualDisplay: false, windowOnVirtualDisplay: nil)
+      && !TextScale.offersOff(virtualDisplay: true, windowOnVirtualDisplay: nil) && TextScale.offersOff(virtualDisplay: nil, windowOnVirtualDisplay: nil))
 // Aa only while a window streams (Noah, 2026-10-29: "it should not be selectable while you are in
 // desktop mode, misleading"): the Mac sizes a window, never the Desktop.
 check("text scale: Aa can be used while a window streams", TextScale.selectable(streaming: .window(102)) && TextScale.selectable(streaming: .window(0)))

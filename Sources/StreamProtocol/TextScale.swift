@@ -6,9 +6,11 @@ import Foundation
 /// the control shows that detent as "Off", one step below 0.5×: a control that showed 1× for both an
 /// untouched Aa and a fit at 1× left no way back to "leave my window alone" short of reconnecting.
 ///
-/// With the virtual display on the host sizes the window on its own display and takes no scale for
-/// "off" (a nil scale means 1× there), so the control does not offer Off then (`offered` false,
-/// `offersOff`).
+/// On the virtual display the host sizes the window on its own display and takes no scale for "off"
+/// (a nil scale means 1× there), so the control does not offer Off while a window streams there
+/// (`offered` false, `offersOff`). It does where the window streams in place with Virtual Display on
+/// (the virtual display not available on that macOS, off for the session, or a staging that failed):
+/// there a nil scale leaves the window alone again.
 ///
 /// Aa sizes a window, never the Desktop (the host ignores a viewport's scale for it), so it can be
 /// used only while a window streams (`selectable`; Noah, 2026-10-29): elsewhere every bar dims it.
@@ -69,11 +71,20 @@ public enum TextScale {
         previous != nil && now == nil
     }
 
-    /// Whether the ruler has Off, from the Mac's Virtual Display setting as the device knows it (its
-    /// settings state, kind 16): not while it is on, where no scale is 1×; offered while it is off, and
-    /// before the Mac said (an older Mac, or the state not in yet), where no scale leaves the window
-    /// alone in regular mode.
-    public static func offersOff(virtualDisplay: Bool?) -> Bool { virtualDisplay != true }
+    /// Whether the ruler has Off: only where no scale leaves the window alone, which is everywhere but
+    /// a window on the Mac's virtual display (no scale is 1× there). While a window streams, where it
+    /// streams decides (`windowOnVirtualDisplay`: the running stream's `onVirtualDisplay` in the Mac's
+    /// settings state, kind 16, which goes out before the window list that names the window): the
+    /// Virtual Display setting can be on while the window streams in place (the virtual display not
+    /// available on that macOS, off for the session after a problem, or a staging that failed), and
+    /// there Off is back; a window still staged after the setting went off keeps 1× until its restart.
+    /// Otherwise (nothing or the Desktop streams, or the Mac has not said) the setting as the device
+    /// knows it: not while it is on; offered while it is off, and before the Mac said (an older Mac, or
+    /// the state not in yet), where no scale leaves the window alone in regular mode.
+    public static func offersOff(virtualDisplay: Bool?, windowOnVirtualDisplay: Bool? = nil) -> Bool {
+        if let staged = windowOnVirtualDisplay { return !staged }
+        return virtualDisplay != true
+    }
 
     /// Whether Aa can be used while `source` streams: only a window's. The Mac sizes a window to the
     /// device's panel at Aa's scale; it ignores the scale for the Desktop, and with nothing streaming
