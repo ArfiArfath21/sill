@@ -1059,7 +1059,11 @@ package final class StreamCoordinator {
             // Per connection: another device's viewport without a scale ends nobody's fit.
             let previousScale = fitScales[id]
             fitScales[id] = v.scale
-            if TextScale.endsFit(from: previousScale, to: v.scale) { restoreFits(keeping: nil) }
+            var restored = false
+            if TextScale.endsFit(from: previousScale, to: v.scale) {
+                Stats.shared.bump("win.fitOff")
+                restored = restoreFits(keeping: nil)
+            }
             viewport = v
             clientFPS[id] = v.fps ?? 60
             // The flip its connection made waited for this, its rate (`flipAwaits`): the restart the
@@ -1067,6 +1071,9 @@ package final class StreamCoordinator {
             let flipWaited = flipWait == id
             if flipWaited { flipWait = nil }
             if switching { viewportArrivedWhileSwitching = true; return }   // select's defer applies both
+            // The streamed window went back to its own size: the stream restarts at it now, as after a
+            // fit (`applyViewportToActiveWindow`), not at the catalog's next look up to 2 s later.
+            if restored { await catalog.refreshWindows() }
             await applyViewportToActiveWindow()
             if flipWaited { await applyPending() }
         case .pairingWanted:
@@ -2225,13 +2232,20 @@ package final class StreamCoordinator {
     /// moved through the element its first fit matched, as the virtual display's restore moves a window.
     /// A window the virtual display holds goes home with the stage, to the frame `stageHome` gave it:
     /// only when Quit or a signal lands while `select` waits in `prepare`. One line for each window acted
-    /// on; none for one gone or already home.
-    private func restoreFits(keeping keep: CGWindowID?) {
+    /// on; none for one gone or already home. Returns whether a window was put back (a restore that
+    /// went through), for Aa's Off, after which the stream restarts at the window's own size.
+    @discardableResult
+    private func restoreFits(keeping keep: CGWindowID?) -> Bool {
         var windows = WindowSizer.AXWindows(sizer: sizer)
+        var putBack = false
         for s in fits.restore(keeping: keep, staged: stage.placement?.windowID, on: &windows) {
-            if case .restore = s.decision { Stats.shared.bump(s.done ? "win.restored" : "win.restoreFailed") }
+            if case .restore = s.decision {
+                Stats.shared.bump(s.done ? "win.restored" : "win.restoreFailed")
+                putBack = putBack || s.done
+            }
             if let line = s.line { print(line) }
         }
+        return putBack
     }
 
     /// Where a window Sill sized would go back to now, for the virtual display's stage to keep as its
