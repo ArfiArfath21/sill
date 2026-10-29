@@ -8,6 +8,36 @@ Formerly winstream; the folder still carries the old name.
 
 ## Current step
 
+**Aa's Off, and Aa only for a window (2026-10-29, ArfiArfath21's PR #181 with maintainer edits, branch
+`aa-off`; issue #179, taschaub).** Noah's decisions of 2026-10-29: the Off detent ("off makes more sense
+than 1x"), and Aa not selectable while the Desktop streams ("misleading"). `TextScale` (pure,
+StreamProtocol; `Tests/checks/protocol`) holds Aa's detents: Off, one step left of 0.5×, is no scale (the
+Mac leaves the window alone) and an untouched Aa reads Off; Off only while the Mac's virtual display is off
+(`offersOff`: no scale is 1× there, so an untouched Aa reads 1×); Aa usable only while a window streams
+(`selectable`): over the Desktop or nothing every bar (sideways, the halves, a phone's row 1, the Duo's)
+dims it to 35 %, its ruler never opens, a ruler open when the window stops streaming folds without
+applying, VoiceOver hears "Text size, Off, dimmed, Available for a window." and no adjustment; the value
+stays for the next window. The ruler's frame shows two detents each side of the thumb whatever the
+detents (`TextScaleControl.detentsEachSide`): every bar's ruler keeps main's width, a phone's row 1 its
+room (the contributor's grew a step and ran past the phone's row). Host: a device's viewport going from a
+scale to none (`TextScale.endsFit`, per connection, `fitScales`) puts the windows Sill sized back at once
+(`restoreFits`: whole, its own size where it was moved, left if resized on the Mac) and looks at the
+catalog again, so the stream restarts at the window's own size; `win.fitOff` in the `[1s]` lines. Sill for
+Mac 0.5.1 takes Off as a stop to the fitting (the window goes back when it stops streaming). The tour's
+VoiceOver row: "Swipe up or down on it while a window shows." DEBUG: `-SillScaleScript '<s>
+<scale|off>[; …]'`, the AX dump's value, hint and traits. Verified: protocol 266 + 8 checks and 57 of 57
+mutants (15 TextScale's), window-restore 41,936 (the model's Off from one of two devices: each stop where the
+person expects it) and 95 of 95, run-all 56; the
+three iOS builds (only the StreamClient capture warning) and `swift build -c release` (only CaptureProbe's);
+harness photos in every bar (iPad and phone sizes on 27.0, the Duo's four on an iPhone Duo on 27.1) at the
+default and accessibility-extra-large sizes against main's build: Aa closed at 1× and the ruler at 1.25×
+pixel for pixel main's, the ruler at 1× main's but for the track's faint left end; live against a synthetic
+host: Aa dimmed over its Desktop, VoiceOver's words, viewports 1 → off → 1.25 → off, `win.fitOff 1` at each
+Off. Untested, for Noah: on the iPad with Virtual Display off, Aa on a window to 1.25×, then Off: the window
+back to its own size at once (Sill.log's "Restored …"), and a later pick of it not resized; Aa dimmed over
+the Desktop, VoiceOver too; the ruler's six detents in each bar; with Virtual Display on, no Off and 1×
+untouched; two devices (only the one whose scale it was ends the fit by Off).
+
 **Pinch to zoom (2026-10-28/29, addhumal's PR #196 with maintainer edits; issue #65).** Noah's decisions of
 2026-10-19/20: pinch to zoom, not a slider; Photos-like, centred on the point between the fingers, the Mac's cursor
 not involved; a slight pinch out stays zoomed and only a pinch all the way out (or a lift within 2 % of it) gives the
