@@ -72,17 +72,19 @@ public enum TextScale {
     }
 
     /// Whether the ruler has Off: only where no scale leaves the window alone, which is everywhere but
-    /// a window on the Mac's virtual display (no scale is 1× there). While a window streams, where it
-    /// streams decides (`windowOnVirtualDisplay`: the running stream's `onVirtualDisplay` in the Mac's
-    /// settings state, kind 16, which goes out before the window list that names the window): the
-    /// Virtual Display setting can be on while the window streams in place (the virtual display not
-    /// available on that macOS, off for the session after a problem, or a staging that failed), and
-    /// there Off is back; a window still staged after the setting went off keeps 1× until its restart.
-    /// Otherwise (nothing or the Desktop streams, or the Mac has not said) the setting as the device
-    /// knows it: not while it is on; offered while it is off, and before the Mac said (an older Mac, or
-    /// the state not in yet), where no scale leaves the window alone in regular mode.
-    public static func offersOff(virtualDisplay: Bool?, windowOnVirtualDisplay: Bool? = nil) -> Bool {
-        if let staged = windowOnVirtualDisplay { return !staged }
+    /// a window on the Mac's virtual display (no scale is 1× there). While a window streams (`source`),
+    /// where it streams decides (`onVirtualDisplay`: the running stream's, in the Mac's settings state,
+    /// kind 16, which goes out before the window list that names the window): the Virtual Display
+    /// setting can be on while the window streams in place (the virtual display not available on that
+    /// macOS, off for the session after a problem, or a staging that failed), and there Off is back; a
+    /// window still staged after the setting went off keeps 1× until its restart. Otherwise (nothing
+    /// or the Desktop streams, whose running stream says nothing of a window, or the Mac has not said)
+    /// the setting as the device knows it: not while it is on, where the next window goes on Sill's
+    /// display; offered while it is off, and before the Mac said (an older Mac, or the state not in
+    /// yet), where no scale leaves the window alone in regular mode.
+    public static func offersOff(virtualDisplay: Bool?, streaming source: StreamSource = .none,
+                                 onVirtualDisplay: Bool? = nil) -> Bool {
+        if case .window = source, let staged = onVirtualDisplay { return !staged }
         return virtualDisplay != true
     }
 

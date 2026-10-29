@@ -50,9 +50,8 @@ extension StreamClient {
     /// can be on while the window streams in place), else by the Mac's Virtual Display setting as this
     /// device knows it. Every bar's Aa asks here.
     var textScaleOffersOff: Bool {
-        var windowOnVirtualDisplay: Bool? = nil
-        if case .window = active { windowOnVirtualDisplay = settings.host?.stream?.onVirtualDisplay }
-        return TextScale.offersOff(virtualDisplay: settings.displayed?.virtualDisplay, windowOnVirtualDisplay: windowOnVirtualDisplay)
+        TextScale.offersOff(virtualDisplay: settings.displayed?.virtualDisplay, streaming: active,
+                            onVirtualDisplay: settings.host?.stream?.onVirtualDisplay)
     }
 
     /// Whether Aa can be used now: only while a window streams (`TextScale.selectable`; Noah,

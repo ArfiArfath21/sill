@@ -621,14 +621,26 @@ check("text scale: no Off with the virtual display on", !TextScale.offersOff(vir
 // window streaming in place (the virtual display not available on that macOS, off for the session, or a
 // staging that failed) leaves it alone with no scale, so Off is offered and an untouched Aa reads Off;
 // a window still on the virtual display after the setting went off reads 1× until it restarts.
-check("text scale: Off with Virtual Display on when the window streams in place", TextScale.offersOff(virtualDisplay: true, windowOnVirtualDisplay: false)
-      && TextScale.position(of: nil, offered: TextScale.offersOff(virtualDisplay: true, windowOnVirtualDisplay: false)) == TextScale.off)
-check("text scale: no Off while the window streams on the virtual display", !TextScale.offersOff(virtualDisplay: true, windowOnVirtualDisplay: true)
-      && !TextScale.offersOff(virtualDisplay: false, windowOnVirtualDisplay: true) && !TextScale.offersOff(virtualDisplay: nil, windowOnVirtualDisplay: true))
-check("text scale: Off while the window streams in place, whatever the setting says", TextScale.offersOff(virtualDisplay: false, windowOnVirtualDisplay: false)
-      && TextScale.offersOff(virtualDisplay: nil, windowOnVirtualDisplay: false))
-check("text scale: with no window streaming the setting decides", TextScale.offersOff(virtualDisplay: false, windowOnVirtualDisplay: nil)
-      && !TextScale.offersOff(virtualDisplay: true, windowOnVirtualDisplay: nil) && TextScale.offersOff(virtualDisplay: nil, windowOnVirtualDisplay: nil))
+let aWindow = StreamSource.window(102)
+check("text scale: Off with Virtual Display on when the window streams in place", TextScale.offersOff(virtualDisplay: true, streaming: aWindow, onVirtualDisplay: false)
+      && TextScale.position(of: nil, offered: TextScale.offersOff(virtualDisplay: true, streaming: aWindow, onVirtualDisplay: false)) == TextScale.off)
+check("text scale: no Off while the window streams on the virtual display", !TextScale.offersOff(virtualDisplay: true, streaming: aWindow, onVirtualDisplay: true)
+      && !TextScale.offersOff(virtualDisplay: false, streaming: aWindow, onVirtualDisplay: true) && !TextScale.offersOff(virtualDisplay: nil, streaming: aWindow, onVirtualDisplay: true))
+check("text scale: Off while the window streams in place, whatever the setting says", TextScale.offersOff(virtualDisplay: false, streaming: aWindow, onVirtualDisplay: false)
+      && TextScale.offersOff(virtualDisplay: nil, streaming: aWindow, onVirtualDisplay: false))
+check("text scale: a window the Mac has not reported yet goes by the setting", TextScale.offersOff(virtualDisplay: false, streaming: aWindow, onVirtualDisplay: nil)
+      && !TextScale.offersOff(virtualDisplay: true, streaming: aWindow, onVirtualDisplay: nil) && TextScale.offersOff(virtualDisplay: nil, streaming: aWindow, onVirtualDisplay: nil))
+// The Desktop's running stream, or nothing's, says nothing of where a window goes (the review, 2026-10-29):
+// the setting decides there, so a dimmed Aa over the Desktop keeps the reading the next window will have:
+// 1× with Virtual Display on, though the Desktop's stream is never on the virtual display.
+check("text scale: over the Desktop or nothing the setting decides, whatever their stream says",
+      [StreamSource.desktop, .none].allSatisfy { s in
+          [Bool?.none, false, true].allSatisfy { on in
+              !TextScale.offersOff(virtualDisplay: true, streaming: s, onVirtualDisplay: on)
+                  && TextScale.offersOff(virtualDisplay: false, streaming: s, onVirtualDisplay: on)
+                  && TextScale.offersOff(virtualDisplay: nil, streaming: s, onVirtualDisplay: on) } })
+check("text scale: the Desktop with Virtual Display on reads 1× untouched, as the next window will",
+      TextScale.position(of: nil, offered: TextScale.offersOff(virtualDisplay: true, streaming: .desktop, onVirtualDisplay: false)) == 1.0)
 // Aa only while a window streams (Noah, 2026-10-29: "it should not be selectable while you are in
 // desktop mode, misleading"): the Mac sizes a window, never the Desktop.
 check("text scale: Aa can be used while a window streams", TextScale.selectable(streaming: .window(102)) && TextScale.selectable(streaming: .window(0)))
