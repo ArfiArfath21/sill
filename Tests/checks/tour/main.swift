@@ -847,7 +847,7 @@ check(words(.touch, L, mac: "").subtitle == "What you do here happens on your Ma
 let barL = words(.bar, L)
 check(barL.title == "Windows and Text Size" && barL.subtitle == nil, "bar: title, no subtitle")
 check(texts(barL) == ["Touch and hold a window to close, minimize or go full screen. Keep holding and drag to move it.",
-                      "Aa: touch it and slide to make a window’s text larger or smaller.",
+                      "Aa: while a window shows, touch it and slide to make its text larger or smaller.",
                       "Keyboard types on Mac mini, on screen or with a hardware keyboard."], "bar sideways: \(texts(barL))")
 check(barL.rows.map(\.symbol) == ["hand.point.up.left", "textformat.size", "keyboard"], "bar's symbols")
 check(texts(words(.bar, P)) == Array(texts(barL).prefix(2)), "bar upright: no Keyboard row (it is a cap)")
@@ -906,7 +906,7 @@ check(words(.laptop, F, device: "iPhone", voiceOver: true, first: true).rows.map
 // as with the thumbnails.
 let barLarger = words(.bar, F, device: "iPhone", thumbnails: false)
 check(texts(barLarger) == ["Apps lists the apps on Mac mini: tap an open one again for its next window.",
-                           "Aa: touch it and slide to make a window’s text larger or smaller.",
+                           "Aa: while a window shows, touch it and slide to make its text larger or smaller.",
                            "Keyboard types on Mac mini, on screen or with a hardware keyboard."], "Larger Picture's bar card: \(texts(barLarger))")
 check(barLarger.rows[0].symbol == "magnifyingglass" && barLarger.rows[0].spans.first == TourSpan(text: "Apps", strong: true)
       && barLarger.title == "Windows and Text Size" && barLarger.subtitle == nil, "Apps' row: the button's symbol and name")

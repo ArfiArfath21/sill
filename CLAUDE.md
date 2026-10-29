@@ -26,8 +26,9 @@ scale to none (`TextScale.endsFit`, per connection, `fitScales`) puts the window
 (`restoreFits`: whole, its own size where it was moved, left if resized on the Mac) and looks at the
 catalog again, so the stream restarts at the window's own size; `win.fitOff` in the `[1s]` lines. Sill for
 Mac 0.5.1 takes Off only as a stop to the fitting: it never puts a window back (#57 came after it). The tour's
-VoiceOver row: "Swipe up or down on it while a window shows." DEBUG: `-SillScaleScript '<s>
-<scale|off>[; …]'`, the AX dump's value, hint and traits. Verified: protocol 266 + 8 checks and 57 of 57
+rows say when: "Aa: while a window shows, touch it and slide …" (the review) and VoiceOver's "Swipe up or
+down on it while a window shows." DEBUG: `-SillScaleScript '<s> <scale|off>[; …]'`, the AX dump's value,
+hint and traits. Verified: protocol 266 + 8 checks and 57 of 57
 mutants (15 TextScale's), window-restore 41,936 (the model's Off from one of two devices: each stop where the
 person expects it) and 95 of 95, run-all 56; the
 three iOS builds (only the StreamClient capture warning) and `swift build -c release` (only CaptureProbe's);
