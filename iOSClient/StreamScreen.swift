@@ -580,6 +580,40 @@ struct StreamScreen: View {
                       + (largerPictureHeld != nil ? "; the Settings panel is open, so it applies when the panel closes" : ""))
             }
         }
+        // `-SillZoom 'S@X,Y[; T S@X,Y …]'`: the picture's zoom for photos (StreamZoom): at T seconds (1
+        // without one), one pinch step of factor S about that fraction of the picture's pane (its middle
+        // without one), then the lift's settle, as two fingers would leave it: `2.5@0.3,0.4`, then
+        // `3 0.1` for a pinch all the way out. In the mock too.
+        for (time, factor, point) in Self.zoomSteps(defaults.string(forKey: "SillZoom") ?? "") {
+            after(time) {
+                var z = zoom.zoom
+                let size = z.pane
+                guard size.width > 0, size.height > 0 else { print("harness: -SillZoom: no picture pane yet"); return }
+                let at = CGPoint(x: point.x * size.width, y: point.y * size.height)
+                z.pinch(factor: factor, from: at, to: at, in: size)
+                z.settle()
+                zoom.set(z)
+                print("harness: -SillZoom \(factor)@\(point.x),\(point.y): " + Self.zoomLine(z))
+            }
+        }
+        // `-SillHitTest 'S x,y[; x,y …]'`: at S seconds, what UIKit's hit test finds at each point of the
+        // window (its points), for the zoom's gate: a zoomed picture never under the bar's or the keys'
+        // touches (StreamZoom; HEVCDisplayView takes none).
+        let probe = (defaults.string(forKey: "SillHitTest") ?? "").split(separator: ";").map { $0.split(separator: " ").map(String.init) }
+        if let first = probe.first, first.count == 2, let time = Double(first[0]) {
+            let points = ([first[1]] + probe.dropFirst().compactMap { $0.first }).compactMap { item -> CGPoint? in
+                let xy = item.split(separator: ",").compactMap { Double($0) }
+                return xy.count == 2 ? CGPoint(x: xy[0], y: xy[1]) : nil
+            }
+            after(time) {
+                guard let window = UIApplication.shared.connectedScenes.compactMap({ ($0 as? UIWindowScene)?.keyWindow }).first else { return }
+                for point in points {
+                    let hit = window.hitTest(point, with: nil)
+                    print("harness: hit test at (\(Self.points(point.x)), \(Self.points(point.y))): "
+                          + (hit.map { String(describing: type(of: $0)) } ?? "nothing") + ", the zoom " + Self.zoomLine(zoom.zoom))
+                }
+            }
+        }
         guard live else { return }
         client.runSoundArguments()
         if defaults.bool(forKey: "SillDrawer") {
@@ -602,6 +636,26 @@ struct StreamScreen: View {
         }
     }
     private static var launchArgumentsRan = false
+
+    /// `-SillZoom`'s steps: (seconds, factor, the fraction of the pane); none for what does not read.
+    static func zoomSteps(_ text: String) -> [(Double, CGFloat, CGPoint)] {
+        text.split(separator: ";").compactMap { item in
+            let words = item.split(separator: " ", omittingEmptySubsequences: true)
+            guard words.count == 1 || words.count == 2 else { return nil }
+            let time = words.count == 2 ? Double(words[0]) : 1
+            let parts = words[words.count - 1].split(separator: "@")
+            guard let time, time >= 0, let factor = Double(parts[0]), factor > 0, parts.count <= 2 else { return nil }
+            let xy = parts.count == 2 ? parts[1].split(separator: ",").compactMap { Double($0) } : [0.5, 0.5]
+            guard xy.count == 2 else { return nil }
+            return (time, CGFloat(factor), CGPoint(x: xy[0], y: xy[1]))
+        }
+    }
+
+    /// "2.50×, offset (125.0, 60.0) in a 1000×650 pt pane", for the console.
+    static func zoomLine(_ z: StreamZoom) -> String {
+        String(format: "%.2f×, offset (%.1f, %.1f) in a %@×%@ pt pane", z.scale, z.offset.width, z.offset.height,
+               points(z.pane.width), points(z.pane.height))
+    }
 
     /// `-SillAXDump`: walks the key window as an assistive technology does (an element, else its
     /// `accessibilityElements`, else its element count, else its subviews) and prints one line per
